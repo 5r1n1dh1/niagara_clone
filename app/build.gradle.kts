@@ -1,4 +1,6 @@
 import com.google.gms.googleservices.GoogleServicesPlugin.MissingGoogleServicesStrategy
+import java.io.FileInputStream
+import java.security.KeyStore
 
 plugins {
   alias(libs.plugins.android.application)
@@ -31,13 +33,29 @@ android {
       keyPassword = "android"
     }
     create("release") {
-      val keystorePath = System.getenv("KEYSTORE_PATH") ?: "${rootDir}/my-upload-key.jks"
+      val envKeystore = System.getenv("KEYSTORE_PATH")
+      val keystorePath = envKeystore ?: "${rootDir}/my-upload-key.jks"
       val keystoreFile = file(keystorePath)
-      val storePass = System.getenv("STORE_PASSWORD") ?: System.getenv("KEYSTORE_PASSWORD")
-      val keyPass = System.getenv("KEY_PASSWORD") ?: storePass
+      val storePass = System.getenv("STORE_PASSWORD") ?: System.getenv("KEYSTORE_PASSWORD") ?: System.getenv("KEYSTORE_PASS")
+      val keyPass = System.getenv("KEY_PASSWORD") ?: System.getenv("KEY_PASS") ?: storePass
       val alias = System.getenv("KEY_ALIAS") ?: "upload"
 
-      if (keystoreFile.exists() && keystoreFile.length() > 100L && !storePass.isNullOrBlank()) {
+      var isValidKeystore = false
+      if (keystoreFile.exists() && keystoreFile.length() > 0 && !storePass.isNullOrBlank()) {
+        try {
+          val ks = KeyStore.getInstance(KeyStore.getDefaultType())
+          FileInputStream(keystoreFile).use { stream ->
+            ks.load(stream, storePass.toCharArray())
+          }
+          if (ks.containsAlias(alias) && ks.getKey(alias, (keyPass ?: storePass).toCharArray()) != null) {
+            isValidKeystore = true
+          }
+        } catch (_: Exception) {
+          isValidKeystore = false
+        }
+      }
+
+      if (isValidKeystore) {
         storeFile = keystoreFile
         storePassword = storePass
         keyAlias = alias
