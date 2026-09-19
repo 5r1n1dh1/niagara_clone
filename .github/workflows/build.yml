@@ -16,6 +16,11 @@ on:
           - debug
           - release
           - both
+      skip_tests:
+        description: 'Skip Unit Tests'
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   build:
@@ -26,6 +31,7 @@ jobs:
       KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
       KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
       KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
 
     steps:
       - name: Checkout Repository
@@ -50,25 +56,48 @@ jobs:
           fi
           chmod +x gradlew
 
-      - name: Prepare Environment Files
+      - name: Prepare Environment Files and Keystore
         run: |
           # Create empty .env file if missing so secrets gradle plugin doesn't fail
           if [ ! -f .env ]; then
             touch .env
             echo "Created empty .env file"
           fi
-          # Restore debug.keystore from base64 if available
+
+          # 1. Attempt to restore debug.keystore from debug.keystore.base64 if present
           if [ -f debug.keystore.base64 ] && [ ! -f debug.keystore ]; then
-            base64 -d debug.keystore.base64 > debug.keystore
-            echo "Restored debug.keystore from base64"
+            echo "Decoding debug.keystore from debug.keystore.base64..."
+            base64 -d debug.keystore.base64 > debug.keystore 2>/dev/null || true
           fi
 
+          # 2. If debug.keystore is missing or zero-sized, generate a standard Android debug keystore
+          if [ ! -f debug.keystore ] || [ ! -s debug.keystore ]; then
+            echo "debug.keystore not found. Generating standard Android debug keystore with keytool..."
+            keytool -genkey -v \
+              -keystore debug.keystore \
+              -storepass android \
+              -alias androiddebugkey \
+              -keypass android \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -dname "CN=Android Debug,O=Android,C=US"
+          fi
+
+          echo "Debug keystore status:"
+          ls -l debug.keystore
+
       - name: Run Unit Tests
-        run: ./gradlew testDebugUnitTest --no-daemon --stacktrace
+        if: ${{ github.event.inputs.skip_tests != 'true' && github.event.inputs.skip_tests != true }}
+        run: |
+          set -o pipefail
+          ./gradlew testDebugUnitTest --no-daemon --stacktrace 2>&1 | tee gradle-test.log
 
       - name: Build Debug APK
         if: ${{ github.event.inputs.build_type == 'debug' || github.event.inputs.build_type == 'both' || github.event_name == 'push' || github.event_name == 'pull_request' }}
-        run: ./gradlew assembleDebug --no-daemon --stacktrace
+        run: |
+          set -o pipefail
+          ./gradlew assembleDebug --no-daemon --stacktrace 2>&1 | tee gradle-build.log
 
       - name: Upload Debug APK Artifact
         if: ${{ github.event.inputs.build_type == 'debug' || github.event.inputs.build_type == 'both' || github.event_name == 'push' || github.event_name == 'pull_request' }}
@@ -89,7 +118,9 @@ jobs:
 
       - name: Build Release APK
         if: ${{ github.event.inputs.build_type == 'release' || github.event.inputs.build_type == 'both' }}
-        run: ./gradlew assembleRelease --no-daemon --stacktrace
+        run: |
+          set -o pipefail
+          ./gradlew assembleRelease --no-daemon --stacktrace 2>&1 | tee -a gradle-build.log
 
       - name: Upload Release APK Artifact
         if: ${{ github.event.inputs.build_type == 'release' || github.event.inputs.build_type == 'both' }}
@@ -99,3 +130,138 @@ jobs:
           path: app/build/outputs/apk/release/*.apk
           if-no-files-found: warn
           retention-days: 30
+
+      - name: Send Failure Logs to Google AI Studio
+        if: failure()
+        run: |
+          python3 - << 'EOF'
+          import os, sys, glob, json, urllib.request, urllib.error
+
+          api_key = os.environ.get("GEMINI_API_KEY", "").strip()
+          if not api_key:
+              print("ℹ️ GEMINI_API_KEY secret not configured in repository. Skipping Google AI Studio analysis.")
+              summary_file = os.environ.get("GITHUB_STEP_SUMMARY")
+              if summary_file:
+                  with open(summary_file, "a", encoding="utf-8") as sf:
+                      sf.write("\n### ⚠️ Build Failure Detected\n"
+                               "Note: `GEMINI_API_KEY` secret is not configured in this repository. "
+                               "Add it in GitHub Settings -> Secrets -> Actions to get automated AI diagnosis on failures.\n")
+              sys.exit(0)
+
+          print("🔍 Collecting failure logs for Google AI Studio...")
+
+          collected_chunks = []
+
+          # 1. Capture Gradle test output log
+          if os.path.exists("gradle-test.log"):
+              try:
+                  with open("gradle-test.log", "r", encoding="utf-8", errors="ignore") as f:
+                      lines = f.readlines()
+                      tail_lines = "".join(lines[-150:])
+                      collected_chunks.append("=== GRADLE TEST LOG (tail) ===\n" + tail_lines)
+              except Exception as e:
+                  print(f"Error reading gradle-test.log: {e}")
+
+          # 2. Capture Gradle build output log
+          if os.path.exists("gradle-build.log"):
+              try:
+                  with open("gradle-build.log", "r", encoding="utf-8", errors="ignore") as f:
+                      lines = f.readlines()
+                      tail_lines = "".join(lines[-150:])
+                      collected_chunks.append("=== GRADLE BUILD LOG (tail) ===\n" + tail_lines)
+              except Exception as e:
+                  print(f"Error reading gradle-build.log: {e}")
+
+          # 3. Capture JUnit XML failures
+          test_xml_failures = []
+          for xml_path in glob.glob("app/build/test-results/**/*.xml", recursive=True):
+              try:
+                  with open(xml_path, "r", encoding="utf-8", errors="ignore") as f:
+                      content = f.read()
+                      if "<failure" in content or "<error" in content:
+                          test_xml_failures.append(f"--- XML: {xml_path} ---\n" + content[:3000])
+              except Exception:
+                  pass
+
+          if test_xml_failures:
+              collected_chunks.append("=== JUNIT TEST FAILURES ===\n" + "\n\n".join(test_xml_failures))
+
+          combined_logs = "\n\n".join(collected_chunks).strip()
+          if not combined_logs:
+              combined_logs = "CI step failed without specific captured output. Please review GitHub Actions step console logs."
+          else:
+              # Limit to 15,000 characters
+              combined_logs = combined_logs[:15000]
+
+          prompt = (
+              "You are an expert Android, Kotlin, and Gradle CI/CD engineer analyzing a GitHub Actions build failure for an Android Jetpack Compose app.\n"
+              "Here are the failure logs captured from the CI/CD pipeline:\n\n"
+              f"```\n{combined_logs}\n```\n\n"
+              "Please analyze this failure and provide a clear, concise report in Markdown format:\n"
+              "1. **Root Cause**: Exactly why the build or test failed.\n"
+              "2. **Specific Error Details**: Highlight the failing task, class, method, or stack trace.\n"
+              "3. **Step-by-Step Fix**: The exact code, test, or Gradle changes required to fix it."
+          )
+
+          payload = {
+              "contents": [
+                  {
+                      "parts": [
+                          {"text": prompt}
+                      ]
+                  }
+              ],
+              "generationConfig": {
+                  "temperature": 0.2,
+                  "maxOutputTokens": 2048
+              }
+          }
+
+          url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
+          req = urllib.request.Request(
+              url,
+              data=json.dumps(payload).encode("utf-8"),
+              headers={"Content-Type": "application/json"}
+          )
+
+          try:
+              with urllib.request.urlopen(req, timeout=45) as resp:
+                  result = json.loads(resp.read().decode("utf-8"))
+                  candidates = result.get("candidates", [])
+                  if candidates:
+                      analysis_text = candidates[0]["content"]["parts"][0]["text"]
+                      print("\n" + "="*50)
+                      print("🤖 GOOGLE AI STUDIO FAILURE ANALYSIS")
+                      print("="*50)
+                      print(analysis_text)
+                      print("="*50 + "\n")
+
+                      # Write to GitHub Actions Job Summary
+                      summary_file = os.environ.get("GITHUB_STEP_SUMMARY")
+                      if summary_file:
+                          with open(summary_file, "a", encoding="utf-8") as sf:
+                              sf.write("\n## 🤖 Google AI Studio Failure Analysis\n\n")
+                              sf.write(analysis_text)
+                              sf.write("\n\n---\n*Report generated automatically by Google AI Studio (Gemini) via GitHub Actions.*")
+
+                      # Save as artifact file
+                      with open("gemini-failure-analysis.md", "w", encoding="utf-8") as out:
+                          out.write("# Google AI Studio Failure Analysis\n\n" + analysis_text)
+                  else:
+                      print("No analysis candidate returned by Google AI Studio:", result)
+          except urllib.error.HTTPError as e:
+              err_body = e.read().decode("utf-8", errors="ignore")
+              print(f"Failed to query Google AI Studio (HTTP {e.code}): {err_body}")
+          except Exception as e:
+              print(f"Error sending logs to Google AI Studio: {e}")
+          EOF
+
+      - name: Upload AI Diagnostic Report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gemini-failure-analysis
+          path: gemini-failure-analysis.md
+          if-no-files-found: ignore
+          retention-days: 14
+
