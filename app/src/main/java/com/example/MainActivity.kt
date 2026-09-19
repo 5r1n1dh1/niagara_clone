@@ -30,6 +30,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -120,6 +121,7 @@ fun NiagaraLauncherScreen(
     val calendarEvents by viewModel.calendarEvents.collectAsState()
     val mediaPlayer by viewModel.mediaPlayer.collectAsState()
     val activeNotifications by viewModel.activeNotifications.collectAsState()
+    val allActiveNotifications by viewModel.allActiveNotifications.collectAsState()
     val leftWidgets by viewModel.leftWidgets.collectAsState()
     val carouselWidgets by viewModel.carouselWidgets.collectAsState()
     val dockApps by viewModel.dockApps.collectAsState()
@@ -217,6 +219,20 @@ fun NiagaraLauncherScreen(
         }
     }
 
+    // Dynamic Gaussian blur on wallpaper when swiping to Widgets (page 0) or Apps (page 2)
+    val pageOffset = (pagerState.currentPage - 1) + pagerState.currentPageOffsetFraction
+    val blurFraction = kotlin.math.abs(pageOffset).coerceIn(0f, 1f)
+    val wallpaperBlurRadius = if (settings.themePreset == LauncherThemePreset.FROSTED_GLASS) {
+        (blurFraction * 28f).dp
+    } else {
+        (blurFraction * 20f).dp
+    }
+    val wallpaperBlurModifier = if (wallpaperBlurRadius > 1.dp && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        Modifier.blur(wallpaperBlurRadius)
+    } else {
+        Modifier
+    }
+
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -230,22 +246,24 @@ fun NiagaraLauncherScreen(
             }
             .testTag("niagara_root")
     ) {
-        // Flux Signature Dynamic Wallpaper
-        when (settings.wallpaperStyle) {
-            WallpaperStyle.FLUX_EMBLEM -> {
-                FluxWallpaper(
-                    showEmblem = true,
-                    modifier = Modifier.fillMaxSize()
-                )
-            }
-            WallpaperStyle.FLUX_MINIMAL_GRADIENT -> {
-                FluxWallpaper(
-                    showEmblem = false,
-                    modifier = Modifier.fillMaxSize()
-                )
-            }
-            WallpaperStyle.SYSTEM_SOLID -> {
-                // Handled by system surface background
+        // Flux Signature Dynamic Wallpaper with Gaussian Blur on side screens
+        Box(modifier = Modifier.fillMaxSize().then(wallpaperBlurModifier)) {
+            when (settings.wallpaperStyle) {
+                WallpaperStyle.FLUX_EMBLEM -> {
+                    FluxWallpaper(
+                        showEmblem = true,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+                WallpaperStyle.FLUX_MINIMAL_GRADIENT -> {
+                    FluxWallpaper(
+                        showEmblem = false,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+                WallpaperStyle.SYSTEM_SOLID -> {
+                    // Handled by system surface background
+                }
             }
         }
 
@@ -520,11 +538,13 @@ fun NiagaraLauncherScreen(
         // App Popup Drawer (Contextual shortcuts, notifications, & options)
         activeAppForPopup?.let { app ->
             val notif = activeNotifications[app.packageName] ?: app.notification
+            val appNotifs = allActiveNotifications[app.packageName] ?: emptyList()
             AppPopupDrawer(
                 app = app,
                 iconPackType = settings.iconPackType,
                 customIconSettings = settings.customIconSettings,
                 notification = notif,
+                notifications = appNotifs,
                 onReplyNotification = { replyText ->
                     viewModel.replyToNotification(app.packageName, replyText)
                 },

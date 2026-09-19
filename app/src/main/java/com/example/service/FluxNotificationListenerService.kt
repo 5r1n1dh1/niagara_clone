@@ -67,6 +67,7 @@ class FluxNotificationListenerService : NotificationListenerService() {
             try {
                 val activeSbns = activeNotifications ?: return@launch
                 val map = mutableMapOf<String, NotificationItem>()
+                val multiMap = mutableMapOf<String, MutableList<NotificationItem>>()
                 val timeFormat = SimpleDateFormat("h:mm a", Locale.getDefault())
 
                 for (sbn in activeSbns) {
@@ -95,8 +96,7 @@ class FluxNotificationListenerService : NotificationListenerService() {
                         "Just now"
                     }
 
-                    // Store notification mapped by package name for app launcher badge/preview
-                    map[pkg] = NotificationItem(
+                    val item = NotificationItem(
                         id = sbn.key ?: "${pkg}_${sbn.id}",
                         packageName = pkg,
                         sender = title,
@@ -105,8 +105,13 @@ class FluxNotificationListenerService : NotificationListenerService() {
                         canReply = hasReply,
                         key = sbn.key ?: ""
                     )
+
+                    // Store notification mapped by package name for app launcher badge/preview
+                    map[pkg] = item
+                    multiMap.getOrPut(pkg) { mutableListOf() }.add(item)
                 }
                 _liveNotifications.value = map
+                _allLiveNotifications.value = multiMap
             } catch (t: Throwable) {
                 // Safeguard against OS security exceptions
             }
@@ -161,6 +166,9 @@ class FluxNotificationListenerService : NotificationListenerService() {
 
         private val _liveNotifications = MutableStateFlow<Map<String, NotificationItem>>(emptyMap())
         val liveNotifications: StateFlow<Map<String, NotificationItem>> = _liveNotifications.asStateFlow()
+
+        private val _allLiveNotifications = MutableStateFlow<Map<String, List<NotificationItem>>>(emptyMap())
+        val allLiveNotifications: StateFlow<Map<String, List<NotificationItem>>> = _allLiveNotifications.asStateFlow()
 
         fun isNotificationAccessGranted(context: Context): Boolean {
             val enabledPackages = NotificationManagerCompat.getEnabledListenerPackages(context)

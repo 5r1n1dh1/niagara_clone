@@ -1,12 +1,17 @@
 package com.example.ui.components
 
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.provider.AlarmClock
+import android.provider.MediaStore
 import android.provider.Settings
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -32,16 +37,52 @@ import com.example.data.CustomIconPackSettings
 import com.example.data.IconPackType
 import com.example.data.NotificationItem
 
-fun isMessagingApp(packageName: String, label: String = ""): Boolean {
+enum class AppCategoryType {
+    MUSIC,
+    MESSAGING,
+    CAMERA,
+    BROWSER,
+    EMAIL,
+    MAPS,
+    CALENDAR,
+    CLOCK,
+    GENERIC
+}
+
+fun detectAppCategory(packageName: String, label: String = ""): AppCategoryType {
     val p = packageName.lowercase()
     val l = label.lowercase()
-    return p.contains("messaging") || p.contains("mms") || p.contains("whatsapp") ||
-            p.contains("telegram") || p.contains("slack") || p.contains("discord") ||
-            p.contains("signal") || p.contains("viber") || p.contains("wechat") ||
-            p.contains("messenger") || p.contains("skype") || p.contains("sms") ||
-            l.contains("message") || l.contains("messaging") || l.contains("chat") ||
-            l.contains("whatsapp") || l.contains("telegram") || l.contains("slack") ||
-            l.contains("discord") || l.contains("signal")
+
+    return when {
+        p.contains("spotify") || p.contains("music") || p.contains("audio") || p.contains("podcast") ||
+                p.contains("soundcloud") || p.contains("deezer") || p.contains("tidal") ||
+                l.contains("music") || l.contains("spotify") || l.contains("podcast") -> AppCategoryType.MUSIC
+
+        p.contains("messaging") || p.contains("mms") || p.contains("whatsapp") ||
+                p.contains("telegram") || p.contains("slack") || p.contains("discord") ||
+                p.contains("signal") || p.contains("viber") || p.contains("wechat") ||
+                p.contains("messenger") || p.contains("skype") || p.contains("sms") ||
+                l.contains("message") || l.contains("messaging") || l.contains("chat") ||
+                l.contains("whatsapp") || l.contains("telegram") || l.contains("slack") ||
+                l.contains("discord") || l.contains("signal") -> AppCategoryType.MESSAGING
+
+        p.contains("camera") || p.contains("gallery") || p.contains("photo") ||
+                l.contains("camera") || l.contains("photos") || l.contains("gallery") -> AppCategoryType.CAMERA
+
+        p.contains("chrome") || p.contains("browser") || p.contains("firefox") ||
+                p.contains("edge") || p.contains("opera") || p.contains("brave") ||
+                l.contains("browser") || l.contains("chrome") || l.contains("firefox") -> AppCategoryType.BROWSER
+
+        p.contains("mail") || p.contains("gmail") || p.contains("outlook") ||
+                l.contains("mail") || l.contains("gmail") || l.contains("outlook") -> AppCategoryType.EMAIL
+
+        p.contains("maps") || p.contains("waze") || p.contains("navigation") ||
+                l.contains("maps") || l.contains("navigation") || l.contains("waze") -> AppCategoryType.MAPS
+
+        p.contains("calendar") || l.contains("calendar") -> AppCategoryType.CALENDAR
+        p.contains("deskclock") || p.contains("alarm") || l.contains("clock") -> AppCategoryType.CLOCK
+        else -> AppCategoryType.GENERIC
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -51,6 +92,7 @@ fun AppPopupDrawer(
     iconPackType: IconPackType,
     customIconSettings: CustomIconPackSettings = CustomIconPackSettings(),
     notification: NotificationItem? = app.notification,
+    notifications: List<NotificationItem> = emptyList(),
     onReplyNotification: ((String) -> Unit)? = null,
     onDismissNotification: (() -> Unit)? = null,
     onDismiss: () -> Unit,
@@ -66,8 +108,19 @@ fun AppPopupDrawer(
     var replyInput by remember { mutableStateOf("") }
     var replySentConfirmation by remember { mutableStateOf(false) }
 
-    val isMessaging = remember(app.packageName, app.label) {
-        isMessagingApp(app.packageName, app.label)
+    val category = remember(app.packageName, app.label) {
+        detectAppCategory(app.packageName, app.label)
+    }
+
+    // Consolidated list of notifications for this app
+    val effectiveNotifications = remember(notifications, notification) {
+        if (notifications.isNotEmpty()) {
+            notifications
+        } else if (notification != null) {
+            listOf(notification)
+        } else {
+            emptyList()
+        }
     }
 
     ModalBottomSheet(
@@ -78,10 +131,10 @@ fun AppPopupDrawer(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 24.dp)
-                .padding(bottom = 32.dp)
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 28.dp)
         ) {
-            // App Header Row
+            // 1. Compact App Header Row
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
@@ -90,45 +143,58 @@ fun AppPopupDrawer(
                     app = app,
                     iconPackType = iconPackType,
                     customIconSettings = customIconSettings,
-                    size = 50.dp
+                    size = 46.dp
                 )
 
-                Spacer(modifier = Modifier.width(16.dp))
+                Spacer(modifier = Modifier.width(14.dp))
 
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = app.disguisedName ?: app.label,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 19.sp,
+                        fontSize = 18.sp,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
                         text = app.packageName,
-                        fontSize = 12.sp,
+                        fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 
-                IconButton(onClick = onToggleFavorite) {
+                IconButton(
+                    onClick = onToggleFavorite,
+                    modifier = Modifier.size(36.dp)
+                ) {
                     Icon(
                         imageVector = if (app.isFavorite) Icons.Filled.Star else Icons.Outlined.StarBorder,
                         contentDescription = "Favorite",
-                        tint = if (app.isFavorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        tint = if (app.isFavorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(22.dp)
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(18.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
-            // 5. Notifications Section with Inline Reply for Messaging Apps
-            if (notification != null) {
+            // 2. App-Specific Operations (Play/Pause, Reply, Compose, Camera, etc.)
+            AppSpecificOperationsBar(
+                category = category,
+                packageName = app.packageName,
+                context = context,
+                onDismiss = onDismiss
+            )
+
+            // 3. Active Notifications Section (Shows ALL available notifications compactly)
+            if (effectiveNotifications.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(12.dp))
                 Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)),
+                    shape = RoundedCornerShape(14.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)),
                     modifier = Modifier.fillMaxWidth().testTag("popup_notification_card")
                 ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
+                    Column(modifier = Modifier.padding(12.dp)) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.fillMaxWidth()
@@ -137,93 +203,73 @@ fun AppPopupDrawer(
                                 imageVector = Icons.Filled.Notifications,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(15.dp)
                             )
-                            Spacer(modifier = Modifier.width(8.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "NOTIFICATION",
+                                text = if (effectiveNotifications.size > 1) "NOTIFICATIONS (${effectiveNotifications.size})" else "NOTIFICATION",
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.sp,
+                                letterSpacing = 0.8.sp,
                                 color = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.weight(1f)
                             )
-                            Text(
-                                text = notification.timeAgo,
-                                fontSize = 11.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
                             if (onDismissNotification != null) {
                                 IconButton(
                                     onClick = onDismissNotification,
-                                    modifier = Modifier.size(24.dp)
+                                    modifier = Modifier.size(22.dp)
                                 ) {
                                     Icon(
                                         imageVector = Icons.Filled.Close,
-                                        contentDescription = "Dismiss notification",
-                                        modifier = Modifier.size(14.dp),
+                                        contentDescription = "Dismiss all",
+                                        modifier = Modifier.size(13.dp),
                                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(10.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
 
-                        Text(
-                            text = notification.sender,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Spacer(modifier = Modifier.height(3.dp))
-                        Text(
-                            text = notification.message,
-                            fontSize = 13.sp,
-                            lineHeight = 18.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-
-                        // If Messaging App or replyable notification, show Reply Options
-                        if (isMessaging || notification.canReply) {
-                            Spacer(modifier = Modifier.height(14.dp))
-                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            Text(
-                                text = "Quick Reply",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            // Quick suggestion chips
-                            val quickReplies = listOf("On my way! 🏃", "Sounds good! 👍", "I'll reply soon", "Got it!")
+                        // Compact list of all notifications
+                        effectiveNotifications.take(4).forEachIndexed { index, notifItem ->
+                            if (index > 0) {
+                                HorizontalDivider(
+                                    modifier = Modifier.padding(vertical = 8.dp),
+                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+                                )
+                            }
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                quickReplies.take(3).forEach { chipText ->
-                                    SuggestionChip(
-                                        onClick = {
-                                            onReplyNotification?.invoke(chipText)
-                                            replySentConfirmation = true
-                                        },
-                                        label = { Text(chipText, fontSize = 11.sp) },
-                                        shape = RoundedCornerShape(8.dp),
-                                        colors = SuggestionChipDefaults.suggestionChipColors(
-                                            containerColor = MaterialTheme.colorScheme.surface
-                                        )
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = notifItem.sender,
+                                        fontWeight = FontWeight.SemiBold,
+                                        fontSize = 13.sp,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = notifItem.message,
+                                        fontSize = 12.sp,
+                                        lineHeight = 16.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
+                                Text(
+                                    text = notifItem.timeAgo,
+                                    fontSize = 10.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                                    modifier = Modifier.padding(start = 8.dp)
+                                )
                             }
+                        }
 
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            // Inline Reply Input
+                        // Inline Quick Reply if messaging
+                        val canReply = category == AppCategoryType.MESSAGING || effectiveNotifications.any { it.canReply }
+                        if (canReply) {
+                            Spacer(modifier = Modifier.height(10.dp))
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier.fillMaxWidth()
@@ -234,11 +280,11 @@ fun AppPopupDrawer(
                                         replyInput = it
                                         replySentConfirmation = false
                                     },
-                                    placeholder = { Text("Type reply...", fontSize = 12.sp) },
+                                    placeholder = { Text("Quick reply...", fontSize = 12.sp) },
                                     singleLine = true,
-                                    shape = RoundedCornerShape(12.dp),
-                                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp),
-                                    modifier = Modifier.weight(1f).testTag("popup_reply_input"),
+                                    shape = RoundedCornerShape(10.dp),
+                                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 12.sp),
+                                    modifier = Modifier.weight(1f).height(46.dp).testTag("popup_reply_input"),
                                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                                     keyboardActions = KeyboardActions(onSend = {
                                         if (replyInput.isNotBlank()) {
@@ -249,7 +295,7 @@ fun AppPopupDrawer(
                                     })
                                 )
 
-                                Spacer(modifier = Modifier.width(8.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
 
                                 IconButton(
                                     onClick = {
@@ -264,18 +310,18 @@ fun AppPopupDrawer(
                                         containerColor = MaterialTheme.colorScheme.primary,
                                         disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant
                                     ),
-                                    modifier = Modifier.size(42.dp).testTag("popup_reply_send_button")
+                                    modifier = Modifier.size(38.dp).testTag("popup_reply_send_button")
                                 ) {
                                     Icon(
                                         imageVector = Icons.AutoMirrored.Filled.Send,
-                                        contentDescription = "Send Reply",
-                                        modifier = Modifier.size(18.dp)
+                                        contentDescription = "Send",
+                                        modifier = Modifier.size(16.dp)
                                     )
                                 }
                             }
 
                             if (replySentConfirmation) {
-                                Spacer(modifier = Modifier.height(6.dp))
+                                Spacer(modifier = Modifier.height(4.dp))
                                 Text(
                                     text = "✓ Reply sent",
                                     fontSize = 11.sp,
@@ -286,128 +332,74 @@ fun AppPopupDrawer(
                         }
                     }
                 }
-                Spacer(modifier = Modifier.height(18.dp))
-            } else if (isMessaging) {
-                // If it's a messaging app with no current unread notification
-                Surface(
-                    shape = RoundedCornerShape(14.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(14.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.ChatBubbleOutline,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Messaging App",
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 13.sp,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = "No unread notifications",
-                                fontSize = 11.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                }
-                Spacer(modifier = Modifier.height(18.dp))
             }
 
-            // Pop-up Dynamic Attached Widget Preview
-            AttachedAppWidgetCard(app)
+            Spacer(modifier = Modifier.height(14.dp))
 
-            Spacer(modifier = Modifier.height(18.dp))
-
-            // App Shortcuts
-            if (app.shortcuts.isNotEmpty()) {
-                Text(
-                    text = "App Shortcuts",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
+            // 4. Quick Action Grid / Minimal Action Rows (Uncluttered)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Usage Breaker button
+                ActionPillButton(
+                    icon = if (app.isUsageBreakerActive) Icons.Filled.Spa else Icons.Outlined.Spa,
+                    label = if (app.isUsageBreakerActive) "Breaker On" else "Breaker",
+                    isActive = app.isUsageBreakerActive,
+                    modifier = Modifier.weight(1f),
+                    onClick = onToggleUsageBreaker
                 )
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    app.shortcuts.forEach { shortcut ->
-                        FilledTonalButton(
-                            onClick = { onDismiss() },
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                            shape = RoundedCornerShape(10.dp)
-                        ) {
-                            Icon(Icons.Filled.Bolt, contentDescription = null, modifier = Modifier.size(14.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(shortcut, fontSize = 12.sp)
-                        }
+
+                // Hide App button
+                ActionPillButton(
+                    icon = if (app.isHidden) Icons.Filled.VisibilityOff else Icons.Outlined.Visibility,
+                    label = if (app.isHidden) "Unhide" else "Hide",
+                    isActive = app.isHidden,
+                    modifier = Modifier.weight(1f),
+                    onClick = onToggleHide
+                )
+
+                // Disguise Name button
+                ActionPillButton(
+                    icon = Icons.Outlined.DriveFileRenameOutline,
+                    label = if (app.disguisedName != null) "Disguised" else "Rename",
+                    isActive = app.disguisedName != null,
+                    modifier = Modifier.weight(1f),
+                    onClick = { showDisguiseDialog = true }
+                )
+
+                // App Info button
+                ActionPillButton(
+                    icon = Icons.Outlined.Info,
+                    label = "Info",
+                    isActive = false,
+                    modifier = Modifier.weight(1f),
+                    onClick = {
+                        try {
+                            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                data = Uri.fromParts("package", app.packageName, null)
+                            }
+                            context.startActivity(intent)
+                            onDismiss()
+                        } catch (_: Exception) {}
                     }
-                }
-                Spacer(modifier = Modifier.height(16.dp))
+                )
             }
-
-            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Actions list
-            PopupActionRow(
-                icon = if (app.isUsageBreakerActive) Icons.Filled.Spa else Icons.Outlined.Spa,
-                label = "Usage Breaker (Mindful Delay)",
-                subtitle = if (app.isUsageBreakerActive) "Active • 5s pause before launch" else "Off • Add mindful friction",
-                onClick = onToggleUsageBreaker
-            )
-
-            PopupActionRow(
-                icon = Icons.Outlined.DriveFileRenameOutline,
-                label = "Disguise App Name",
-                subtitle = if (app.disguisedName != null) "Currently disguised as \"${app.disguisedName}\"" else "Rename to disguise from others",
-                onClick = { showDisguiseDialog = true }
-            )
-
-            PopupActionRow(
-                icon = if (app.isHidden) Icons.Filled.VisibilityOff else Icons.Outlined.Visibility,
-                label = if (app.isHidden) "Unhide App" else "Hide App",
-                subtitle = "Completely hide from homescreen and lists",
-                onClick = onToggleHide
-            )
-
-            PopupActionRow(
-                icon = Icons.Outlined.Info,
-                label = "App Info & System Settings",
-                subtitle = "Storage, permissions, notifications",
-                onClick = {
-                    val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                        data = Uri.fromParts("package", app.packageName, null)
-                    }
-                    context.startActivity(intent)
-                    onDismiss()
-                }
-            )
         }
     }
 
     if (showDisguiseDialog) {
         AlertDialog(
             onDismissRequest = { showDisguiseDialog = false },
-            title = { Text("Disguise App Name") },
+            title = { Text("Disguise App Name", fontSize = 17.sp, fontWeight = FontWeight.Bold) },
             text = {
                 Column {
-                    Text("Choose a stealth decoy label for ${app.label}:", fontSize = 13.sp)
+                    Text("Decoy label for ${app.label}:", fontSize = 13.sp)
                     Spacer(modifier = Modifier.height(8.dp))
                     OutlinedTextField(
                         value = disguiseText,
                         onValueChange = { disguiseText = it },
-                        placeholder = { Text("e.g. Calculator, Notes, System") },
+                        placeholder = { Text("e.g. Calculator, Notes, Clock") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -434,81 +426,234 @@ fun AppPopupDrawer(
 }
 
 @Composable
-private fun AttachedAppWidgetCard(app: AppItem) {
-    Surface(
-        shape = RoundedCornerShape(14.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(modifier = Modifier.padding(14.dp)) {
+private fun AppSpecificOperationsBar(
+    category: AppCategoryType,
+    packageName: String,
+    context: Context,
+    onDismiss: () -> Unit
+) {
+    when (category) {
+        AppCategoryType.MUSIC -> {
             Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Filled.Widgets,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = "Pop-up Widget Slot",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-                Surface(
-                    shape = RoundedCornerShape(6.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer
+                FilledTonalButton(
+                    onClick = {
+                        val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? android.media.AudioManager
+                        try {
+                            val downEvent = android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)
+                            val upEvent = android.view.KeyEvent(android.view.KeyEvent.ACTION_UP, android.view.KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)
+                            audioManager?.dispatchMediaKeyEvent(downEvent)
+                            audioManager?.dispatchMediaKeyEvent(upEvent)
+                        } catch (_: Exception) {}
+                        onDismiss()
+                    },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
                 ) {
-                    Text(
-                        text = "Attached",
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                    )
+                    Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Play / Pause", fontSize = 12.sp)
+                }
+
+                FilledTonalButton(
+                    onClick = {
+                        val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? android.media.AudioManager
+                        try {
+                            val downEvent = android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_MEDIA_NEXT)
+                            val upEvent = android.view.KeyEvent(android.view.KeyEvent.ACTION_UP, android.view.KeyEvent.KEYCODE_MEDIA_NEXT)
+                            audioManager?.dispatchMediaKeyEvent(downEvent)
+                            audioManager?.dispatchMediaKeyEvent(upEvent)
+                        } catch (_: Exception) {}
+                        onDismiss()
+                    },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                ) {
+                    Icon(Icons.Filled.SkipNext, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Next Track", fontSize = 12.sp)
                 }
             }
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "Live telemetry & instant actions attached directly to ${app.label}. One swipe brings the widget without cluttering the homescreen.",
-                fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+        }
+
+        AppCategoryType.CAMERA -> {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                FilledTonalButton(
+                    onClick = {
+                        try {
+                            val intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE).apply {
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            context.startActivity(intent)
+                        } catch (_: Exception) {}
+                        onDismiss()
+                    },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+                ) {
+                    Icon(Icons.Filled.PhotoCamera, contentDescription = null, modifier = Modifier.size(15.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Take Photo", fontSize = 12.sp)
+                }
+
+                FilledTonalButton(
+                    onClick = {
+                        try {
+                            val intent = Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA).apply {
+                                putExtra("android.intent.extras.CAMERA_FACING", 1)
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            context.startActivity(intent)
+                        } catch (_: Exception) {}
+                        onDismiss()
+                    },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+                ) {
+                    Icon(Icons.Filled.CameraFront, contentDescription = null, modifier = Modifier.size(15.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Selfie", fontSize = 12.sp)
+                }
+            }
+        }
+
+        AppCategoryType.BROWSER -> {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                FilledTonalButton(
+                    onClick = {
+                        try {
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com")).apply {
+                                setPackage(packageName)
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            context.startActivity(intent)
+                        } catch (_: Exception) {
+                            val launchIntent = context.packageManager.getLaunchIntentForPackage(packageName)
+                            launchIntent?.let { context.startActivity(it) }
+                        }
+                        onDismiss()
+                    },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+                ) {
+                    Icon(Icons.Filled.OpenInBrowser, contentDescription = null, modifier = Modifier.size(15.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("New Tab", fontSize = 12.sp)
+                }
+
+                FilledTonalButton(
+                    onClick = {
+                        try {
+                            val launchIntent = context.packageManager.getLaunchIntentForPackage(packageName)
+                            launchIntent?.let { context.startActivity(it) }
+                        } catch (_: Exception) {}
+                        onDismiss()
+                    },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+                ) {
+                    Icon(Icons.Filled.Shield, contentDescription = null, modifier = Modifier.size(15.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Private / Open", fontSize = 12.sp)
+                }
+            }
+        }
+
+        AppCategoryType.EMAIL -> {
+            FilledTonalButton(
+                onClick = {
+                    try {
+                        val intent = Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:")).apply {
+                            setPackage(packageName)
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        context.startActivity(intent)
+                    } catch (_: Exception) {}
+                    onDismiss()
+                },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(10.dp),
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+            ) {
+                Icon(Icons.Filled.Edit, contentDescription = null, modifier = Modifier.size(15.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Compose New Email", fontSize = 12.sp)
+            }
+        }
+
+        AppCategoryType.CLOCK -> {
+            FilledTonalButton(
+                onClick = {
+                    try {
+                        val intent = Intent(AlarmClock.ACTION_SET_ALARM).apply {
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        context.startActivity(intent)
+                    } catch (_: Exception) {}
+                    onDismiss()
+                },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(10.dp),
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+            ) {
+                Icon(Icons.Filled.Alarm, contentDescription = null, modifier = Modifier.size(15.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Set Alarm / Timer", fontSize = 12.sp)
+            }
+        }
+
+        else -> {
+            // Generic apps: no redundant buttons, keeps context menu minimal
         }
     }
 }
 
 @Composable
-private fun PopupActionRow(
+private fun ActionPillButton(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     label: String,
-    subtitle: String,
-    onClick: () -> Unit
+    isActive: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
-            .clickable(onClick = onClick)
-            .padding(vertical = 10.dp, horizontal = 4.dp),
-        verticalAlignment = Alignment.CenterVertically
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(10.dp),
+        color = if (isActive) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+        modifier = modifier.height(52.dp)
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(22.dp)
-        )
-        Spacer(modifier = Modifier.width(16.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(text = label, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-            Text(text = subtitle, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Column(
+            modifier = Modifier.fillMaxSize().padding(4.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                tint = if (isActive) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = label,
+                fontSize = 10.sp,
+                fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
+                color = if (isActive) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }

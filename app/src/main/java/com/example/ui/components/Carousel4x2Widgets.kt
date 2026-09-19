@@ -42,6 +42,7 @@ fun Carousel4x2WidgetCard(
     onOpenWeather: () -> Unit,
     onOpenCalendar: () -> Unit,
     onOpenCustomize: () -> Unit,
+    onOpenSettings: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -56,7 +57,13 @@ fun Carousel4x2WidgetCard(
         Box(modifier = Modifier.fillMaxSize().padding(14.dp)) {
             when (type) {
                 WidgetType.CLOCK -> {
-                    Clock4x2Widget()
+                    Clock4x2Widget(
+                        weather = weather,
+                        event = calendarEvents.firstOrNull(),
+                        onOpenWeather = onOpenWeather,
+                        onOpenCalendar = onOpenCalendar,
+                        onOpenSettings = onOpenSettings
+                    )
                 }
                 WidgetType.WEATHER_FORECAST -> {
                     Weather4x2Widget(weather = weather, onClick = onOpenWeather)
@@ -630,7 +637,13 @@ private fun DualClock4x2Widget() {
 }
 
 @Composable
-private fun Clock4x2Widget() {
+private fun Clock4x2Widget(
+    weather: WeatherInfo,
+    event: CalendarEvent?,
+    onOpenWeather: () -> Unit,
+    onOpenCalendar: () -> Unit,
+    onOpenSettings: () -> Unit
+) {
     var currentTime by remember { mutableStateOf(Calendar.getInstance()) }
     LaunchedEffect(Unit) {
         while (true) {
@@ -651,43 +664,43 @@ private fun Clock4x2Widget() {
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.Top
         ) {
-            Row(verticalAlignment = Alignment.Bottom) {
+            Row(
+                verticalAlignment = Alignment.Bottom,
+                modifier = Modifier.clickable(onClick = onOpenSettings)
+            ) {
                 Text(
                     text = timeFormat.format(currentTime.time),
-                    fontSize = 46.sp,
+                    fontSize = 44.sp,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = (-1.5).sp,
-                    lineHeight = 46.sp,
+                    lineHeight = 44.sp,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
                     text = secondsFormat.format(currentTime.time),
-                    fontSize = 18.sp,
+                    fontSize = 17.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(bottom = 6.dp)
                 )
             }
 
+            // Weather Glance Pill
             Surface(
                 shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f),
+                modifier = Modifier.clickable(onClick = onOpenWeather)
             ) {
                 Row(
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                    modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        imageVector = Icons.Filled.AccessTime,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(14.dp)
-                    )
-                    Spacer(modifier = Modifier.width(5.dp))
+                    Text(text = weather.conditionIcon, fontSize = 13.sp)
+                    Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = "LIVE",
-                        fontSize = 11.sp,
+                        text = "${weather.temperatureCelsius}°C",
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
                     )
@@ -695,7 +708,12 @@ private fun Clock4x2Widget() {
             }
         }
 
-        Column {
+        // Date and Calendar Glance
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onOpenCalendar)
+        ) {
             Text(
                 text = dateFormat.format(currentTime.time),
                 fontSize = 14.sp,
@@ -703,11 +721,31 @@ private fun Clock4x2Widget() {
                 color = MaterialTheme.colorScheme.primary
             )
             Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = "${currentTime.timeZone.displayName} • Week ${currentTime.get(Calendar.WEEK_OF_YEAR)}",
-                fontSize = 11.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            if (event != null) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Filled.Event,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.secondary,
+                        modifier = Modifier.size(12.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "${event.title} • ${event.time}",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            } else {
+                Text(
+                    text = "${currentTime.timeZone.displayName} • Week ${currentTime.get(Calendar.WEEK_OF_YEAR)}",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }

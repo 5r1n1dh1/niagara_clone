@@ -29,6 +29,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     val calendarEvents = repository.calendarEvents
     val mediaPlayer = repository.mediaPlayer
     val activeNotifications = repository.activeNotifications
+    val allActiveNotifications = repository.allActiveNotifications
     val leftWidgets = repository.leftWidgets
     val carouselWidgets = repository.carouselWidgets
 

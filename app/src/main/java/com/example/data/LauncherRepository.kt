@@ -68,6 +68,9 @@ class LauncherRepository(private val context: Context) {
     private val _activeNotifications = MutableStateFlow<Map<String, NotificationItem>>(emptyMap())
     val activeNotifications: StateFlow<Map<String, NotificationItem>> = _activeNotifications.asStateFlow()
 
+    private val _allActiveNotifications = MutableStateFlow<Map<String, List<NotificationItem>>>(emptyMap())
+    val allActiveNotifications: StateFlow<Map<String, List<NotificationItem>>> = _allActiveNotifications.asStateFlow()
+
     private val _leftWidgets = MutableStateFlow<List<CustomWidgetConfig>>(emptyList())
     val leftWidgets: StateFlow<List<CustomWidgetConfig>> = _leftWidgets.asStateFlow()
 
@@ -103,6 +106,11 @@ class LauncherRepository(private val context: Context) {
                     }
                     _allApps.value = updated
                 }
+            }
+        }
+        repositoryScope.launch {
+            com.example.service.FluxNotificationListenerService.allLiveNotifications.collect { multiMap ->
+                _allActiveNotifications.value = multiMap
             }
         }
     }

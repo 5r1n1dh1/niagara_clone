@@ -55,7 +55,15 @@ fun CenterHomeScreen(
     onNavigateToAllApps: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val pagerState = rememberPagerState(pageCount = { carouselWidgets.size.coerceAtMost(5) })
+    // Fixed 3-card carousel: Card 1 is Clock, Cards 2 & 3 are user selected
+    val displayWidgets = remember(carouselWidgets) {
+        val customOthers = carouselWidgets.filter { it != WidgetType.CLOCK }.take(2)
+        val fillList = listOf(WidgetType.WEATHER_FORECAST, WidgetType.MEDIA_PLAYER).filter { it !in customOthers }
+        val finalOthers = (customOthers + fillList).take(2)
+        listOf(WidgetType.CLOCK) + finalOthers
+    }
+
+    val pagerState = rememberPagerState(pageCount = { 3 })
 
     LazyColumn(
         modifier = modifier
@@ -72,37 +80,16 @@ fun CenterHomeScreen(
             }
         }
 
-        // Clock Header
-        if (settings.showClockHeader) {
-            item(key = "center_clock_header") {
-                ClockHeader(
-                    clockStyle = settings.clockStyle,
-                    showSeconds = settings.showSeconds,
-                    showDate = settings.showDate,
-                    weather = weather,
-                    upcomingEvent = calendarEvents.firstOrNull(),
-                    fontScale = settings.fontScale,
-                    isLeftHanded = settings.leftHandedMode,
-                    onClockClick = onOpenSettings,
-                    onDateClick = onOpenCalendar,
-                    onWeatherClick = onOpenWeather
-                )
-                Spacer(modifier = Modifier.height(14.dp))
-            }
-        }
-
-        // 4.1 Swipable 4x2 Widgets Carousel (Max 5 widgets)
+        // 4.1 Swipable 4x2 Widgets Carousel (Exactly 3 widgets: Clock is Fixed #1)
         item(key = "center_carousel_container") {
             Column(modifier = Modifier.fillMaxWidth()) {
-                val displayWidgets = carouselWidgets.take(5)
-
                 HorizontalPager(
                     state = pagerState,
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("center_4x2_carousel")
                 ) { page ->
-                    val widgetType = displayWidgets.getOrNull(page) ?: WidgetType.WEATHER_FORECAST
+                    val widgetType = displayWidgets.getOrNull(page) ?: WidgetType.CLOCK
                     Carousel4x2WidgetCard(
                         type = widgetType,
                         weather = weather,
@@ -115,35 +102,32 @@ fun CenterHomeScreen(
                         onToggleHeadphones = onToggleHeadphones,
                         onOpenWeather = onOpenWeather,
                         onOpenCalendar = onOpenCalendar,
-                        onOpenCustomize = onOpenCarouselCustomize
+                        onOpenCustomize = onOpenCarouselCustomize,
+                        onOpenSettings = onOpenSettings
                     )
                 }
 
-                // Dot page indicator for carousel
-                if (displayWidgets.size > 1) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 10.dp, bottom = 8.dp),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        repeat(displayWidgets.size) { idx ->
-                            val isSelected = pagerState.currentPage == idx
-                            Box(
-                                modifier = Modifier
-                                    .padding(horizontal = 3.dp)
-                                    .size(if (isSelected) 6.dp else 4.dp)
-                                    .clip(CircleShape)
-                                    .background(
-                                        if (isSelected) MaterialTheme.colorScheme.primary
-                                        else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f)
-                                    )
-                            )
-                        }
+                // Dot page indicator for 3 carousel widgets
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 10.dp, bottom = 8.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    repeat(3) { idx ->
+                        val isSelected = pagerState.currentPage == idx
+                        Box(
+                            modifier = Modifier
+                                .padding(horizontal = 3.dp)
+                                .size(if (isSelected) 6.dp else 4.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    if (isSelected) MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f)
+                                )
+                        )
                     }
-                } else {
-                    Spacer(modifier = Modifier.height(8.dp))
                 }
             }
         }
