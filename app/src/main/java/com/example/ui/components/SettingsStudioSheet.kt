@@ -422,10 +422,29 @@ fun SettingsStudioSheet(
                             HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp))
                             SettingsToggleRow(
                                 title = "Double-Tap to Sleep",
-                                subtitle = "Double-tap empty wallpaper to lock display",
+                                subtitle = "Double-tap empty wallpaper to turn off and lock display",
                                 checked = settings.doubleTapToSleep,
-                                onCheckedChange = { onUpdateSettings(settings.copy(doubleTapToSleep = it)) }
+                                onCheckedChange = { isChecked ->
+                                    onUpdateSettings(settings.copy(doubleTapToSleep = isChecked))
+                                    if (isChecked && !com.example.service.FluxAccessibilityService.isServiceRunning()) {
+                                        com.example.service.FluxAccessibilityService.openAccessibilitySettings(context)
+                                    }
+                                }
                             )
+                            if (settings.doubleTapToSleep && !com.example.service.FluxAccessibilityService.isServiceRunning()) {
+                                Spacer(modifier = Modifier.height(4.dp))
+                                OutlinedButton(
+                                    onClick = {
+                                        com.example.service.FluxAccessibilityService.openAccessibilitySettings(context)
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Icon(Icons.Filled.Lock, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Grant Lock Permission (Accessibility)", fontSize = 12.sp)
+                                }
+                            }
                             HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp))
                             SettingsToggleRow(
                                 title = "Hide Status Bar",

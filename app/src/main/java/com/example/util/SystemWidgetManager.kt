@@ -96,13 +96,31 @@ object SystemWidgetManager {
         }
     }
 
-    fun getAppWidgetInfo(context: Context, appWidgetId: Int): AppWidgetProviderInfo? {
+    fun getAppWidgetInfo(
+        context: Context,
+        appWidgetId: Int,
+        providerPackage: String? = null,
+        providerClass: String? = null
+    ): AppWidgetProviderInfo? {
         val manager = appWidgetManager ?: AppWidgetManager.getInstance(context)
-        return try {
-            manager.getAppWidgetInfo(appWidgetId)
-        } catch (e: Exception) {
-            null
+        if (appWidgetId > 0) {
+            try {
+                val info = manager.getAppWidgetInfo(appWidgetId)
+                if (info != null) return info
+            } catch (_: Exception) {
+                // Fallback to searching provider
+            }
         }
+        if (!providerPackage.isNullOrBlank() && !providerClass.isNullOrBlank()) {
+            return try {
+                manager.installedProviders?.firstOrNull {
+                    it.provider.packageName == providerPackage && it.provider.className == providerClass
+                }
+            } catch (_: Exception) {
+                null
+            }
+        }
+        return null
     }
 
     fun createWidgetHostView(

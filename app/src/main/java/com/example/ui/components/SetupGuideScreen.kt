@@ -1135,14 +1135,16 @@ private fun StepPersonalization(
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = "Double tap on empty home screen space to turn off screen.",
+                            text = "Double tap on empty home screen space to turn off screen instantly.",
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                     Switch(
                         checked = doubleTapSleep,
-                        onCheckedChange = onToggleDoubleTap
+                        onCheckedChange = { isChecked ->
+                            onToggleDoubleTap(isChecked)
+                        }
                     )
                 }
             }

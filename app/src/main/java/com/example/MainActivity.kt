@@ -362,8 +362,8 @@ fun NiagaraLauncherScreen(
             }
         }
 
-        // 5. Fixed Dock (Hidden on All Apps screen per user request)
-        if (pagerState.currentPage != 2) {
+        // 5. Fixed Dock (Visible ONLY on Home Screen per user request)
+        if (pagerState.currentPage == 1) {
             FixedDock(
                 dockApps = dockApps,
                 iconPackType = settings.iconPackType,

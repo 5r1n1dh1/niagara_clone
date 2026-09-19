@@ -30,6 +30,8 @@ import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.*
 import com.example.util.SystemWidgetProviderItem
+import com.example.util.IntegrationCategory
+import com.example.util.WidgetIntegrationsManager
 
 class LauncherRepository(private val context: Context) {
 
@@ -726,20 +728,68 @@ class LauncherRepository(private val context: Context) {
     }
 
     fun togglePlayPauseMedia() {
+        val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? android.media.AudioManager
+        try {
+            val downEvent = android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)
+            val upEvent = android.view.KeyEvent(android.view.KeyEvent.ACTION_UP, android.view.KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)
+            audioManager?.dispatchMediaKeyEvent(downEvent)
+            audioManager?.dispatchMediaKeyEvent(upEvent)
+        } catch (_: Exception) {}
+
+        val newPlayingState = !_mediaPlayer.value.isPlaying
+        val musicPkg = widgetIntegrations.getPackage(IntegrationCategory.MUSIC)
+        val appLabel = if (musicPkg != null) {
+            try {
+                val pm = context.packageManager
+                val appInfo = pm.getApplicationInfo(musicPkg, PackageManager.GET_META_DATA)
+                pm.getApplicationLabel(appInfo).toString()
+            } catch (_: Exception) {
+                _mediaPlayer.value.appName
+            }
+        } else {
+            _mediaPlayer.value.appName
+        }
+
         _mediaPlayer.value = _mediaPlayer.value.copy(
-            isPlaying = !_mediaPlayer.value.isPlaying
+            isPlaying = newPlayingState,
+            appName = appLabel
         )
     }
 
     fun skipNextMedia() {
+        val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? android.media.AudioManager
+        try {
+            val downEvent = android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_MEDIA_NEXT)
+            val upEvent = android.view.KeyEvent(android.view.KeyEvent.ACTION_UP, android.view.KeyEvent.KEYCODE_MEDIA_NEXT)
+            audioManager?.dispatchMediaKeyEvent(downEvent)
+            audioManager?.dispatchMediaKeyEvent(upEvent)
+        } catch (_: Exception) {}
+
+        val musicPkg = widgetIntegrations.getPackage(IntegrationCategory.MUSIC)
+        val currentApp = if (musicPkg != null) widgetIntegrations.getAppLabel(IntegrationCategory.MUSIC, context.packageManager) else "Spotify"
+
         val tracks = listOf(
-            MediaPlaybackState(true, "Midnight City", "M83", "Spotify", 0.35f, "4:03", "1:25"),
-            MediaPlaybackState(true, "Starboy", "The Weeknd, Daft Punk", "Spotify", 0.12f, "3:50", "0:27"),
-            MediaPlaybackState(true, "Solar Power", "Lorde", "Spotify", 0.65f, "3:12", "2:04"),
-            MediaPlaybackState(true, "Resonance", "HOME", "Spotify", 0.80f, "3:32", "2:49")
+            MediaPlaybackState(true, "Midnight City", "M83", currentApp, 0.35f, "4:03", "1:25"),
+            MediaPlaybackState(true, "Starboy", "The Weeknd, Daft Punk", currentApp, 0.12f, "3:50", "0:27"),
+            MediaPlaybackState(true, "Solar Power", "Lorde", currentApp, 0.65f, "3:12", "2:04"),
+            MediaPlaybackState(true, "Resonance", "HOME", currentApp, 0.80f, "3:32", "2:49")
         )
         val next = tracks.random()
         _mediaPlayer.value = next
+    }
+
+    fun syncMusicIntegration() {
+        val musicPkg = widgetIntegrations.getPackage(IntegrationCategory.MUSIC)
+        if (musicPkg != null) {
+            try {
+                val pm = context.packageManager
+                val appInfo = pm.getApplicationInfo(musicPkg, PackageManager.GET_META_DATA)
+                val label = pm.getApplicationLabel(appInfo).toString()
+                _mediaPlayer.value = _mediaPlayer.value.copy(
+                    appName = label
+                )
+            } catch (_: Exception) {}
+        }
     }
 
     fun skipPreviousMedia() {

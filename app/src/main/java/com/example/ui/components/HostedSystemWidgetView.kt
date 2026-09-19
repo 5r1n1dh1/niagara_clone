@@ -30,12 +30,16 @@ fun HostedSystemWidgetView(
 ) {
     val context = LocalContext.current
     val providerInfo = remember(appWidgetId, providerPackage, providerClass) {
-        if (appWidgetId > 0) {
-            SystemWidgetManager.getAppWidgetInfo(context, appWidgetId)
+        SystemWidgetManager.getAppWidgetInfo(context, appWidgetId, providerPackage, providerClass)
+    }
+
+    val hostView = remember(appWidgetId, providerInfo) {
+        if (appWidgetId > 0 && providerInfo != null) {
+            SystemWidgetManager.createWidgetHostView(context, appWidgetId, providerInfo)
         } else null
     }
 
-    if (appWidgetId > 0 && providerInfo != null) {
+    if (hostView != null) {
         Surface(
             shape = RoundedCornerShape(18.dp),
             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
@@ -44,13 +48,12 @@ fun HostedSystemWidgetView(
                 .clip(RoundedCornerShape(18.dp))
         ) {
             AndroidView(
-                factory = { ctx ->
-                    val hostView = SystemWidgetManager.createWidgetHostView(ctx, appWidgetId, providerInfo)
-                    hostView ?: AppWidgetHostView(ctx)
+                factory = { _ ->
+                    hostView
                 },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(min = 120.dp, max = 240.dp)
+                    .heightIn(min = 100.dp, max = 260.dp)
                     .padding(8.dp)
             )
         }

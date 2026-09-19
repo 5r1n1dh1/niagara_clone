@@ -53,6 +53,11 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         widgetIntegrations.launch(category)
     }
 
+    fun setWidgetIntegration(category: com.example.util.IntegrationCategory, packageName: String?) {
+        widgetIntegrations.setPackage(category, packageName)
+        repository.syncMusicIntegration()
+    }
+
     val dockApps: StateFlow<List<AppItem>> = combine(allApps, repository.dockPackageNames) { apps, pkgs ->
         val list = mutableListOf<AppItem>()
         for (pkg in pkgs) {
@@ -324,8 +329,17 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     fun triggerDoubleTapSleep() {
         if (settings.value.doubleTapToSleep) {
             vibrateTick()
-            _isSleepOverlayVisible.value = true
+            val locked = com.example.service.FluxAccessibilityService.requestLockScreen(getApplication())
+            if (!locked) {
+                // If accessibility service is not yet enabled, show visual sleep screen and toast
+                _isSleepOverlayVisible.value = true
+                showToast("Tip: Enable Accessibility for Flux to turn off the physical screen")
+            }
         }
+    }
+
+    fun openAccessibilitySettings() {
+        com.example.service.FluxAccessibilityService.openAccessibilitySettings(getApplication())
     }
 
     fun dismissSleepOverlay() {

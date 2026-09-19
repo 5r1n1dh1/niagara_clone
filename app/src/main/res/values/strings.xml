@@ -6,4 +6,5 @@
     <string name="settings_title">Launcher Settings</string>
     <string name="usage_breaker_title">Mindful Pause</string>
     <string name="take_a_breath">Take a mindful breath before continuing</string>
+    <string name="accessibility_service_description">Enables double-tap to turn off and lock the screen seamlessly.</string>
 </resources>
