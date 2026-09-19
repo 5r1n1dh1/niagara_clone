@@ -1,0 +1,6 @@
+{
+  "name": "Flux Launcher",
+  "description": "Ergonomic, minimalist Android launcher inspired by Flux Launcher, featuring the signature glassmorphic emblem wallpaper, adaptive icon, 3-page navigation, widgets, and Anycons custom icon engine.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

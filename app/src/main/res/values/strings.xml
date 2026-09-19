@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">Flux Launcher</string>
+    <string name="search_placeholder">Search apps, web, math, commands…</string>
+    <string name="favorites_title">Favorites</string>
+    <string name="all_apps_title">All Apps</string>
+    <string name="settings_title">Launcher Settings</string>
+    <string name="usage_breaker_title">Mindful Pause</string>
+    <string name="take_a_breath">Take a mindful breath before continuing</string>
+</resources>
