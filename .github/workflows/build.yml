@@ -21,6 +21,11 @@ jobs:
   build:
     name: Build & Package APK
     runs-on: ubuntu-latest
+    env:
+      RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+      KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+      KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+      KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
 
     steps:
       - name: Checkout Repository
@@ -65,21 +70,23 @@ jobs:
           retention-days: 30
 
       - name: Setup Release Keystore (Optional)
-        if: ${{ (github.event.inputs.build_type == 'release' || github.event.inputs.build_type == 'both') && secrets.RELEASE_KEYSTORE_BASE64 != '' }}
+        if: ${{ (github.event.inputs.build_type == 'release' || github.event.inputs.build_type == 'both') && env.RELEASE_KEYSTORE_BASE64 != '' }}
         run: |
-          echo "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" | base64 -d > "${GITHUB_WORKSPACE}/my-upload-key.jks"
+          echo "$RELEASE_KEYSTORE_BASE64" | base64 -d > "${GITHUB_WORKSPACE}/my-upload-key.jks"
           echo "KEYSTORE_PATH=${GITHUB_WORKSPACE}/my-upload-key.jks" >> $GITHUB_ENV
-          echo "STORE_PASSWORD=${{ secrets.KEYSTORE_PASSWORD }}" >> $GITHUB_ENV
-          echo "KEY_PASSWORD=${{ secrets.KEY_PASSWORD }}" >> $GITHUB_ENV
+          echo "STORE_PASSWORD=$KEYSTORE_PASSWORD" >> $GITHUB_ENV
+          echo "KEY_PASSWORD=$KEY_PASSWORD" >> $GITHUB_ENV
+          echo "KEY_ALIAS=$KEY_ALIAS" >> $GITHUB_ENV
 
       - name: Build Release APK
-        if: ${{ (github.event.inputs.build_type == 'release' || github.event.inputs.build_type == 'both') && secrets.RELEASE_KEYSTORE_BASE64 != '' }}
+        if: ${{ github.event.inputs.build_type == 'release' || github.event.inputs.build_type == 'both' }}
         run: ./gradlew assembleRelease --no-daemon --stacktrace
 
       - name: Upload Release APK Artifact
-        if: ${{ (github.event.inputs.build_type == 'release' || github.event.inputs.build_type == 'both') && secrets.RELEASE_KEYSTORE_BASE64 != '' }}
+        if: ${{ github.event.inputs.build_type == 'release' || github.event.inputs.build_type == 'both' }}
         uses: actions/upload-artifact@v4
         with:
           name: flux-launcher-release-apk
           path: app/build/outputs/apk/release/*.apk
+          if-no-files-found: warn
           retention-days: 30
