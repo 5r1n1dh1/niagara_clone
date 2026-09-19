@@ -38,8 +38,12 @@ import com.example.util.WidgetIntegrationsManager
 fun SettingsStudioSheet(
     settings: LauncherSettings,
     allApps: List<AppItem> = emptyList(),
+    dockApps: List<AppItem> = emptyList(),
     widgetIntegrations: WidgetIntegrationsManager? = null,
     onUpdateSettings: (LauncherSettings) -> Unit,
+    onSelectDockSlot: ((Int) -> Unit)? = null,
+    onClearDockSlot: ((Int) -> Unit)? = null,
+    onResetDockDefaults: (() -> Unit)? = null,
     onExportBackup: () -> String,
     onImportBackup: (String) -> Boolean,
     onResetDefaults: () -> Unit,
@@ -56,8 +60,12 @@ fun SettingsStudioSheet(
         SettingsContent(
             settings = settings,
             allApps = allApps,
+            dockApps = dockApps,
             widgetIntegrations = widgetIntegrations,
             onUpdateSettings = onUpdateSettings,
+            onSelectDockSlot = onSelectDockSlot,
+            onClearDockSlot = onClearDockSlot,
+            onResetDockDefaults = onResetDockDefaults,
             onExportBackup = onExportBackup,
             onImportBackup = onImportBackup,
             onResetDefaults = onResetDefaults,
@@ -73,8 +81,12 @@ fun SettingsStudioSheet(
 fun SettingsContent(
     settings: LauncherSettings,
     allApps: List<AppItem> = emptyList(),
+    dockApps: List<AppItem> = emptyList(),
     widgetIntegrations: WidgetIntegrationsManager? = null,
     onUpdateSettings: (LauncherSettings) -> Unit,
+    onSelectDockSlot: ((Int) -> Unit)? = null,
+    onClearDockSlot: ((Int) -> Unit)? = null,
+    onResetDockDefaults: (() -> Unit)? = null,
     onExportBackup: () -> String,
     onImportBackup: (String) -> Boolean,
     onResetDefaults: () -> Unit,
@@ -104,7 +116,7 @@ fun SettingsContent(
         FluxAccessibilityService.isServiceRunning()
     }
 
-    val categories = listOf("Appearance", "Gestures & Lock", "Widgets & Clock", "Integrations", "System")
+    val categories = listOf("Appearance", "Dock", "Gestures & Lock", "Widgets & Clock", "Integrations", "System")
 
     Column(
         modifier = modifier
@@ -188,19 +200,70 @@ fun SettingsContent(
                 0 -> {
                     // --- APPEARANCE ---
                     item {
-                        SettingsCard(title = "Themes & Colors") {
-                            Text("Theme Preset", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+                        SettingsCard(title = "Wallpaper & Themes") {
+                            Text("Wallpaper Style", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
                             Spacer(modifier = Modifier.height(8.dp))
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                LauncherThemePreset.entries.take(4).forEach { preset ->
+                                WallpaperStyle.entries.forEach { style ->
+                                    FilterChip(
+                                        selected = settings.wallpaperStyle == style,
+                                        onClick = { onUpdateSettings(settings.copy(wallpaperStyle = style)) },
+                                        label = {
+                                            val name = when (style) {
+                                                WallpaperStyle.SYSTEM_DEVICE -> "Device"
+                                                WallpaperStyle.FLUX_EMBLEM -> "Emblem"
+                                                WallpaperStyle.FLUX_MINIMAL_GRADIENT -> "Gradient"
+                                                WallpaperStyle.SYSTEM_SOLID -> "Solid"
+                                            }
+                                            Text(name, fontSize = 11.sp)
+                                        },
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            OutlinedButton(
+                                onClick = {
+                                    try {
+                                        val intent = Intent(Intent.ACTION_SET_WALLPAPER)
+                                        context.startActivity(Intent.createChooser(intent, "Choose Wallpaper"))
+                                    } catch (_: Exception) {
+                                        val intent = Intent(Settings.ACTION_DISPLAY_SETTINGS)
+                                        context.startActivity(intent)
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Icon(Icons.Filled.Wallpaper, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Change Device Wallpaper", fontSize = 12.sp)
+                            }
+
+                            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+
+                            Text("Theme Preset", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+                            Spacer(modifier = Modifier.height(8.dp))
+                            androidx.compose.foundation.lazy.LazyRow(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                items(LauncherThemePreset.entries.size) { idx ->
+                                    val preset = LauncherThemePreset.entries[idx]
                                     FilterChip(
                                         selected = settings.themePreset == preset,
                                         onClick = { onUpdateSettings(settings.copy(themePreset = preset)) },
-                                        label = { Text(preset.name.replace("_", " ").lowercase().replaceFirstChar { it.uppercase() }, fontSize = 11.sp) },
-                                        modifier = Modifier.weight(1f)
+                                        label = {
+                                            Text(
+                                                preset.name.replace("_", " ").lowercase().replaceFirstChar { it.uppercase() },
+                                                fontSize = 11.sp
+                                            )
+                                        }
                                     )
                                 }
                             }
@@ -222,25 +285,207 @@ fun SettingsContent(
                                 }
                             }
 
-                            Spacer(modifier = Modifier.height(12.dp))
+                            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+
                             SettingsToggleRow(
                                 title = "Show Notification Badges",
                                 subtitle = "Show dots on apps with active unread alerts",
                                 checked = settings.showAppNotificationBadges,
                                 onCheckedChange = { onUpdateSettings(settings.copy(showAppNotificationBadges = it)) }
                             )
-
-                            SettingsToggleRow(
-                                title = "Show Dock Labels",
-                                subtitle = "Display text below home dock apps",
-                                checked = settings.showDockLabels,
-                                onCheckedChange = { onUpdateSettings(settings.copy(showDockLabels = it)) }
-                            )
                         }
                     }
                 }
 
                 1 -> {
+                    // --- DOCK CUSTOMIZATION ---
+                    item {
+                        SettingsCard(title = "Dock Layout & Visibility") {
+                            SettingsToggleRow(
+                                title = "Show Bottom Dock",
+                                subtitle = "Display pinned quick-launch dock on the home screen",
+                                checked = settings.showDock,
+                                onCheckedChange = { onUpdateSettings(settings.copy(showDock = it)) }
+                            )
+
+                            if (settings.showDock) {
+                                HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp))
+
+                                Text(
+                                    "Number of Dock Slots",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    listOf(3, 4, 5).forEach { count ->
+                                        FilterChip(
+                                            selected = settings.dockSlotCount == count,
+                                            onClick = { onUpdateSettings(settings.copy(dockSlotCount = count)) },
+                                            label = { Text("$count Slots", fontSize = 11.sp) },
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                    }
+                                }
+
+                                HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp))
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        "Dock Icon Scale",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Text(
+                                        "${(settings.dockIconScale * 100).toInt()}%",
+                                        fontSize = 12.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Slider(
+                                    value = settings.dockIconScale,
+                                    onValueChange = { onUpdateSettings(settings.copy(dockIconScale = it)) },
+                                    valueRange = 0.8f..1.3f,
+                                    steps = 4
+                                )
+
+                                HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp))
+
+                                SettingsToggleRow(
+                                    title = "Show Dock App Labels",
+                                    subtitle = "Display app titles beneath dock icons",
+                                    checked = settings.showDockLabels,
+                                    onCheckedChange = { onUpdateSettings(settings.copy(showDockLabels = it)) }
+                                )
+
+                                HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp))
+
+                                SettingsToggleRow(
+                                    title = "Frosted Glass Blur Background",
+                                    subtitle = "Apply translucent glass backdrop behind dock icons",
+                                    checked = settings.dockBlurBackground,
+                                    onCheckedChange = { onUpdateSettings(settings.copy(dockBlurBackground = it)) }
+                                )
+                            }
+                        }
+                    }
+
+                    if (settings.showDock) {
+                        item {
+                            SettingsCard(title = "Dock App Slots") {
+                                val maxSlots = settings.dockSlotCount.coerceIn(3, 5)
+                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    for (slot in 0 until maxSlots) {
+                                        val app = dockApps.getOrNull(slot)
+                                        Surface(
+                                            shape = RoundedCornerShape(10.dp),
+                                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.SpaceBetween
+                                            ) {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    modifier = Modifier.weight(1f)
+                                                ) {
+                                                    if (app != null) {
+                                                        AppIconRenderer(
+                                                            app = app,
+                                                            iconPackType = settings.iconPackType,
+                                                            size = 32.dp
+                                                        )
+                                                        Spacer(modifier = Modifier.width(10.dp))
+                                                        Column {
+                                                            Text(
+                                                                text = "Slot #${slot + 1}: ${app.label}",
+                                                                fontSize = 13.sp,
+                                                                fontWeight = FontWeight.Medium,
+                                                                color = MaterialTheme.colorScheme.onSurface
+                                                            )
+                                                            Text(
+                                                                text = app.packageName,
+                                                                fontSize = 10.sp,
+                                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                            )
+                                                        }
+                                                    } else {
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .size(32.dp)
+                                                                .clip(CircleShape)
+                                                                .background(MaterialTheme.colorScheme.surfaceVariant),
+                                                            contentAlignment = Alignment.Center
+                                                        ) {
+                                                            Text("+", fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                        }
+                                                        Spacer(modifier = Modifier.width(10.dp))
+                                                        Text(
+                                                            text = "Slot #${slot + 1}: (Empty)",
+                                                            fontSize = 13.sp,
+                                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                        )
+                                                    }
+                                                }
+
+                                                Row {
+                                                    FilledTonalButton(
+                                                        onClick = { onSelectDockSlot?.invoke(slot) },
+                                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                                                        shape = RoundedCornerShape(6.dp)
+                                                    ) {
+                                                        Text("Change", fontSize = 11.sp)
+                                                    }
+                                                    if (app != null && onClearDockSlot != null) {
+                                                        Spacer(modifier = Modifier.width(4.dp))
+                                                        IconButton(
+                                                            onClick = { onClearDockSlot(slot) },
+                                                            modifier = Modifier.size(30.dp)
+                                                        ) {
+                                                            Icon(
+                                                                Icons.Filled.Close,
+                                                                contentDescription = "Clear Slot",
+                                                                modifier = Modifier.size(16.dp),
+                                                                tint = MaterialTheme.colorScheme.error
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(10.dp))
+
+                                OutlinedButton(
+                                    onClick = { onResetDockDefaults?.invoke() },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Icon(Icons.Filled.Restore, contentDescription = null, modifier = Modifier.size(14.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Reset Dock to Defaults (Phone, Messages, Chrome)", fontSize = 11.sp)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                2 -> {
                     // --- GESTURES & LOCK ---
                     item {
                         SettingsCard(title = "Gestures & Locking") {
@@ -273,7 +518,7 @@ fun SettingsContent(
 
                             SettingsToggleRow(
                                 title = "Swipe Down for Notifications",
-                                subtitle = "Pull down anywhere on home to open notification center",
+                                subtitle = "Pull down anywhere on home to open system notification shade",
                                 checked = settings.swipeDownForNotificationCenter,
                                 onCheckedChange = { onUpdateSettings(settings.copy(swipeDownForNotificationCenter = it)) }
                             )
@@ -299,7 +544,7 @@ fun SettingsContent(
                     }
                 }
 
-                2 -> {
+                3 -> {
                     // --- WIDGETS & CLOCK ---
                     item {
                         SettingsCard(title = "Home Screen Widgets") {
@@ -339,7 +584,7 @@ fun SettingsContent(
                     }
                 }
 
-                3 -> {
+                4 -> {
                     // --- APP INTEGRATIONS ---
                     item {
                         val pm = context.packageManager
@@ -381,7 +626,7 @@ fun SettingsContent(
                     }
                 }
 
-                4 -> {
+                5 -> {
                     // --- SYSTEM & BACKUP ---
                     item {
                         SettingsCard(title = "System Setup & Backup") {

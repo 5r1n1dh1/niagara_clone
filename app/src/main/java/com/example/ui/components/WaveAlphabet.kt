@@ -40,8 +40,10 @@ fun WaveAlphabet(
     var componentHeight by remember { mutableFloatStateOf(1f) }
     var currentTouchY by remember { mutableStateOf<Float?>(null) }
 
+    val verticalPaddingPx = with(androidx.compose.ui.platform.LocalDensity.current) { 32.dp.toPx() }
     val itemCount = ALPHABET_ITEMS.size
-    val itemHeight = if (componentHeight > 1f) componentHeight / itemCount else 24f
+    val effectiveHeight = (componentHeight - 2 * verticalPaddingPx).coerceAtLeast(1f)
+    val itemHeight = effectiveHeight / itemCount
 
     Box(
         modifier = modifier
@@ -51,20 +53,24 @@ fun WaveAlphabet(
             .onGloballyPositioned { coordinates ->
                 componentHeight = coordinates.size.height.toFloat()
             }
-            .pointerInput(componentHeight, isLeftHanded) {
+            .pointerInput(componentHeight, isLeftHanded, verticalPaddingPx) {
                 detectDragGestures(
                     onDragStart = { offset ->
                         currentTouchY = offset.y
-                        val index = (offset.y / itemHeight).toInt().coerceIn(0, itemCount - 1)
+                        val relativeY = (offset.y - verticalPaddingPx).coerceIn(0f, effectiveHeight - 1f)
+                        val index = (relativeY / itemHeight).toInt().coerceIn(0, itemCount - 1)
                         val letter = ALPHABET_ITEMS[index]
                         onLetterSelected(letter)
+                        onLetterConfirmed(letter)
                     },
                     onDrag = { change, _ ->
                         change.consume()
                         currentTouchY = change.position.y
-                        val index = (change.position.y / itemHeight).toInt().coerceIn(0, itemCount - 1)
+                        val relativeY = (change.position.y - verticalPaddingPx).coerceIn(0f, effectiveHeight - 1f)
+                        val index = (relativeY / itemHeight).toInt().coerceIn(0, itemCount - 1)
                         val letter = ALPHABET_ITEMS[index]
                         onLetterSelected(letter)
+                        onLetterConfirmed(letter)
                     },
                     onDragEnd = {
                         val finalLetter = selectedLetter ?: 'A'
@@ -78,14 +84,17 @@ fun WaveAlphabet(
                     }
                 )
             }
-            .pointerInput(componentHeight) {
+            .pointerInput(componentHeight, verticalPaddingPx) {
                 detectTapGestures(
                     onPress = { offset ->
-                        val index = (offset.y / itemHeight).toInt().coerceIn(0, itemCount - 1)
+                        currentTouchY = offset.y
+                        val relativeY = (offset.y - verticalPaddingPx).coerceIn(0f, effectiveHeight - 1f)
+                        val index = (relativeY / itemHeight).toInt().coerceIn(0, itemCount - 1)
                         val letter = ALPHABET_ITEMS[index]
                         onLetterSelected(letter)
-                        tryAwaitRelease()
                         onLetterConfirmed(letter)
+                        tryAwaitRelease()
+                        currentTouchY = null
                         onLetterSelected(null)
                     }
                 )
@@ -95,18 +104,18 @@ fun WaveAlphabet(
         Column(
             modifier = Modifier
                 .fillMaxHeight()
-                .padding(vertical = 48.dp),
+                .padding(vertical = 32.dp),
             verticalArrangement = Arrangement.SpaceBetween,
             horizontalAlignment = if (isLeftHanded) Alignment.Start else Alignment.End
         ) {
             ALPHABET_ITEMS.forEachIndexed { index, letter ->
-                val letterCenterY = (index + 0.5f) * (componentHeight / itemCount)
+                val letterCenterY = verticalPaddingPx + (index + 0.5f) * itemHeight
                 val touchY = currentTouchY
 
                 // Gaussian Wave calculation for kinetic bulge
                 val distance = if (touchY != null) abs(touchY - letterCenterY) else 9999f
                 val waveInfluence = if (touchY != null) {
-                    exp(-((distance * distance) / (2f * 65f * 65f)))
+                    exp(-((distance * distance) / (2f * 55f * 55f)))
                 } else {
                     0f
                 }

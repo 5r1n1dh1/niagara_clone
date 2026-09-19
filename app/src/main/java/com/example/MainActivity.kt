@@ -74,6 +74,7 @@ class MainActivity : ComponentActivity() {
 
             LaunchedEffect(settings.hideStatusBar) {
                 val windowInsetsController = WindowCompat.getInsetsController(window, window.decorView)
+                windowInsetsController.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
                 if (settings.hideStatusBar) {
                     windowInsetsController.hide(WindowInsetsCompat.Type.statusBars())
                 } else {
@@ -125,6 +126,7 @@ fun NiagaraLauncherScreen(
     val leftWidgets by viewModel.leftWidgets.collectAsState()
     val carouselWidgets by viewModel.carouselWidgets.collectAsState()
     val dockApps by viewModel.dockApps.collectAsState()
+    val systemWallpaperBitmap by viewModel.systemWallpaperBitmap.collectAsState()
 
     val context = LocalContext.current
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -246,26 +248,14 @@ fun NiagaraLauncherScreen(
             }
             .testTag("niagara_root")
     ) {
-        // Flux Signature Dynamic Wallpaper with Gaussian Blur on side screens
-        Box(modifier = Modifier.fillMaxSize().then(wallpaperBlurModifier)) {
-            when (settings.wallpaperStyle) {
-                WallpaperStyle.FLUX_EMBLEM -> {
-                    FluxWallpaper(
-                        showEmblem = true,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
-                WallpaperStyle.FLUX_MINIMAL_GRADIENT -> {
-                    FluxWallpaper(
-                        showEmblem = false,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
-                WallpaperStyle.SYSTEM_SOLID -> {
-                    // Handled by system surface background
-                }
-            }
-        }
+        // Live Wallpaper Backdrop supporting Device Wallpaper, Minimal Gradients, and Frosted Glass
+        LauncherWallpaperBackdrop(
+            themePreset = settings.themePreset,
+            wallpaperStyle = settings.wallpaperStyle,
+            systemWallpaperBitmap = systemWallpaperBitmap,
+            blurRadius = wallpaperBlurRadius,
+            modifier = Modifier.fillMaxSize()
+        )
 
         // 3-Page Horizontal Pager
         HorizontalPager(
@@ -315,6 +305,7 @@ fun NiagaraLauncherScreen(
                         onToggleMediaPlay = { viewModel.toggleMediaPlayPause() },
                         onMediaNext = { viewModel.skipMediaNext() },
                         onMediaPrev = { viewModel.skipMediaPrev() },
+                        onSeekMedia = { viewModel.seekMedia(it) },
                         onToggleHeadphones = { viewModel.toggleHeadphonesConnected() },
                         onOpenWeather = { viewModel.launchIntegration(com.example.util.IntegrationCategory.WEATHER) },
                         onOpenCalendar = { viewModel.launchIntegration(com.example.util.IntegrationCategory.CALENDAR) },
@@ -381,12 +372,15 @@ fun NiagaraLauncherScreen(
         }
 
         // 5. Fixed Dock (Visible ONLY on Home Screen per user request)
-        if (pagerState.currentPage == 1) {
+        if (pagerState.currentPage == 1 && settings.showDock) {
             FixedDock(
                 dockApps = dockApps,
                 iconPackType = settings.iconPackType,
                 showLabels = settings.showDockLabels,
                 blurBackground = settings.dockBlurBackground,
+                slotCount = settings.dockSlotCount,
+                iconScale = settings.dockIconScale,
+                isFrostedTheme = settings.themePreset == LauncherThemePreset.FROSTED_GLASS,
                 onAppClick = { viewModel.launchApp(it) },
                 onAppLongClick = { slotIndex -> viewModel.openDockPicker(slotIndex) },
                 modifier = Modifier.align(Alignment.BottomCenter)
@@ -468,8 +462,12 @@ fun NiagaraLauncherScreen(
             SettingsStudioSheet(
                 settings = settings,
                 allApps = allApps,
+                dockApps = dockApps,
                 widgetIntegrations = viewModel.widgetIntegrations,
                 onUpdateSettings = { viewModel.repository.updateSettings(it) },
+                onSelectDockSlot = { slotIndex -> viewModel.openDockPicker(slotIndex) },
+                onClearDockSlot = { slotIndex -> viewModel.clearDockSlot(slotIndex) },
+                onResetDockDefaults = { viewModel.resetDockToDefaults() },
                 onExportBackup = { viewModel.repository.exportBackupJson() },
                 onImportBackup = { viewModel.repository.importBackupJson(it) },
                 onResetDefaults = { viewModel.repository.resetToDefaults() },
@@ -574,20 +572,5 @@ fun NiagaraLauncherScreen(
             isVisible = isSleepOverlayVisible,
             onWakeUp = { viewModel.dismissSleepOverlay() }
         )
-
-        // 2. Swipe down Notification Center & Quick Settings Shade
-        if (isNotificationCenterOpen) {
-            NotificationCenterSheet(
-                notifications = activeNotifications,
-                onDismissNotification = { pkg -> viewModel.dismissNotification(pkg) },
-                onReplyNotification = { pkg, text -> viewModel.replyToNotification(pkg, text) },
-                onClearAll = { viewModel.clearAllNotifications() },
-                onClose = { viewModel.closeNotificationCenter() },
-                onOpenSettings = {
-                    viewModel.closeNotificationCenter()
-                    viewModel.openSettings()
-                }
-            )
-        }
     }
 }

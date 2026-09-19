@@ -14,9 +14,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -46,6 +49,8 @@ fun RightAllAppsScreen(
 ) {
     val listState = rememberLazyListState()
     val isLeftHanded = settings.leftHandedMode
+    val focusRequester = remember { FocusRequester() }
+    val keyboardController = LocalSoftwareKeyboardController.current
 
     var filterText by remember { mutableStateOf("") }
     var isSearchFocused by remember { mutableStateOf(false) }
@@ -111,61 +116,67 @@ fun RightAllAppsScreen(
             Column(
                 modifier = Modifier.fillMaxSize()
             ) {
-                // When search is active or keyboard open, the search bar slides/sits gracefully at the TOP
-                AnimatedVisibility(
-                    visible = isSearchAtTop,
-                    enter = fadeIn() + expandVertically(),
-                    exit = fadeOut() + shrinkVertically()
+                // Top Search Bar Container
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (isSearchAtTop) 0.88f else 0.55f),
+                    tonalElevation = if (isSearchAtTop) 6.dp else 2.dp,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 8.dp)
                 ) {
-                    Surface(
-                        shape = RoundedCornerShape(16.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f),
-                        tonalElevation = 6.dp,
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 20.dp, vertical = 8.dp)
+                            .padding(horizontal = 14.dp, vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 14.dp, vertical = 2.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                        IconButton(
+                            onClick = {
+                                focusRequester.requestFocus()
+                                keyboardController?.show()
+                            },
+                            modifier = Modifier.size(24.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Filled.Search,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
+                                contentDescription = "Search",
+                                tint = if (isSearchAtTop) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(18.dp)
                             )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            TextField(
-                                value = filterText,
-                                onValueChange = { filterText = it },
-                                placeholder = { Text("Search apps or categories...", fontSize = 13.sp) },
-                                singleLine = true,
-                                colors = TextFieldDefaults.colors(
-                                    focusedContainerColor = Color.Transparent,
-                                    unfocusedContainerColor = Color.Transparent,
-                                    focusedIndicatorColor = Color.Transparent,
-                                    unfocusedIndicatorColor = Color.Transparent
-                                ),
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .onFocusChanged { isSearchFocused = it.isFocused }
-                            )
-                            if (filterText.isNotEmpty()) {
-                                IconButton(
-                                    onClick = { filterText = "" },
-                                    modifier = Modifier.size(24.dp)
-                                ) {
-                                    Icon(Icons.Filled.Close, contentDescription = "Clear", modifier = Modifier.size(16.dp))
-                                }
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        TextField(
+                            value = filterText,
+                            onValueChange = { filterText = it },
+                            placeholder = { Text("Search apps or categories...", fontSize = 13.sp) },
+                            singleLine = true,
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent,
+                                focusedIndicatorColor = Color.Transparent,
+                                unfocusedIndicatorColor = Color.Transparent
+                            ),
+                            modifier = Modifier
+                                .weight(1f)
+                                .focusRequester(focusRequester)
+                                .onFocusChanged { isSearchFocused = it.isFocused }
+                        )
+                        if (filterText.isNotEmpty() || isSearchFocused) {
+                            IconButton(
+                                onClick = {
+                                    filterText = ""
+                                    keyboardController?.hide()
+                                },
+                                modifier = Modifier.size(24.dp)
+                            ) {
+                                Icon(Icons.Filled.Close, contentDescription = "Clear", modifier = Modifier.size(16.dp))
                             }
                         }
                     }
                 }
 
-                // Main App List & Bottom Bar Container
+                // Main App List & Fast Scroll
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -180,10 +191,7 @@ fun RightAllAppsScreen(
                                 end = if (isLeftHanded) sideMargin else 36.dp
                             )
                             .testTag("all_apps_list"),
-                        contentPadding = PaddingValues(
-                            top = if (isSearchAtTop) 4.dp else 12.dp,
-                            bottom = if (isSearchAtTop) 24.dp else 80.dp
-                        )
+                        contentPadding = PaddingValues(top = 4.dp, bottom = 90.dp)
                     ) {
                         // Categorized Folders
                         if (filterText.isBlank() && folders.isNotEmpty()) {
@@ -257,12 +265,13 @@ fun RightAllAppsScreen(
                                 } else {
                                     letter
                                 }
-                                val index = nonHiddenApps.indexOfFirst {
+                                val appIndex = nonHiddenApps.indexOfFirst {
                                     it.label.firstOrNull()?.uppercaseChar() == targetChar
                                 }
-                                if (index != -1) {
+                                if (appIndex != -1) {
                                     scope.launch {
-                                        listState.scrollToItem(index.coerceAtLeast(0))
+                                        val offset = if (folders.isNotEmpty()) folders.size else 0
+                                        listState.scrollToItem((appIndex + offset).coerceAtLeast(0))
                                     }
                                 }
                             },
@@ -270,50 +279,6 @@ fun RightAllAppsScreen(
                                 .fillMaxHeight()
                                 .padding(vertical = 16.dp)
                         )
-                    }
-
-                    // Bottom-docked minimal search bar when idle (Slides up to top when focused)
-                    if (!isSearchAtTop) {
-                        Surface(
-                            shape = RoundedCornerShape(20.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.75f),
-                            tonalElevation = 4.dp,
-                            modifier = Modifier
-                                .align(Alignment.BottomCenter)
-                                .fillMaxWidth()
-                                .padding(horizontal = 20.dp, vertical = 10.dp)
-                                .navigationBarsPadding()
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 2.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Filled.Search,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                TextField(
-                                    value = filterText,
-                                    onValueChange = { filterText = it },
-                                    placeholder = { Text("Search apps or categories...", fontSize = 13.sp) },
-                                    singleLine = true,
-                                    colors = TextFieldDefaults.colors(
-                                        focusedContainerColor = Color.Transparent,
-                                        unfocusedContainerColor = Color.Transparent,
-                                        focusedIndicatorColor = Color.Transparent,
-                                        unfocusedIndicatorColor = Color.Transparent
-                                    ),
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .onFocusChanged { isSearchFocused = it.isFocused }
-                                )
-                            }
-                        }
                     }
                 }
             }

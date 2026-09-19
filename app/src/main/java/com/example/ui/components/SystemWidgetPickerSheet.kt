@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -147,7 +148,20 @@ fun SystemWidgetPickerSheet(
                         .heightIn(max = 420.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(filteredProviders, key = { "${it.appPackage}_${it.widgetLabel}_${it.minWidth}" }) { item ->
+                    itemsIndexed(
+                        items = filteredProviders,
+                        key = { index: Int, item: SystemWidgetProviderItem ->
+                            "${item.providerInfo.provider.flattenToString()}_${index}"
+                        }
+                    ) { _, item: SystemWidgetProviderItem ->
+                        val iconBitmap = remember(item.appIcon) {
+                            try {
+                                item.appIcon?.toBitmap(80, 80)?.asImageBitmap()
+                            } catch (e: Throwable) {
+                                null
+                            }
+                        }
+
                         Surface(
                             shape = RoundedCornerShape(14.dp),
                             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
@@ -170,33 +184,14 @@ fun SystemWidgetPickerSheet(
                                     modifier = Modifier.weight(1f),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    if (item.appIcon != null) {
-                                        val bitmap = remember(item.appIcon) {
-                                            try {
-                                                item.appIcon.toBitmap(80, 80).asImageBitmap()
-                                            } catch (e: Exception) {
-                                                null
-                                            }
-                                        }
-                                        if (bitmap != null) {
-                                            Image(
-                                                bitmap = bitmap,
-                                                contentDescription = item.appLabel,
-                                                modifier = Modifier
-                                                    .size(36.dp)
-                                                    .clip(RoundedCornerShape(8.dp))
-                                            )
-                                        } else {
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(36.dp)
-                                                    .clip(RoundedCornerShape(8.dp))
-                                                    .background(MaterialTheme.colorScheme.primaryContainer),
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                Text(item.appLabel.take(1), fontWeight = FontWeight.Bold)
-                                            }
-                                        }
+                                    if (iconBitmap != null) {
+                                        Image(
+                                            bitmap = iconBitmap,
+                                            contentDescription = item.appLabel,
+                                            modifier = Modifier
+                                                .size(36.dp)
+                                                .clip(RoundedCornerShape(8.dp))
+                                        )
                                     } else {
                                         Box(
                                             modifier = Modifier
@@ -205,7 +200,11 @@ fun SystemWidgetPickerSheet(
                                                 .background(MaterialTheme.colorScheme.primaryContainer),
                                             contentAlignment = Alignment.Center
                                         ) {
-                                            Text(item.appLabel.take(1), fontWeight = FontWeight.Bold)
+                                            Text(
+                                                text = item.appLabel.firstOrNull()?.toString() ?: "W",
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                                            )
                                         }
                                     }
 

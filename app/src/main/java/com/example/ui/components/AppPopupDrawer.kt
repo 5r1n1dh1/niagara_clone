@@ -103,6 +103,7 @@ fun AppPopupDrawer(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    var isFavoriteState by remember(app.isFavorite, app.packageName) { mutableStateOf(app.isFavorite) }
     var showDisguiseDialog by remember { mutableStateOf(false) }
     var disguiseText by remember { mutableStateOf(app.disguisedName ?: "") }
     var replyInput by remember { mutableStateOf("") }
@@ -163,14 +164,17 @@ fun AppPopupDrawer(
                 }
 
                 IconButton(
-                    onClick = onToggleFavorite,
-                    modifier = Modifier.size(36.dp)
+                    onClick = {
+                        isFavoriteState = !isFavoriteState
+                        onToggleFavorite()
+                    },
+                    modifier = Modifier.size(36.dp).testTag("app_popup_favorite_toggle")
                 ) {
                     Icon(
-                        imageVector = if (app.isFavorite) Icons.Filled.Star else Icons.Outlined.StarBorder,
+                        imageVector = if (isFavoriteState) Icons.Filled.Star else Icons.Outlined.StarBorder,
                         contentDescription = "Favorite",
-                        tint = if (app.isFavorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(22.dp)
+                        tint = if (isFavoriteState) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(24.dp)
                     )
                 }
             }

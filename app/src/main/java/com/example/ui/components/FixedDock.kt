@@ -31,7 +31,7 @@ import com.example.data.AppItem
 import com.example.data.IconPackType
 
 /**
- * Fixed Bottom Dock showing exactly MAX 3 icons.
+ * Fixed Bottom Dock showing user-customized app icons.
  * Persistent across all 3 screens (Left, Center, Right).
  */
 @OptIn(ExperimentalFoundationApi::class)
@@ -39,14 +39,17 @@ import com.example.data.IconPackType
 fun FixedDock(
     dockApps: List<AppItem>,
     iconPackType: IconPackType,
+    slotCount: Int = 3,
     showLabels: Boolean = false,
     blurBackground: Boolean = true,
+    iconScale: Float = 1.0f,
+    isFrostedTheme: Boolean = false,
     onAppClick: (AppItem) -> Unit,
-    onAppLongClick: (Int) -> Unit, // Slot index 0, 1, or 2
+    onAppLongClick: (Int) -> Unit, // Slot index 0..(slotCount-1)
     modifier: Modifier = Modifier
 ) {
-    // Exactly max 3 icons
-    val displayApps = dockApps.take(3)
+    val maxSlots = slotCount.coerceIn(3, 5)
+    val displayApps = dockApps.take(maxSlots)
 
     Box(
         modifier = modifier
@@ -58,25 +61,38 @@ fun FixedDock(
     ) {
         Surface(
             shape = RoundedCornerShape(28.dp),
-            color = if (blurBackground) {
+            color = if (isFrostedTheme) {
+                Color(0x551E293B)
+            } else if (blurBackground) {
                 MaterialTheme.colorScheme.surface.copy(alpha = 0.88f)
             } else {
                 MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
             },
             tonalElevation = if (blurBackground) 8.dp else 2.dp,
             shadowElevation = if (blurBackground) 10.dp else 0.dp,
+            border = if (isFrostedTheme) {
+                androidx.compose.foundation.BorderStroke(
+                    1.dp,
+                    androidx.compose.ui.graphics.Brush.linearGradient(
+                        listOf(
+                            Color.White.copy(alpha = 0.35f),
+                            Color.White.copy(alpha = 0.10f)
+                        )
+                    )
+                )
+            } else null,
             modifier = Modifier
                 .wrapContentWidth()
-                .height(if (showLabels) 76.dp else 64.dp)
+                .height(if (showLabels) (76 * iconScale).dp else (64 * iconScale).dp)
                 .clip(RoundedCornerShape(28.dp))
         ) {
             Row(
                 modifier = Modifier
-                    .padding(horizontal = 14.dp, vertical = 6.dp),
-                horizontalArrangement = Arrangement.spacedBy(18.dp),
+                    .padding(horizontal = (12 * iconScale).dp, vertical = (6 * iconScale).dp),
+                horizontalArrangement = Arrangement.spacedBy((14 * iconScale).dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                for (index in 0..2) {
+                for (index in 0 until maxSlots) {
                     val app = displayApps.getOrNull(index)
                     val interactionSource = remember { MutableInteractionSource() }
                     val isPressed by interactionSource.collectIsPressedAsState()
@@ -94,7 +110,7 @@ fun FixedDock(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center,
                             modifier = Modifier
-                                .width(54.dp)
+                                .width((50 * iconScale).dp)
                                 .graphicsLayer {
                                     scaleX = slotScale
                                     scaleY = slotScale
@@ -109,20 +125,20 @@ fun FixedDock(
                                 .testTag("dock_slot_$index")
                         ) {
                             Box(
-                                modifier = Modifier.size(if (showLabels) 40.dp else 50.dp),
+                                modifier = Modifier.size(if (showLabels) (38 * iconScale).dp else (46 * iconScale).dp),
                                 contentAlignment = Alignment.Center
                             ) {
                                 AppIconRenderer(
                                     app = app,
                                     iconPackType = iconPackType,
-                                    size = if (showLabels) 36.dp else 42.dp
+                                    size = if (showLabels) (34 * iconScale).dp else (40 * iconScale).dp
                                 )
                             }
                             if (showLabels) {
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
                                     text = app.label,
-                                    fontSize = 10.sp,
+                                    fontSize = (9 * iconScale).sp,
                                     fontWeight = FontWeight.Medium,
                                     maxLines = 1,
                                     color = MaterialTheme.colorScheme.onSurface
@@ -133,7 +149,7 @@ fun FixedDock(
                         // Empty slot indicator
                         Box(
                             modifier = Modifier
-                                .size(if (showLabels) 40.dp else 50.dp)
+                                .size(if (showLabels) (38 * iconScale).dp else (46 * iconScale).dp)
                                 .graphicsLayer {
                                     scaleX = slotScale
                                     scaleY = slotScale
@@ -150,7 +166,7 @@ fun FixedDock(
                         ) {
                             Text(
                                 text = "+",
-                                fontSize = 20.sp,
+                                fontSize = 18.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }

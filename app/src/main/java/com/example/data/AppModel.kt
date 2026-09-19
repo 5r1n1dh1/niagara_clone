@@ -56,13 +56,14 @@ enum class ClockStyle(val displayName: String) {
 }
 
 enum class WallpaperStyle(val displayName: String) {
+    SYSTEM_DEVICE("Device Wallpaper"),
     FLUX_EMBLEM("Flux Signature Wallpaper"),
     FLUX_MINIMAL_GRADIENT("Flux Soft Gradient"),
     SYSTEM_SOLID("Solid Dark Theme")
 }
 
 enum class LauncherThemePreset(val displayName: String, val primary: Color, val background: Color, val surface: Color, val accent: Color) {
-    FROSTED_GLASS("Frosted Glass", Color(0xFFBAE6FD), Color(0xFF0C1322), Color(0xFF1E293B), Color(0xFF38BDF8)),
+    FROSTED_GLASS("Frosted Glass", Color(0xFFBAE6FD), Color(0x660C1322), Color(0x731E293B), Color(0xFF38BDF8)),
     FLUX_EMERALD("Flux Emerald", Color(0xFF6EE7B7), Color(0xFF0B211A), Color(0xFF163E33), Color(0xFFA7F3D0)),
     MIDNIGHT_OBSIDIAN("Midnight Obsidian", Color(0xFF38BDF8), Color(0xFF090D16), Color(0xFF131C2E), Color(0xFF00E5FF)),
     AMOLED_BLACK("Pitch Black AMOLED", Color(0xFFFFFFFF), Color(0xFF000000), Color(0xFF121212), Color(0xFF64B5F6)),
@@ -178,8 +179,11 @@ data class LauncherSettings(
     val appIconScale: Float = 1.0f,
     val showAppNotificationBadges: Boolean = true,
     val compactAppRowSpacing: Boolean = false,
+    val showDock: Boolean = true,
+    val dockSlotCount: Int = 3, // 3, 4, or 5
     val showDockLabels: Boolean = false,
     val dockBlurBackground: Boolean = true,
+    val dockIconScale: Float = 1.0f,
     val blurBackgrounds: Boolean = true,
     val waveAlphabetHapticIntensity: Int = 2, // 1: subtle, 2: medium, 3: heavy
     val customIconSettings: CustomIconPackSettings = CustomIconPackSettings(),

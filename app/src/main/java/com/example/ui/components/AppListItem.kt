@@ -198,18 +198,6 @@ fun AppListItem(
                         ) {}
                     }
                 }
-            } else {
-                IconButton(
-                    onClick = onAppLongClick,
-                    modifier = Modifier.size(32.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.MoreVert,
-                        contentDescription = "App Options",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
             }
         }
 

@@ -2,16 +2,21 @@ package com.example.ui
 
 import android.annotation.SuppressLint
 import android.app.Application
+import android.app.WallpaperManager
 import android.content.ComponentName
 import android.content.Intent
 import android.net.Uri
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.widget.Toast
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.drawable.toBitmap
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.*
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
@@ -32,6 +37,27 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     val allActiveNotifications = repository.allActiveNotifications
     val leftWidgets = repository.leftWidgets
     val carouselWidgets = repository.carouselWidgets
+
+    private val _systemWallpaperBitmap = MutableStateFlow<ImageBitmap?>(null)
+    val systemWallpaperBitmap: StateFlow<ImageBitmap?> = _systemWallpaperBitmap.asStateFlow()
+
+    init {
+        loadSystemWallpaper()
+    }
+
+    fun loadSystemWallpaper() {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val wpManager = WallpaperManager.getInstance(getApplication())
+                val drawable = wpManager.drawable
+                if (drawable != null) {
+                    val bitmap = drawable.toBitmap(720, 1280, android.graphics.Bitmap.Config.ARGB_8888)
+                    _systemWallpaperBitmap.value = bitmap.asImageBitmap()
+                }
+            } catch (_: Exception) {
+            }
+        }
+    }
 
     val widgetIntegrations = com.example.util.WidgetIntegrationsManager(application)
 
@@ -59,7 +85,8 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         repository.syncMusicIntegration()
     }
 
-    val dockApps: StateFlow<List<AppItem>> = combine(allApps, repository.dockPackageNames) { apps, pkgs ->
+    val dockApps: StateFlow<List<AppItem>> = combine(allApps, repository.dockPackageNames, settings) { apps, pkgs, sett ->
+        val maxSlots = sett.dockSlotCount.coerceIn(3, 5)
         val list = mutableListOf<AppItem>()
         for (pkg in pkgs) {
             val found = apps.find { it.packageName == pkg }
@@ -67,20 +94,37 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
                 list.add(found)
             }
         }
-        // Ensure up to 3 icons
-        if (list.size < 3) {
+        if (list.size < maxSlots) {
             for (app in apps) {
-                if (list.size >= 3) break
+                if (list.size >= maxSlots) break
                 if (list.none { it.packageName == app.packageName }) {
                     list.add(app)
                 }
             }
         }
-        list.take(3)
+        list.take(maxSlots)
     }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     private val _dockPickerSlot = MutableStateFlow<Int?>(null)
     val dockPickerSlot: StateFlow<Int?> = _dockPickerSlot.asStateFlow()
+
+    fun setDockSlot(slotIndex: Int, packageName: String) {
+        repository.setDockSlot(slotIndex, packageName)
+        _dockPickerSlot.value = null
+        showToast("Dock updated")
+        vibrateClick()
+    }
+
+    fun clearDockSlot(slotIndex: Int) {
+        repository.clearDockSlot(slotIndex)
+        vibrateClick()
+    }
+
+    fun resetDockToDefaults() {
+        repository.resetDockToDefaults()
+        showToast("Dock reset to default apps")
+        vibrateClick()
+    }
 
     private val _isAddWidgetOpen = MutableStateFlow(false)
     val isAddWidgetOpen: StateFlow<Boolean> = _isAddWidgetOpen.asStateFlow()
@@ -212,25 +256,30 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun openNotificationCenter() {
-        _isNotificationCenterOpen.value = true
         vibrateClick()
         triggerSystemNotificationShade()
     }
 
-    private fun triggerSystemNotificationShade() {
+    fun triggerSystemNotificationShade(): Boolean {
         val context = getApplication<Application>()
-        try {
+        return try {
             @SuppressLint("WrongConstant")
             val statusBarService = context.getSystemService("statusbar")
             val statusBarManagerClass = Class.forName("android.app.StatusBarManager")
-            val method = try {
-                statusBarManagerClass.getMethod("expandNotificationsPanel")
-            } catch (_: NoSuchMethodException) {
-                statusBarManagerClass.getMethod("expand")
-            }
+            val method = statusBarManagerClass.getMethod("expandNotificationsPanel")
             method.invoke(statusBarService)
+            true
         } catch (_: Throwable) {
-            // Falls back smoothly to our custom rich NotificationCenterSheet
+            try {
+                @SuppressLint("WrongConstant")
+                val statusBarService = context.getSystemService("statusbar")
+                val statusBarManagerClass = Class.forName("android.app.StatusBarManager")
+                val method = statusBarManagerClass.getMethod("expand")
+                method.invoke(statusBarService)
+                true
+            } catch (_: Throwable) {
+                false
+            }
         }
     }
 
@@ -348,8 +397,17 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun toggleFavorite(packageName: String) {
+        val wasFav = favorites.value.any { it.packageName == packageName }
         repository.toggleFavorite(packageName)
+        val app = allApps.value.find { it.packageName == packageName }
+        val name = app?.disguisedName ?: app?.label ?: "App"
+        showToast(if (wasFav) "Removed $name from favorites" else "Added $name to favorites ⭐")
         vibrateClick()
+        _activeAppForPopup.value?.let { current ->
+            if (current.packageName == packageName) {
+                _activeAppForPopup.value = current.copy(isFavorite = !wasFav)
+            }
+        }
     }
 
     fun toggleHideApp(packageName: String) {
@@ -390,6 +448,11 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
 
     fun skipMediaPrev() {
         repository.skipPreviousMedia()
+        vibrateTick()
+    }
+
+    fun seekMedia(percent: Float) {
+        repository.seekMedia(percent)
         vibrateTick()
     }
 

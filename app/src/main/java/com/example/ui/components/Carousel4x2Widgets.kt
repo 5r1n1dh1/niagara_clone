@@ -1,7 +1,9 @@
 package com.example.ui.components
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -28,6 +30,7 @@ import java.util.*
  * 4x2 Aspect-Ratio Standard Widget Card for the Center Home Screen Carousel
  * Dimensions: ~4 cols x 2 rows in standard Android launcher grid (~165dp height, fillMaxWidth).
  */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun Carousel4x2WidgetCard(
     type: WidgetType,
@@ -35,9 +38,11 @@ fun Carousel4x2WidgetCard(
     mediaPlayer: MediaPlaybackState,
     calendarEvents: List<CalendarEvent>,
     isHeadphonesConnected: Boolean,
+    showSeconds: Boolean = false,
     onToggleMediaPlay: () -> Unit,
     onMediaNext: () -> Unit,
     onMediaPrev: () -> Unit,
+    onSeekMedia: (Float) -> Unit = {},
     onToggleHeadphones: () -> Unit,
     onOpenWeather: () -> Unit,
     onOpenCalendar: () -> Unit,
@@ -52,6 +57,10 @@ fun Carousel4x2WidgetCard(
         modifier = modifier
             .fillMaxWidth()
             .height(168.dp) // Standard 4x2 grid equivalent height
+            .combinedClickable(
+                onClick = {},
+                onLongClick = onOpenCustomize
+            )
             .testTag("carousel_4x2_card_${type.name}")
     ) {
         Box(modifier = Modifier.fillMaxSize().padding(14.dp)) {
@@ -60,6 +69,7 @@ fun Carousel4x2WidgetCard(
                     Clock4x2Widget(
                         weather = weather,
                         event = calendarEvents.firstOrNull(),
+                        showSeconds = showSeconds,
                         onOpenWeather = onOpenWeather,
                         onOpenCalendar = onOpenCalendar,
                         onOpenSettings = onOpenSettings
@@ -75,6 +85,7 @@ fun Carousel4x2WidgetCard(
                         onTogglePlay = onToggleMediaPlay,
                         onNext = onMediaNext,
                         onPrev = onMediaPrev,
+                        onSeek = onSeekMedia,
                         onToggleHeadphones = onToggleHeadphones
                     )
                 }
@@ -106,21 +117,6 @@ fun Carousel4x2WidgetCard(
                         )
                     }
                 }
-            }
-
-            // Subtle customize indicator on top-right
-            IconButton(
-                onClick = onOpenCustomize,
-                modifier = Modifier
-                    .size(24.dp)
-                    .align(Alignment.TopEnd)
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Tune,
-                    contentDescription = "Customize carousel widgets",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                    modifier = Modifier.size(15.dp)
-                )
             }
         }
     }
@@ -191,6 +187,7 @@ private fun MediaPlayer4x2Widget(
     onTogglePlay: () -> Unit,
     onNext: () -> Unit,
     onPrev: () -> Unit,
+    onSeek: (Float) -> Unit = {},
     onToggleHeadphones: () -> Unit
 ) {
     Column(
@@ -237,22 +234,25 @@ private fun MediaPlayer4x2Widget(
             }
         }
 
-        // Progress bar
+        // Interactive Progress / Seek bar
         Column {
-            LinearProgressIndicator(
-                progress = { media.progressPercent },
+            Slider(
+                value = media.progressPercent.coerceIn(0f, 1f),
+                onValueChange = { onSeek(it) },
+                colors = SliderDefaults.colors(
+                    thumbColor = MaterialTheme.colorScheme.primary,
+                    activeTrackColor = MaterialTheme.colorScheme.primary,
+                    inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
+                ),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(4.dp)
-                    .clip(RoundedCornerShape(2.dp)),
-                color = MaterialTheme.colorScheme.primary,
-                trackColor = MaterialTheme.colorScheme.surfaceVariant
+                    .height(18.dp)
             )
 
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 4.dp),
+                    .padding(top = 2.dp),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(text = media.currentTimeText, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -640,15 +640,22 @@ private fun DualClock4x2Widget() {
 private fun Clock4x2Widget(
     weather: WeatherInfo,
     event: CalendarEvent?,
+    showSeconds: Boolean = false,
     onOpenWeather: () -> Unit,
     onOpenCalendar: () -> Unit,
     onOpenSettings: () -> Unit
 ) {
     var currentTime by remember { mutableStateOf(Calendar.getInstance()) }
-    LaunchedEffect(Unit) {
+    LaunchedEffect(showSeconds) {
         while (true) {
             currentTime = Calendar.getInstance()
-            kotlinx.coroutines.delay(1000)
+            if (showSeconds) {
+                kotlinx.coroutines.delay(1000L)
+            } else {
+                val now = System.currentTimeMillis()
+                val delayMs = (60_000L - (now % 60_000L) + 50L).coerceIn(1000L, 60_000L)
+                kotlinx.coroutines.delay(delayMs)
+            }
         }
     }
     val timeFormat = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
@@ -676,14 +683,16 @@ private fun Clock4x2Widget(
                     lineHeight = 44.sp,
                     color = MaterialTheme.colorScheme.onSurface
                 )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = secondsFormat.format(currentTime.time),
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(bottom = 6.dp)
-                )
+                if (showSeconds) {
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = secondsFormat.format(currentTime.time),
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(bottom = 6.dp)
+                    )
+                }
             }
 
             // Weather Glance Pill

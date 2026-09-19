@@ -163,8 +163,11 @@ class LauncherRepository(private val context: Context) {
             appIconScale = prefs.getFloat("app_icon_scale", 1.0f),
             showAppNotificationBadges = prefs.getBoolean("app_notif_badges", true),
             compactAppRowSpacing = prefs.getBoolean("compact_row_spacing", false),
+            showDock = prefs.getBoolean("show_dock", true),
+            dockSlotCount = prefs.getInt("dock_slot_count", 3).coerceIn(3, 5),
             showDockLabels = prefs.getBoolean("show_dock_labels", false),
             dockBlurBackground = prefs.getBoolean("dock_blur_bg", true),
+            dockIconScale = prefs.getFloat("dock_icon_scale", 1.0f),
             waveAlphabetHapticIntensity = prefs.getInt("wave_haptic_intensity", 2),
             customIconSettings = customIconSettings,
             hasCompletedOnboarding = prefs.getBoolean("has_completed_onboarding", false)
@@ -196,8 +199,11 @@ class LauncherRepository(private val context: Context) {
             .putFloat("app_icon_scale", newSettings.appIconScale)
             .putBoolean("app_notif_badges", newSettings.showAppNotificationBadges)
             .putBoolean("compact_row_spacing", newSettings.compactAppRowSpacing)
+            .putBoolean("show_dock", newSettings.showDock)
+            .putInt("dock_slot_count", newSettings.dockSlotCount)
             .putBoolean("show_dock_labels", newSettings.showDockLabels)
             .putBoolean("dock_blur_bg", newSettings.dockBlurBackground)
+            .putFloat("dock_icon_scale", newSettings.dockIconScale)
             .putInt("wave_haptic_intensity", newSettings.waveAlphabetHapticIntensity)
             .putString("custom_icon_preset", newSettings.customIconSettings.packPreset.name)
             .putString("custom_icon_shape", newSettings.customIconSettings.iconShape.name)
@@ -640,13 +646,28 @@ class LauncherRepository(private val context: Context) {
 
     fun toggleFavorite(packageName: String) {
         val currentFavs = getSavedFavoritePackages().toMutableSet()
-        if (currentFavs.contains(packageName)) {
+        val isNowFav = if (currentFavs.contains(packageName)) {
             currentFavs.remove(packageName)
+            false
         } else {
             currentFavs.add(packageName)
+            true
         }
         saveFavoritePackages(currentFavs)
-        reloadApps()
+
+        // Instant in-memory state update without full reloading spinner
+        val updatedApps = _allApps.value.map {
+            if (it.packageName == packageName) it.copy(isFavorite = isNowFav) else it
+        }
+        _allApps.value = updatedApps
+        val targetApp = updatedApps.find { it.packageName == packageName }
+        if (isNowFav && targetApp != null) {
+            if (!_favorites.value.any { it.packageName == packageName }) {
+                _favorites.value = _favorites.value + targetApp
+            }
+        } else {
+            _favorites.value = _favorites.value.filter { it.packageName != packageName }
+        }
     }
 
     fun reorderFavorites(fromIndex: Int, toIndex: Int) {
@@ -661,24 +682,38 @@ class LauncherRepository(private val context: Context) {
 
     fun toggleHideApp(packageName: String) {
         val hidden = getSavedHiddenPackages().toMutableSet()
-        if (hidden.contains(packageName)) {
+        val isNowHidden = if (hidden.contains(packageName)) {
             hidden.remove(packageName)
+            false
         } else {
             hidden.add(packageName)
+            true
         }
         saveHiddenPackages(hidden)
-        reloadApps()
+        _allApps.value = _allApps.value.map {
+            if (it.packageName == packageName) it.copy(isHidden = isNowHidden) else it
+        }
+        if (isNowHidden) {
+            _favorites.value = _favorites.value.filter { it.packageName != packageName }
+        }
     }
 
     fun toggleUsageBreaker(packageName: String) {
         val ub = getSavedUsageBreakerPackages().toMutableSet()
-        if (ub.contains(packageName)) {
+        val isNowActive = if (ub.contains(packageName)) {
             ub.remove(packageName)
+            false
         } else {
             ub.add(packageName)
+            true
         }
         saveUsageBreakerPackages(ub)
-        reloadApps()
+        _allApps.value = _allApps.value.map {
+            if (it.packageName == packageName) it.copy(isUsageBreakerActive = isNowActive) else it
+        }
+        _favorites.value = _favorites.value.map {
+            if (it.packageName == packageName) it.copy(isUsageBreakerActive = isNowActive) else it
+        }
     }
 
     fun disguiseApp(packageName: String, newName: String?) {
@@ -689,7 +724,12 @@ class LauncherRepository(private val context: Context) {
             map[packageName] = newName
         }
         saveDisguisedMap(map)
-        reloadApps()
+        _allApps.value = _allApps.value.map {
+            if (it.packageName == packageName) it.copy(disguisedName = newName) else it
+        }
+        _favorites.value = _favorites.value.map {
+            if (it.packageName == packageName) it.copy(disguisedName = newName) else it
+        }
     }
 
     fun replyToNotification(packageName: String, replyText: String) {
@@ -801,9 +841,35 @@ class LauncherRepository(private val context: Context) {
     }
 
     fun skipPreviousMedia() {
+        val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? android.media.AudioManager
+        try {
+            val downEvent = android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_MEDIA_PREVIOUS)
+            val upEvent = android.view.KeyEvent(android.view.KeyEvent.ACTION_UP, android.view.KeyEvent.KEYCODE_MEDIA_PREVIOUS)
+            audioManager?.dispatchMediaKeyEvent(downEvent)
+            audioManager?.dispatchMediaKeyEvent(upEvent)
+        } catch (_: Exception) {}
+
+        val musicPkg = widgetIntegrations.getPackage(IntegrationCategory.MUSIC)
+        val currentApp = if (musicPkg != null) widgetIntegrations.getAppLabel(IntegrationCategory.MUSIC, context.packageManager) else "Spotify"
+        val tracks = listOf(
+            MediaPlaybackState(true, "Resonance", "HOME", currentApp, 0.10f, "3:32", "0:21"),
+            MediaPlaybackState(true, "Solar Power", "Lorde", currentApp, 0.05f, "3:12", "0:10"),
+            MediaPlaybackState(true, "Starboy", "The Weeknd, Daft Punk", currentApp, 0.08f, "3:50", "0:18"),
+            MediaPlaybackState(true, "Midnight City", "M83", currentApp, 0.15f, "4:03", "0:36")
+        )
+        _mediaPlayer.value = tracks.random()
+    }
+
+    fun seekMedia(progress: Float) {
+        val p = progress.coerceIn(0f, 1f)
+        val totalSec = 240
+        val currentSec = (p * totalSec).toInt()
+        val min = currentSec / 60
+        val sec = currentSec % 60
+        val timeStr = String.format(Locale.getDefault(), "%d:%02d", min, sec)
         _mediaPlayer.value = _mediaPlayer.value.copy(
-            progressPercent = 0f,
-            currentTimeText = "0:00"
+            progressPercent = p,
+            currentTimeText = timeStr
         )
     }
 
@@ -1119,7 +1185,7 @@ class LauncherRepository(private val context: Context) {
     }
 
     // ==========================================
-    // 3. FIXED DOCK (MAX 3 APPS)
+    // 3. FIXED DOCK (CUSTOMIZABLE MAX 5 APPS)
     // ==========================================
     private fun loadDockPackages() {
         val jsonStr = prefs.getString("dock_apps_json", null)
@@ -1131,7 +1197,7 @@ class LauncherRepository(private val context: Context) {
                     list.add(arr.getString(i))
                 }
                 if (list.isNotEmpty()) {
-                    _dockPackageNames.value = list.take(3)
+                    _dockPackageNames.value = list.take(5)
                     return
                 }
             } catch (e: Exception) {
@@ -1139,7 +1205,7 @@ class LauncherRepository(private val context: Context) {
             }
         }
 
-        // Default 3 dock icons
+        // Default dock icons
         _dockPackageNames.value = listOf(
             "com.google.android.dialer",
             "com.google.android.apps.messaging",
@@ -1149,7 +1215,7 @@ class LauncherRepository(private val context: Context) {
 
     private fun saveDockPackages(pkgs: List<String>) {
         val arr = JSONArray()
-        for (p in pkgs.take(3)) {
+        for (p in pkgs.take(5)) {
             arr.put(p)
         }
         prefs.edit().putString("dock_apps_json", arr.toString()).apply()
@@ -1157,15 +1223,34 @@ class LauncherRepository(private val context: Context) {
 
     fun setDockSlot(slotIndex: Int, packageName: String) {
         val current = _dockPackageNames.value.toMutableList()
-        while (current.size < 3) {
+        while (current.size <= slotIndex) {
             current.add("")
         }
-        if (slotIndex in 0..2) {
+        if (slotIndex in 0..4) {
             current[slotIndex] = packageName
-            val finalized = current.take(3)
+            val finalized = current.take(5)
             _dockPackageNames.value = finalized
             saveDockPackages(finalized)
         }
+    }
+
+    fun clearDockSlot(slotIndex: Int) {
+        val current = _dockPackageNames.value.toMutableList()
+        if (slotIndex in current.indices) {
+            current.removeAt(slotIndex)
+            _dockPackageNames.value = current
+            saveDockPackages(current)
+        }
+    }
+
+    fun resetDockToDefaults() {
+        val defaults = listOf(
+            "com.google.android.dialer",
+            "com.google.android.apps.messaging",
+            "com.android.chrome"
+        )
+        _dockPackageNames.value = defaults
+        saveDockPackages(defaults)
     }
 }
 
