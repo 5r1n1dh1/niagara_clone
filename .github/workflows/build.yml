@@ -10,7 +10,7 @@ on:
       build_type:
         description: 'Build Type (debug or release)'
         required: true
-        default: 'debug'
+        default: 'release'
         type: choice
         options:
           - debug
@@ -19,7 +19,7 @@ on:
       skip_tests:
         description: 'Skip Unit Tests'
         required: false
-        default: false
+        default: true
         type: boolean
 
 jobs:
@@ -270,4 +270,3 @@ jobs:
           path: gemini-failure-analysis.md
           if-no-files-found: ignore
           retention-days: 14
-
