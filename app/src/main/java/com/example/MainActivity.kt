@@ -31,11 +31,16 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -51,9 +56,16 @@ import kotlinx.coroutines.launch
 class MainActivity : ComponentActivity() {
 
     private val viewModel: LauncherViewModel by viewModels()
+    var appWidgetHost: android.appwidget.AppWidgetHost? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        appWidgetHost = android.appwidget.AppWidgetHost(applicationContext, 1024)
+        try {
+            appWidgetHost?.startListening()
+        } catch (e: Exception) {
+            // Safe fallback
+        }
         enableEdgeToEdge()
 
         setContent {
@@ -79,6 +91,15 @@ class MainActivity : ComponentActivity() {
                     NiagaraLauncherScreen(viewModel = viewModel)
                 }
             }
+        }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        try {
+            appWidgetHost?.stopListening()
+        } catch (e: Exception) {
+            // Safe fallback
         }
     }
 }
@@ -116,9 +137,6 @@ fun NiagaraLauncherScreen(
                 add(Manifest.permission.POST_NOTIFICATIONS)
             }
             add(Manifest.permission.READ_CALENDAR)
-            add(Manifest.permission.ACCESS_FINE_LOCATION)
-            add(Manifest.permission.ACCESS_COARSE_LOCATION)
-            add(Manifest.permission.CAMERA)
         }.filter {
             ContextCompat.checkSelfPermission(context, it) != PackageManager.PERMISSION_GRANTED
         }
@@ -148,6 +166,7 @@ fun NiagaraLauncherScreen(
     val mathResult by viewModel.mathResult.collectAsState()
 
     val isAddWidgetOpen by viewModel.isAddWidgetOpen.collectAsState()
+    val isSystemWidgetPickerOpen by viewModel.isSystemWidgetPickerOpen.collectAsState()
     val editingNoteWidget by viewModel.editingNoteWidget.collectAsState()
     val isCarouselCustomizeOpen by viewModel.isCarouselCustomizeOpen.collectAsState()
     val dockPickerSlot by viewModel.dockPickerSlot.collectAsState()
@@ -159,9 +178,50 @@ fun NiagaraLauncherScreen(
     val pagerState = rememberPagerState(initialPage = 1, pageCount = { 3 })
     val coroutineScope = rememberCoroutineScope()
 
+    val notificationSwipeDownConnection = remember(settings.swipeDownForNotificationCenter) {
+        object : NestedScrollConnection {
+            var accumulatedDragY = 0f
+
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                if (available.y < 0f) {
+                    accumulatedDragY = 0f
+                }
+                return Offset.Zero
+            }
+
+            override fun onPostScroll(
+                consumed: Offset,
+                available: Offset,
+                source: NestedScrollSource
+            ): Offset {
+                if (!settings.swipeDownForNotificationCenter) return Offset.Zero
+                if (source == NestedScrollSource.UserInput && available.y > 0f) {
+                    accumulatedDragY += available.y
+                    if (accumulatedDragY > 50f) {
+                        accumulatedDragY = 0f
+                        viewModel.openNotificationCenter()
+                        return Offset(0f, available.y)
+                    }
+                }
+                return Offset.Zero
+            }
+
+            override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
+                accumulatedDragY = 0f
+                if (!settings.swipeDownForNotificationCenter) return Velocity.Zero
+                if (available.y > 180f) {
+                    viewModel.openNotificationCenter()
+                    return available
+                }
+                return Velocity.Zero
+            }
+        }
+    }
+
     Box(
         modifier = modifier
             .fillMaxSize()
+            .nestedScroll(notificationSwipeDownConnection)
             .pointerInput(settings.doubleTapToSleep) {
                 detectTapGestures(
                     onDoubleTap = {
@@ -206,7 +266,9 @@ fun NiagaraLauncherScreen(
                         mediaPlayer = mediaPlayer,
                         calendarEvents = calendarEvents,
                         isHeadphonesConnected = settings.isHeadphonesConnected,
+                        isFrostedTheme = settings.themePreset == LauncherThemePreset.FROSTED_GLASS,
                         onAddWidgetClick = { viewModel.openAddWidgetDialog() },
+                        onAddSystemWidgetClick = { viewModel.openSystemWidgetPicker() },
                         onDeleteWidget = { id -> viewModel.deleteLeftWidget(id) },
                         onReorderWidget = { from, to -> viewModel.reorderLeftWidget(from, to) },
                         onEditNoteClick = { widget -> viewModel.openEditNoteWidget(widget) },
@@ -214,7 +276,9 @@ fun NiagaraLauncherScreen(
                         onMediaNext = { viewModel.skipMediaNext() },
                         onMediaPrev = { viewModel.skipMediaPrev() },
                         onToggleHeadphones = { viewModel.toggleHeadphonesConnected() },
-                        onRefreshWeather = { viewModel.showToast("Updated weather for ${weather.location} ⛅") }
+                        onRefreshWeather = { viewModel.showToast("Updated weather for ${weather.location} ⛅") },
+                        onOpenWeather = { viewModel.launchIntegration(com.example.util.IntegrationCategory.WEATHER) },
+                        onOpenCalendar = { viewModel.launchIntegration(com.example.util.IntegrationCategory.CALENDAR) }
                     )
                 }
                 1 -> {
@@ -229,15 +293,14 @@ fun NiagaraLauncherScreen(
                         calendarEvents = calendarEvents,
                         onAppClick = { viewModel.launchApp(it) },
                         onAppLongClick = { viewModel.openAppPopup(it) },
-                        onSwipeRightForPopup = { viewModel.openAppPopup(it) },
                         onReplyNotification = { pkg, text -> viewModel.replyToNotification(pkg, text) },
                         onDismissNotification = { pkg -> viewModel.dismissNotification(pkg) },
                         onToggleMediaPlay = { viewModel.toggleMediaPlayPause() },
                         onMediaNext = { viewModel.skipMediaNext() },
                         onMediaPrev = { viewModel.skipMediaPrev() },
                         onToggleHeadphones = { viewModel.toggleHeadphonesConnected() },
-                        onOpenWeather = { viewModel.showToast("Weather for ${weather.location}: ${weather.condition} ${weather.temperatureCelsius}°C") },
-                        onOpenCalendar = { viewModel.showToast("Opening calendar...") },
+                        onOpenWeather = { viewModel.launchIntegration(com.example.util.IntegrationCategory.WEATHER) },
+                        onOpenCalendar = { viewModel.launchIntegration(com.example.util.IntegrationCategory.CALENDAR) },
                         onOpenCarouselCustomize = { viewModel.openCarouselCustomize() },
                         onOpenSettings = { viewModel.openSettings() },
                         onNavigateToAllApps = {
@@ -246,7 +309,7 @@ fun NiagaraLauncherScreen(
                     )
                 }
                 2 -> {
-                    // 3. Right most screen: Lists all apps with strict margins and alphabet quick jump
+                    // 3. Right most screen: Lists all apps with strict margins
                     RightAllAppsScreen(
                         allApps = allApps,
                         folders = folders,
@@ -256,7 +319,6 @@ fun NiagaraLauncherScreen(
                         onWaveLetterSelected = { viewModel.setWaveSelectedLetter(it) },
                         onAppClick = { viewModel.launchApp(it) },
                         onAppLongClick = { viewModel.openAppPopup(it) },
-                        onSwipeRightForPopup = { viewModel.openAppPopup(it) },
                         onReplyNotification = { pkg, text -> viewModel.replyToNotification(pkg, text) },
                         onDismissNotification = { pkg -> viewModel.dismissNotification(pkg) },
                         onToggleFolderExpanded = { folderId -> viewModel.repository.toggleFolderExpanded(folderId) }
@@ -270,7 +332,16 @@ fun NiagaraLauncherScreen(
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .statusBarsPadding()
-                .padding(top = 4.dp),
+                .padding(top = 4.dp)
+                .pointerInput(settings.swipeDownForNotificationCenter) {
+                    if (settings.swipeDownForNotificationCenter) {
+                        detectVerticalDragGestures { _, dragAmount ->
+                            if (dragAmount > 15f) {
+                                viewModel.openNotificationCenter()
+                            }
+                        }
+                    }
+                },
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -292,34 +363,18 @@ fun NiagaraLauncherScreen(
             }
         }
 
-        // 5. ALL 3 SCREENS SHOW A FIXED DOCK (MAX 3 ICONS)
-        FixedDock(
-            dockApps = dockApps,
-            iconPackType = settings.iconPackType,
-            showLabels = settings.showDockLabels,
-            blurBackground = settings.dockBlurBackground,
-            onAppClick = { viewModel.launchApp(it) },
-            onAppLongClick = { slotIndex -> viewModel.openDockPicker(slotIndex) },
-            modifier = Modifier.align(Alignment.BottomCenter)
-        )
-
-        // Floating Quick Search Action Button
-        NiagaraButton(
-            isLeftHanded = settings.leftHandedMode,
-            onTap = { viewModel.openSearch() },
-            onSwipeUp = {
-                val camera = allApps.find { it.packageName.contains("camera", true) || it.label.contains("camera", true) }
-                if (camera != null) {
-                    viewModel.launchApp(camera)
-                } else {
-                    viewModel.openSettings()
-                }
-            },
-            modifier = Modifier
-                .align(if (settings.leftHandedMode) Alignment.BottomStart else Alignment.BottomEnd)
-                .navigationBarsPadding()
-                .padding(bottom = 80.dp, start = 16.dp, end = 16.dp)
-        )
+        // 5. Fixed Dock (Hidden on All Apps screen per user request)
+        if (pagerState.currentPage != 2) {
+            FixedDock(
+                dockApps = dockApps,
+                iconPackType = settings.iconPackType,
+                showLabels = settings.showDockLabels,
+                blurBackground = settings.dockBlurBackground,
+                onAppClick = { viewModel.launchApp(it) },
+                onAppLongClick = { slotIndex -> viewModel.openDockPicker(slotIndex) },
+                modifier = Modifier.align(Alignment.BottomCenter)
+            )
+        }
 
         // ==========================================
         // DIALOGS, SHEETS & OVERLAYS
@@ -395,12 +450,42 @@ fun NiagaraLauncherScreen(
         if (isSettingsOpen) {
             SettingsStudioSheet(
                 settings = settings,
+                allApps = allApps,
+                widgetIntegrations = viewModel.widgetIntegrations,
                 onUpdateSettings = { viewModel.repository.updateSettings(it) },
                 onExportBackup = { viewModel.repository.exportBackupJson() },
                 onImportBackup = { viewModel.repository.importBackupJson(it) },
                 onResetDefaults = { viewModel.repository.resetToDefaults() },
                 onOpenSetupGuide = { viewModel.openSetupGuide() },
+                onOpenSystemWidgetPicker = { viewModel.openSystemWidgetPicker() },
                 onDismiss = { viewModel.closeSettings() }
+            )
+        }
+
+        // System Widget Picker Sheet
+        if (isSystemWidgetPickerOpen) {
+            SystemWidgetPickerSheet(
+                targetScreenTitle = "Left Widgets Screen",
+                onSelectProvider = { providerItem ->
+                    viewModel.closeSystemWidgetPicker()
+                    val appWidgetHost = (context as? MainActivity)?.appWidgetHost
+                    val appWidgetManager = android.appwidget.AppWidgetManager.getInstance(context)
+                    val newId = appWidgetHost?.allocateAppWidgetId() ?: -1
+                    val success = try {
+                        appWidgetManager.bindAppWidgetIdIfAllowed(newId, providerItem.providerInfo.provider)
+                    } catch (e: Exception) {
+                        false
+                    }
+                    if (!success && newId != -1) {
+                        val intent = Intent(android.appwidget.AppWidgetManager.ACTION_APPWIDGET_BIND).apply {
+                            putExtra(android.appwidget.AppWidgetManager.EXTRA_APPWIDGET_ID, newId)
+                            putExtra(android.appwidget.AppWidgetManager.EXTRA_APPWIDGET_PROVIDER, providerItem.providerInfo.provider)
+                        }
+                        (context as? android.app.Activity)?.startActivityForResult(intent, 501)
+                    }
+                    viewModel.addLeftSystemWidget(providerItem, newId)
+                },
+                onDismiss = { viewModel.closeSystemWidgetPicker() }
             )
         }
 

@@ -29,6 +29,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.*
+import com.example.util.SystemWidgetProviderItem
 
 class LauncherRepository(private val context: Context) {
 
@@ -74,8 +75,11 @@ class LauncherRepository(private val context: Context) {
     private val _dockPackageNames = MutableStateFlow<List<String>>(emptyList())
     val dockPackageNames: StateFlow<List<String>> = _dockPackageNames.asStateFlow()
 
+    val widgetIntegrations = WidgetIntegrationsManager(context)
+
     init {
-        loadDefaultNotifications()
+        com.example.util.SystemWidgetManager.init(context)
+        observeLiveNotifications()
         loadAvailableSystemWidgets()
         loadLeftWidgets()
         loadCarouselWidgets()
@@ -83,6 +87,22 @@ class LauncherRepository(private val context: Context) {
         loadFolders()
         refreshCalendarEvents()
         reloadApps()
+    }
+
+    private fun observeLiveNotifications() {
+        repositoryScope.launch {
+            com.example.service.FluxNotificationListenerService.liveNotifications.collect { liveMap ->
+                _activeNotifications.value = liveMap
+                val currentApps = _allApps.value
+                if (currentApps.isNotEmpty()) {
+                    val updated = currentApps.map { app ->
+                        val notif = liveMap[app.packageName]
+                        if (app.notification != notif) app.copy(notification = notif) else app
+                    }
+                    _allApps.value = updated
+                }
+            }
+        }
     }
 
     private fun loadSettings(): LauncherSettings {
@@ -262,6 +282,7 @@ class LauncherRepository(private val context: Context) {
             WidgetType.DAILY_HABITS -> true
             WidgetType.MINDFULNESS_QUOTE -> true
             WidgetType.DUAL_CLOCK -> true
+            WidgetType.SYSTEM_APPWIDGET -> true
         }
     }
 
@@ -342,24 +363,7 @@ class LauncherRepository(private val context: Context) {
     }
 
     private fun loadDefaultNotifications() {
-        _activeNotifications.value = mapOf(
-            "com.google.android.apps.messaging" to NotificationItem(
-                id = "n_msg",
-                packageName = "com.google.android.apps.messaging",
-                sender = "Sarah Jenkins",
-                message = "Dinner reservation confirmed for 7:30 PM tonight!",
-                timeAgo = "5m ago",
-                canReply = true
-            ),
-            "com.whatsapp" to NotificationItem(
-                id = "n_1",
-                packageName = "com.whatsapp",
-                sender = "Alex River",
-                message = "Hey, are you free for a coffee catch-up later?",
-                timeAgo = "3m ago",
-                canReply = true
-            )
-        )
+        // Active notifications are collected in real-time from FluxNotificationListenerService
     }
 
     fun reloadApps() {
@@ -679,18 +683,31 @@ class LauncherRepository(private val context: Context) {
     }
 
     fun replyToNotification(packageName: String, replyText: String) {
-        // Dismiss active preview and post quick toast
+        val notif = _activeNotifications.value[packageName]
+        if (notif != null) {
+            com.example.service.FluxNotificationListenerService.instance?.replyNotificationByKey(notif.key, replyText)
+        }
         val current = _activeNotifications.value.toMutableMap()
         current.remove(packageName)
         _activeNotifications.value = current
-        reloadApps()
+        val currentApps = _allApps.value
+        _allApps.value = currentApps.map {
+            if (it.packageName == packageName) it.copy(notification = null) else it
+        }
     }
 
     fun dismissNotification(packageName: String) {
+        val notif = _activeNotifications.value[packageName]
+        if (notif != null) {
+            com.example.service.FluxNotificationListenerService.instance?.dismissNotificationByKey(notif.key)
+        }
         val current = _activeNotifications.value.toMutableMap()
         current.remove(packageName)
         _activeNotifications.value = current
-        reloadApps()
+        val currentApps = _allApps.value
+        _allApps.value = currentApps.map {
+            if (it.packageName == packageName) it.copy(notification = null) else it
+        }
     }
 
     fun simulateIncomingNotification(packageName: String, sender: String, message: String) {
@@ -867,7 +884,11 @@ class LauncherRepository(private val context: Context) {
                             type = type,
                             title = obj.optString("title", type.displayName),
                             content = obj.optString("content", ""),
-                            isEnabled = obj.optBoolean("isEnabled", true)
+                            isEnabled = obj.optBoolean("isEnabled", true),
+                            appWidgetId = obj.optInt("appWidgetId", -1),
+                            providerPackage = if (obj.has("providerPackage")) obj.optString("providerPackage") else null,
+                            providerClass = if (obj.has("providerClass")) obj.optString("providerClass") else null,
+                            linkedPackageName = if (obj.has("linkedPackageName")) obj.optString("linkedPackageName") else null
                         )
                     )
                 }
@@ -910,6 +931,10 @@ class LauncherRepository(private val context: Context) {
             obj.put("title", w.title)
             obj.put("content", w.content)
             obj.put("isEnabled", w.isEnabled)
+            obj.put("appWidgetId", w.appWidgetId)
+            w.providerPackage?.let { obj.put("providerPackage", it) }
+            w.providerClass?.let { obj.put("providerClass", it) }
+            w.linkedPackageName?.let { obj.put("linkedPackageName", it) }
             arr.put(obj)
         }
         prefs.edit().putString("left_widgets_json", arr.toString()).apply()
@@ -927,6 +952,20 @@ class LauncherRepository(private val context: Context) {
         saveLeftWidgets(updated)
     }
 
+    fun addLeftSystemWidget(providerItem: SystemWidgetProviderItem, appWidgetId: Int) {
+        val newWidget = CustomWidgetConfig(
+            id = "sys_w_${System.currentTimeMillis()}",
+            type = WidgetType.SYSTEM_APPWIDGET,
+            title = providerItem.widgetLabel,
+            appWidgetId = appWidgetId,
+            providerPackage = providerItem.providerInfo.provider.packageName,
+            providerClass = providerItem.providerInfo.provider.className
+        )
+        val updated = _leftWidgets.value + newWidget
+        _leftWidgets.value = updated
+        saveLeftWidgets(updated)
+    }
+
     fun updateLeftWidget(id: String, newTitle: String, newContent: String) {
         val updated = _leftWidgets.value.map {
             if (it.id == id) it.copy(title = newTitle, content = newContent) else it
@@ -936,6 +975,10 @@ class LauncherRepository(private val context: Context) {
     }
 
     fun deleteLeftWidget(id: String) {
+        val target = _leftWidgets.value.find { it.id == id }
+        if (target != null && target.appWidgetId > 0) {
+            com.example.util.SystemWidgetManager.deleteAppWidgetId(target.appWidgetId)
+        }
         val updated = _leftWidgets.value.filter { it.id != id }
         _leftWidgets.value = updated
         saveLeftWidgets(updated)

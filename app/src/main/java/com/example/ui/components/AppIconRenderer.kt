@@ -1,6 +1,7 @@
 package com.example.ui.components
 
 import android.graphics.drawable.Drawable
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -21,7 +22,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -306,24 +310,51 @@ fun AppIconRenderer(
             }
 
             IconPackType.DEFAULT_APP -> {
-                if (app.iconDrawable != null) {
-                    val bitmap = remember(app.iconDrawable) {
+                val context = LocalContext.current
+                val drawable = remember(app.packageName, app.iconDrawable) {
+                    app.iconDrawable ?: try {
+                        context.packageManager.getApplicationIcon(app.packageName)
+                    } catch (e: Exception) {
                         try {
-                            app.iconDrawable.toBitmap(size.value.toInt() * 2, size.value.toInt() * 2)
-                        } catch (e: Exception) {
+                            val intent = context.packageManager.getLaunchIntentForPackage(app.packageName)
+                            if (intent?.component != null) {
+                                context.packageManager.getActivityIcon(intent.component!!)
+                            } else null
+                        } catch (e2: Exception) {
                             null
                         }
                     }
-                    if (bitmap != null) {
-                        Image(
-                            bitmap = bitmap.asImageBitmap(),
-                            contentDescription = app.label,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .clip(RoundedCornerShape(size * 0.24f))
-                        )
-                    } else {
-                        FallbackGlyph(app, size, primaryColor)
+                }
+                val bitmap = remember(drawable) {
+                    try {
+                        drawable?.let { d ->
+                            val density = context.resources.displayMetrics.density
+                            val px = (size.value * density).toInt().coerceAtLeast(64)
+                            d.toBitmap(width = px, height = px).asImageBitmap()
+                        }
+                    } catch (e: Exception) {
+                        null
+                    }
+                }
+
+                if (bitmap != null) {
+                    Image(
+                        bitmap = bitmap,
+                        contentDescription = app.label,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(RoundedCornerShape(size * 0.22f))
+                    )
+                } else if (drawable != null) {
+                    Canvas(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(RoundedCornerShape(size * 0.22f))
+                    ) {
+                        drawIntoCanvas { canvas ->
+                            drawable.setBounds(0, 0, this.size.width.toInt(), this.size.height.toInt())
+                            drawable.draw(canvas.nativeCanvas)
+                        }
                     }
                 } else {
                     FallbackGlyph(app, size, primaryColor)

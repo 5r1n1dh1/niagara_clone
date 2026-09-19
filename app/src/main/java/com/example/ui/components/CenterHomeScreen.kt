@@ -41,7 +41,7 @@ fun CenterHomeScreen(
     calendarEvents: List<CalendarEvent>,
     onAppClick: (AppItem) -> Unit,
     onAppLongClick: (AppItem) -> Unit,
-    onSwipeRightForPopup: (AppItem) -> Unit,
+    onSwipeRightForPopup: ((AppItem) -> Unit)? = null,
     onReplyNotification: (packageName: String, text: String) -> Unit,
     onDismissNotification: (packageName: String) -> Unit,
     onToggleMediaPlay: () -> Unit,
@@ -233,7 +233,7 @@ fun CenterHomeScreen(
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "Swipe right to All Apps, then swipe right or long-press an app to star it as a favorite.",
+                            text = "Swipe right to All Apps, then long-press an app or tap options to star it as a favorite.",
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center
@@ -254,7 +254,6 @@ fun CenterHomeScreen(
                     compactSpacing = settings.compactAppRowSpacing,
                     onAppClick = { onAppClick(app) },
                     onAppLongClick = { onAppLongClick(app) },
-                    onSwipeRightForPopup = { onSwipeRightForPopup(app) },
                     onReplyNotification = { text -> onReplyNotification(app.packageName, text) },
                     onDismissNotification = { onDismissNotification(app.packageName) }
                 )

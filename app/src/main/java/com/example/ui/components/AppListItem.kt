@@ -4,7 +4,6 @@ import androidx.compose.animation.*
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -46,35 +45,17 @@ fun AppListItem(
     compactSpacing: Boolean = false,
     onAppClick: () -> Unit,
     onAppLongClick: () -> Unit,
-    onSwipeRightForPopup: () -> Unit,
+    onSwipeRightForPopup: (() -> Unit)? = null,
     onReplyNotification: (String) -> Unit,
     onDismissNotification: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var isReplying by remember { mutableStateOf(false) }
     var replyText by remember { mutableStateOf("") }
-    var dragAccumulator by remember { mutableFloatStateOf(0f) }
 
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .pointerInput(app.packageName) {
-                detectHorizontalDragGestures(
-                    onDragStart = { dragAccumulator = 0f },
-                    onHorizontalDrag = { change, dragAmount ->
-                        change.consume()
-                        dragAccumulator += dragAmount
-                    },
-                    onDragEnd = {
-                        val triggerSwipe = if (isLeftHanded) dragAccumulator < -80f else dragAccumulator > 80f
-                        if (triggerSwipe) {
-                            onSwipeRightForPopup()
-                        }
-                        dragAccumulator = 0f
-                    },
-                    onDragCancel = { dragAccumulator = 0f }
-                )
-            }
             .clip(RoundedCornerShape(12.dp))
             .combinedClickable(
                 onClick = onAppClick,
@@ -91,18 +72,14 @@ fun AppListItem(
             if (!isLeftHanded) {
                 Box(
                     modifier = Modifier
+                        .size((38 * iconScale).dp)
                         .clip(RoundedCornerShape(12.dp))
-                        .combinedClickable(
-                            onClick = onAppClick,
-                            onLongClick = onAppLongClick
-                        )
                 ) {
                     AppIconRenderer(
                         app = app,
                         iconPackType = iconPackType,
                         customIconSettings = customIconSettings,
-                        size = (38 * iconScale).dp,
-                        modifier = Modifier.padding(end = 16.dp)
+                        size = (38 * iconScale).dp
                     )
                     if (showBadges && app.notification != null) {
                         Surface(
@@ -114,6 +91,7 @@ fun AppListItem(
                         ) {}
                     }
                 }
+                Spacer(modifier = Modifier.width(14.dp))
             }
 
             Column(
@@ -175,20 +153,17 @@ fun AppListItem(
             }
 
             if (isLeftHanded) {
+                Spacer(modifier = Modifier.width(14.dp))
                 Box(
                     modifier = Modifier
+                        .size((38 * iconScale).dp)
                         .clip(RoundedCornerShape(12.dp))
-                        .combinedClickable(
-                            onClick = onAppClick,
-                            onLongClick = onAppLongClick
-                        )
                 ) {
                     AppIconRenderer(
                         app = app,
                         iconPackType = iconPackType,
                         customIconSettings = customIconSettings,
-                        size = (38 * iconScale).dp,
-                        modifier = Modifier.padding(start = 16.dp)
+                        size = (38 * iconScale).dp
                     )
                     if (showBadges && app.notification != null) {
                         Surface(

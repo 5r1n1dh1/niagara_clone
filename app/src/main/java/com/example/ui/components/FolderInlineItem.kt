@@ -31,7 +31,7 @@ fun FolderInlineItem(
     onToggleExpand: () -> Unit,
     onAppClick: (AppItem) -> Unit,
     onAppLongClick: (AppItem) -> Unit,
-    onSwipeRightForPopup: (AppItem) -> Unit,
+    onSwipeRightForPopup: ((AppItem) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -120,7 +120,6 @@ fun FolderInlineItem(
                         fontScale = fontScale,
                         onAppClick = { onAppClick(app) },
                         onAppLongClick = { onAppLongClick(app) },
-                        onSwipeRightForPopup = { onSwipeRightForPopup(app) },
                         onReplyNotification = {},
                         onDismissNotification = {}
                     )

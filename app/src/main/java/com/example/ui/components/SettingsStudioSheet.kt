@@ -1,5 +1,8 @@
 package com.example.ui.components
 
+import android.content.Context
+import android.content.Intent
+import android.provider.Settings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -15,29 +18,50 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.*
+import com.example.util.DefaultLauncherHelper
+import com.example.util.IntegrationCategory
+import com.example.util.WidgetIntegrationsManager
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsStudioSheet(
     settings: LauncherSettings,
+    allApps: List<AppItem> = emptyList(),
+    widgetIntegrations: WidgetIntegrationsManager? = null,
     onUpdateSettings: (LauncherSettings) -> Unit,
     onExportBackup: () -> String,
     onImportBackup: (String) -> Boolean,
     onResetDefaults: () -> Unit,
     onOpenSetupGuide: () -> Unit = {},
+    onOpenSystemWidgetPicker: () -> Unit = {},
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
     var backupDialogText by remember { mutableStateOf<String?>(null) }
     var importDialogText by remember { mutableStateOf("") }
     var showImportDialog by remember { mutableStateOf(false) }
+
+    // State for app integration picker dialog
+    var selectedIntegrationForPicker by remember { mutableStateOf<IntegrationCategory?>(null) }
+    var integrationSearchFilter by remember { mutableStateOf("") }
+
+    // Check system status
+    val isDefaultLauncher = remember(context) {
+        DefaultLauncherHelper.isDefaultLauncher(context)
+    }
+    val isNotificationAccessGranted = remember(context) {
+        val flat = Settings.Secure.getString(context.contentResolver, "enabled_notification_listeners")
+        flat != null && flat.contains(context.packageName)
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -64,12 +88,19 @@ fun SettingsStudioSheet(
                         modifier = Modifier.size(24.dp)
                     )
                     Spacer(modifier = Modifier.width(10.dp))
-                    Text(
-                        text = "Is this Niagara Settings",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 20.sp,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
+                    Column {
+                        Text(
+                            text = "Flux Launcher Settings",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 20.sp,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "Customization, widgets & system controls",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
 
                 FilledTonalButton(
@@ -85,10 +116,234 @@ fun SettingsStudioSheet(
             LazyColumn(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(max = 540.dp),
+                    .heightIn(max = 560.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // Section 0: Setup / Start Up Guide Banner
+                // Section 0.1: Default Launcher Configuration
+                item {
+                    Card(
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (isDefaultLauncher)
+                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                            else
+                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .clip(CircleShape)
+                                        .background(
+                                            if (isDefaultLauncher) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
+                                            else MaterialTheme.colorScheme.primary
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = if (isDefaultLauncher) Icons.Filled.CheckCircle else Icons.Filled.Home,
+                                        contentDescription = null,
+                                        tint = if (isDefaultLauncher) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onPrimary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = if (isDefaultLauncher) "Default Home App Active" else "Set Flux as Default Launcher",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 15.sp,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = if (isDefaultLauncher)
+                                            "Flux is set as your default Android launcher"
+                                        else
+                                            "Make Flux handle your home button & navigation",
+                                        fontSize = 12.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+
+                            if (!isDefaultLauncher) {
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Button(
+                                    onClick = { DefaultLauncherHelper.openSetDefaultLauncher(context) },
+                                    shape = RoundedCornerShape(10.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Icon(Icons.Filled.Home, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Set as Default Launcher", fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Section 0.2: Live Notifications Access Card
+                item {
+                    Card(
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.secondaryContainer),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.NotificationsActive,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = if (isNotificationAccessGranted) "Live Notifications Active" else "Enable Live Notifications",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = if (isNotificationAccessGranted)
+                                        "Real-time app notification dots & direct quick replies"
+                                    else
+                                        "Grant access so app dots & notification shade update live",
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            if (!isNotificationAccessGranted) {
+                                FilledTonalButton(
+                                    onClick = {
+                                        val intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).apply {
+                                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                        }
+                                        context.startActivity(intent)
+                                    },
+                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                                ) {
+                                    Text("Grant", fontSize = 11.sp)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Section 0.3: Widget App Integrations
+                item {
+                    SettingsSectionTitle("Widget App Integrations")
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Text(
+                                text = "Choose which installed applications launch when clicking widget cards:",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            IntegrationCategory.entries.forEach { category ->
+                                val currentAppLabel = remember(category, allApps) {
+                                    widgetIntegrations?.getAppLabel(category, context.packageManager)
+                                        ?: "Auto-Detect Default"
+                                }
+                                val customPkg = widgetIntegrations?.getPackage(category)
+
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .clickable {
+                                            integrationSearchFilter = ""
+                                            selectedIntegrationForPicker = category
+                                        }
+                                        .padding(vertical = 8.dp, horizontal = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Icon(
+                                            imageVector = when (category) {
+                                                IntegrationCategory.WEATHER -> Icons.Filled.WbSunny
+                                                IntegrationCategory.CALENDAR -> Icons.Filled.CalendarMonth
+                                                IntegrationCategory.MUSIC -> Icons.Filled.MusicNote
+                                                IntegrationCategory.NOTES -> Icons.Filled.EditNote
+                                                IntegrationCategory.CLOCK -> Icons.Filled.Schedule
+                                            },
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Column {
+                                            Text(
+                                                text = category.displayName,
+                                                fontWeight = FontWeight.SemiBold,
+                                                fontSize = 14.sp
+                                            )
+                                            Text(
+                                                text = currentAppLabel,
+                                                fontSize = 12.sp,
+                                                color = if (customPkg != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+                                    Icon(
+                                        imageVector = Icons.Filled.ChevronRight,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                                if (category != IntegrationCategory.entries.last()) {
+                                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(10.dp))
+                            FilledTonalButton(
+                                onClick = {
+                                    onDismiss()
+                                    onOpenSystemWidgetPicker()
+                                },
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(Icons.Filled.Widgets, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Add System Android Widget")
+                            }
+                        }
+                    }
+                }
+
+                // Section 0.4: Setup / Start Up Guide Banner
                 item {
                     Card(
                         onClick = {
@@ -800,6 +1055,98 @@ fun SettingsStudioSheet(
             },
             dismissButton = {
                 TextButton(onClick = { showImportDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    if (selectedIntegrationForPicker != null) {
+        val category = selectedIntegrationForPicker!!
+        AlertDialog(
+            onDismissRequest = { selectedIntegrationForPicker = null },
+            title = {
+                Text("Select ${category.displayName} App")
+            },
+            text = {
+                val filteredApps = remember(allApps, integrationSearchFilter) {
+                    if (integrationSearchFilter.isBlank()) allApps
+                    else allApps.filter { it.label.contains(integrationSearchFilter, ignoreCase = true) }
+                }
+
+                Column(modifier = Modifier.fillMaxWidth().heightIn(max = 380.dp)) {
+                    OutlinedTextField(
+                        value = integrationSearchFilter,
+                        onValueChange = { integrationSearchFilter = it },
+                        placeholder = { Text("Search installed apps...") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+                    )
+
+                    LazyColumn(
+                        modifier = Modifier.weight(1f, fill = false),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        item {
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        widgetIntegrations?.setPackage(category, null)
+                                        selectedIntegrationForPicker = null
+                                    }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(Icons.Filled.AutoAwesome, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Column {
+                                        Text("Auto-Detect System Default", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                        Text("Uses system default or recommended handler", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                }
+                            }
+                        }
+
+                        items(filteredApps.size) { idx ->
+                            val app = filteredApps[idx]
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        widgetIntegrations?.setPackage(category, app.packageName)
+                                        selectedIntegrationForPicker = null
+                                    }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(10.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    AppIconRenderer(
+                                        app = app,
+                                        iconPackType = settings.iconPackType,
+                                        size = 28.dp
+                                    )
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(app.label, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                                        Text(app.packageName, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { selectedIntegrationForPicker = null }) {
                     Text("Cancel")
                 }
             }

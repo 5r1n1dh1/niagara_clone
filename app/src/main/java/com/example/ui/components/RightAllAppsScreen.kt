@@ -36,14 +36,13 @@ fun RightAllAppsScreen(
     onWaveLetterSelected: (Char?) -> Unit,
     onAppClick: (AppItem) -> Unit,
     onAppLongClick: (AppItem) -> Unit,
-    onSwipeRightForPopup: (AppItem) -> Unit,
+    onSwipeRightForPopup: ((AppItem) -> Unit)? = null,
     onReplyNotification: (packageName: String, text: String) -> Unit,
     onDismissNotification: (packageName: String) -> Unit,
     onToggleFolderExpanded: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val listState = rememberLazyListState()
-    val coroutineScope = rememberCoroutineScope()
     val isLeftHanded = settings.leftHandedMode
 
     var filterText by remember { mutableStateOf("") }
@@ -59,41 +58,20 @@ fun RightAllAppsScreen(
         }
     }
 
-    // Group apps by first character for letter-guided quick jumping
-    val letterPositionMap = remember(nonHiddenApps, folders, filterText) {
-        val map = mutableMapOf<Char, Int>()
-        // Index 0: Search & Stats Header
-        // Index 1: Folders (if any)
-        var currentIndex = 1 + (if (folders.isNotEmpty() && filterText.isBlank()) folders.size + 1 else 0)
-
-        for (app in nonHiddenApps) {
-            val firstChar = app.label.firstOrNull()?.uppercaseChar() ?: '#'
-            val key = if (firstChar in 'A'..'Z') firstChar else '#'
-            if (!map.containsKey(key)) {
-                map[key] = currentIndex
-            }
-            currentIndex++
-        }
-        map
-    }
-
-    Box(
+    FrostedGlassBackground(
+        isFrostedTheme = (settings.themePreset == LauncherThemePreset.FROSTED_GLASS),
         modifier = modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background.copy(alpha = 0.52f))
             .statusBarsPadding()
             .testTag("right_all_apps_screen")
     ) {
-        // 3. Right most screen lists all apps - LEFT AND RIGHT MARGIN IS A MUST
-        // Explicit generous margins: start = 24.dp, end = 58.dp (or mirrored for left-handed)
-        val leftMargin = if (isLeftHanded) 58.dp else 24.dp
-        val rightMargin = if (isLeftHanded) 24.dp else 58.dp
+        val sideMargin = 20.dp
 
         if (isAppsLoading) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(top = 160.dp, start = leftMargin, end = rightMargin),
+                    .padding(top = 160.dp, start = sideMargin, end = sideMargin),
                 contentAlignment = Alignment.TopCenter
             ) {
                 Column(
@@ -121,17 +99,18 @@ fun RightAllAppsScreen(
         } else {
             LazyColumn(
                 state = listState,
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(start = leftMargin, end = rightMargin)
-                .testTag("all_apps_lazy_column"),
-            contentPadding = PaddingValues(top = 10.dp, bottom = 110.dp)
-        ) {
-            // Header & Fast Filter Field
-            item(key = "all_apps_header") {
-                Column(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)) {
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = sideMargin)
+                    .testTag("all_apps_lazy_column"),
+                contentPadding = PaddingValues(top = 10.dp, bottom = 86.dp)
+            ) {
+                // Header (No search bar here, moved to bottom)
+                item(key = "all_apps_header") {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp, bottom = 10.dp, start = 4.dp, end = 4.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -148,145 +127,116 @@ fun RightAllAppsScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // Minimal Search Bar Field
-                    Surface(
-                        shape = RoundedCornerShape(14.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 12.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.Search,
-                                contentDescription = "Search",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.width(10.dp))
-                            TextField(
-                                value = filterText,
-                                onValueChange = { filterText = it },
-                                placeholder = { Text("Filter apps or categories...", fontSize = 13.sp) },
-                                singleLine = true,
-                                colors = TextFieldDefaults.colors(
-                                    focusedContainerColor = androidx.compose.ui.graphics.Color.Transparent,
-                                    unfocusedContainerColor = androidx.compose.ui.graphics.Color.Transparent,
-                                    focusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
-                                    unfocusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent
-                                ),
-                                modifier = Modifier.weight(1f)
-                            )
-                            if (filterText.isNotEmpty()) {
-                                IconButton(
-                                    onClick = { filterText = "" },
-                                    modifier = Modifier.size(24.dp)
-                                ) {
-                                    Icon(Icons.Filled.Close, contentDescription = "Clear", modifier = Modifier.size(16.dp))
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Optional Folders section
-            if (folders.isNotEmpty() && filterText.isBlank()) {
-                item(key = "folders_header") {
-                    Text(
-                        text = "FOLDERS",
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
-                    )
                 }
 
-                itemsIndexed(folders, key = { _, folder -> folder.id }) { _, folder ->
-                    val folderApps = remember(folder.appPackageNames, allApps) {
-                        allApps.filter { folder.appPackageNames.contains(it.packageName) }
-                    }
-                    FolderInlineItem(
-                        folder = folder,
-                        appsInFolder = folderApps,
-                        iconPackType = settings.iconPackType,
-                        isLeftHanded = isLeftHanded,
-                        fontScale = settings.fontScale,
-                        onToggleExpand = { onToggleFolderExpanded(folder.id) },
-                        onAppClick = onAppClick,
-                        onAppLongClick = onAppLongClick,
-                        onSwipeRightForPopup = onSwipeRightForPopup
-                    )
-                }
-            }
-
-            // All App Items with Alphabet Sections
-            var currentHeaderChar = ' '
-            nonHiddenApps.forEachIndexed { index, app ->
-                val firstChar = app.label.firstOrNull()?.uppercaseChar() ?: '#'
-                val displayChar = if (firstChar in 'A'..'Z') firstChar else '#'
-
-                if (displayChar != currentHeaderChar) {
-                    currentHeaderChar = displayChar
-                    item(key = "letter_header_$displayChar") {
+                // Optional Folders section
+                if (folders.isNotEmpty() && filterText.isBlank()) {
+                    item(key = "folders_header") {
                         Text(
-                            text = displayChar.toString(),
-                            fontSize = 13.sp,
+                            text = "FOLDERS",
+                            fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(top = 14.dp, bottom = 4.dp, start = 4.dp)
+                            letterSpacing = 1.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
+                        )
+                    }
+
+                    itemsIndexed(folders, key = { _, folder -> folder.id }) { _, folder ->
+                        val folderApps = remember(folder.appPackageNames, allApps) {
+                            allApps.filter { folder.appPackageNames.contains(it.packageName) }
+                        }
+                        FolderInlineItem(
+                            folder = folder,
+                            appsInFolder = folderApps,
+                            iconPackType = settings.iconPackType,
+                            isLeftHanded = isLeftHanded,
+                            fontScale = settings.fontScale,
+                            onToggleExpand = { onToggleFolderExpanded(folder.id) },
+                            onAppClick = onAppClick,
+                            onAppLongClick = onAppLongClick
                         )
                     }
                 }
 
-                item(key = "all_${app.packageName}") {
-                    AppListItem(
-                        app = app,
-                        iconPackType = settings.iconPackType,
-                        customIconSettings = settings.customIconSettings,
-                        isLeftHanded = isLeftHanded,
-                        fontScale = settings.fontScale,
-                        iconScale = settings.appIconScale,
-                        showBadges = settings.showAppNotificationBadges,
-                        compactSpacing = settings.compactAppRowSpacing,
-                        onAppClick = { onAppClick(app) },
-                        onAppLongClick = { onAppLongClick(app) },
-                        onSwipeRightForPopup = { onSwipeRightForPopup(app) },
-                        onReplyNotification = { text -> onReplyNotification(app.packageName, text) },
-                        onDismissNotification = { onDismissNotification(app.packageName) }
+                // All App Items with Alphabet Sections
+                var currentHeaderChar = ' '
+                nonHiddenApps.forEachIndexed { index, app ->
+                    val firstChar = app.label.firstOrNull()?.uppercaseChar() ?: '#'
+                    val displayChar = if (firstChar in 'A'..'Z') firstChar else '#'
+
+                    if (displayChar != currentHeaderChar) {
+                        currentHeaderChar = displayChar
+                        item(key = "letter_header_$displayChar") {
+                            Text(
+                                text = displayChar.toString(),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(top = 14.dp, bottom = 4.dp, start = 4.dp)
+                            )
+                        }
+                    }
+
+                    item(key = "all_${app.packageName}") {
+                        AppListItem(
+                            app = app,
+                            iconPackType = settings.iconPackType,
+                            customIconSettings = settings.customIconSettings,
+                            isLeftHanded = isLeftHanded,
+                            fontScale = settings.fontScale,
+                            iconScale = settings.appIconScale,
+                            showBadges = settings.showAppNotificationBadges,
+                            compactSpacing = settings.compactAppRowSpacing,
+                            onAppClick = { onAppClick(app) },
+                            onAppLongClick = { onAppLongClick(app) },
+                            onReplyNotification = { text -> onReplyNotification(app.packageName, text) },
+                            onDismissNotification = { onDismissNotification(app.packageName) }
+                        )
+                    }
+                }
+            }
+
+            // Bottom-docked minimal search bar with NO search icon
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.75f),
+                tonalElevation = 4.dp,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 12.dp)
+                    .navigationBarsPadding()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextField(
+                        value = filterText,
+                        onValueChange = { filterText = it },
+                        placeholder = { Text("Filter apps or categories...", fontSize = 13.sp) },
+                        singleLine = true,
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = androidx.compose.ui.graphics.Color.Transparent,
+                            unfocusedContainerColor = androidx.compose.ui.graphics.Color.Transparent,
+                            focusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
+                            unfocusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent
+                        ),
+                        modifier = Modifier.weight(1f)
                     )
+                    if (filterText.isNotEmpty()) {
+                        IconButton(
+                            onClick = { filterText = "" },
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(Icons.Filled.Close, contentDescription = "Clear", modifier = Modifier.size(16.dp))
+                        }
+                    }
                 }
             }
         }
-
-        // 3. Alphabet-guided quick jump feature (Wave Alphabet)
-        WaveAlphabet(
-            isLeftHanded = isLeftHanded,
-            selectedLetter = selectedWaveLetter,
-            onLetterSelected = { letter ->
-                onWaveLetterSelected(letter)
-                if (letter != null) {
-                    val targetIndex = letterPositionMap[letter] ?: 0
-                    coroutineScope.launch {
-                        listState.scrollToItem(targetIndex)
-                    }
-                }
-            },
-            onLetterConfirmed = { letter ->
-                val targetIndex = letterPositionMap[letter] ?: 0
-                coroutineScope.launch {
-                    listState.animateScrollToItem(targetIndex)
-                }
-            },
-            modifier = Modifier.align(if (isLeftHanded) Alignment.CenterStart else Alignment.CenterEnd)
-        )
     }
-}
 }

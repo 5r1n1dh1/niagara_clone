@@ -36,7 +36,9 @@ fun LeftWidgetsScreen(
     mediaPlayer: MediaPlaybackState,
     calendarEvents: List<CalendarEvent>,
     isHeadphonesConnected: Boolean,
+    isFrostedTheme: Boolean = false,
     onAddWidgetClick: () -> Unit,
+    onAddSystemWidgetClick: () -> Unit = {},
     onDeleteWidget: (String) -> Unit,
     onReorderWidget: (from: Int, to: Int) -> Unit,
     onEditNoteClick: (CustomWidgetConfig) -> Unit,
@@ -45,15 +47,15 @@ fun LeftWidgetsScreen(
     onMediaPrev: () -> Unit,
     onToggleHeadphones: () -> Unit,
     onRefreshWeather: () -> Unit,
+    onOpenWeather: () -> Unit = {},
+    onOpenCalendar: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var isEditMode by remember { mutableStateOf(false) }
 
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background.copy(alpha = 0.52f))
-            .testTag("left_widgets_screen")
+    FrostedGlassBackground(
+        isFrostedTheme = isFrostedTheme,
+        modifier = modifier.testTag("left_widgets_screen")
     ) {
         Column(
             modifier = Modifier
@@ -98,7 +100,14 @@ fun LeftWidgetsScreen(
                         )
                     }
                 )
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                FilledTonalIconButton(
+                    onClick = onAddSystemWidgetClick,
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(Icons.Filled.Widgets, contentDescription = "Add System Widget", modifier = Modifier.size(18.dp))
+                }
+                Spacer(modifier = Modifier.width(6.dp))
                 FilledTonalIconButton(
                     onClick = onAddWidgetClick,
                     modifier = Modifier.size(36.dp)
@@ -283,6 +292,14 @@ private fun LeftWidgetCardWrapper(
                 }
                 WidgetType.DUAL_CLOCK -> {
                     DualClockWidgetBody()
+                }
+                WidgetType.SYSTEM_APPWIDGET -> {
+                    HostedSystemWidgetView(
+                        appWidgetId = widget.appWidgetId,
+                        providerPackage = widget.providerPackage,
+                        providerClass = widget.providerClass,
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
             }
         }

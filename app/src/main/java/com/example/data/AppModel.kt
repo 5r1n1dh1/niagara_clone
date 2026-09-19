@@ -4,13 +4,13 @@ import android.graphics.drawable.Drawable
 import androidx.compose.ui.graphics.Color
 
 enum class IconPackType(val displayName: String) {
+    DEFAULT_APP("Default System Icons"),
     MATERIAL("Material Modern"),
     ANYCONS_DOTS("Niagara Dots"),
     ANYCONS_STICKER("Anycons Sticker"),
     ANYCONS_MINIMAL("Anycons Minimalist"),
     ANYCONS_COLORFUL("Anycons Pastel Duotone"),
-    CUSTOM("Custom Icon Pack"),
-    DEFAULT_APP("System App Icons")
+    CUSTOM("Custom Icon Pack")
 }
 
 data class CustomIconPackSettings(
@@ -62,6 +62,7 @@ enum class WallpaperStyle(val displayName: String) {
 }
 
 enum class LauncherThemePreset(val displayName: String, val primary: Color, val background: Color, val surface: Color, val accent: Color) {
+    FROSTED_GLASS("Frosted Glass", Color(0xFFBAE6FD), Color(0xFF0C1322), Color(0xFF1E293B), Color(0xFF38BDF8)),
     FLUX_EMERALD("Flux Emerald", Color(0xFF6EE7B7), Color(0xFF0B211A), Color(0xFF163E33), Color(0xFFA7F3D0)),
     MIDNIGHT_OBSIDIAN("Midnight Obsidian", Color(0xFF38BDF8), Color(0xFF090D16), Color(0xFF131C2E), Color(0xFF00E5FF)),
     AMOLED_BLACK("Pitch Black AMOLED", Color(0xFFFFFFFF), Color(0xFF000000), Color(0xFF121212), Color(0xFF64B5F6)),
@@ -101,7 +102,8 @@ data class NotificationItem(
     val sender: String,
     val message: String,
     val timeAgo: String,
-    val canReply: Boolean = true
+    val canReply: Boolean = true,
+    val key: String = id
 )
 
 data class FolderItem(
@@ -159,7 +161,7 @@ data class LauncherSettings(
     val showSeconds: Boolean = false,
     val showDate: Boolean = true,
     val showClockHeader: Boolean = true,
-    val iconPackType: IconPackType = IconPackType.MATERIAL,
+    val iconPackType: IconPackType = IconPackType.DEFAULT_APP,
     val themePreset: LauncherThemePreset = LauncherThemePreset.FLUX_EMERALD,
     val wallpaperStyle: WallpaperStyle = WallpaperStyle.FLUX_EMBLEM,
     val customFont: AppFontFamily = AppFontFamily.MODERN_SANS,
@@ -178,6 +180,7 @@ data class LauncherSettings(
     val compactAppRowSpacing: Boolean = false,
     val showDockLabels: Boolean = false,
     val dockBlurBackground: Boolean = true,
+    val blurBackgrounds: Boolean = true,
     val waveAlphabetHapticIntensity: Int = 2, // 1: subtle, 2: medium, 3: heavy
     val customIconSettings: CustomIconPackSettings = CustomIconPackSettings(),
     val hasCompletedOnboarding: Boolean = false
@@ -192,7 +195,8 @@ enum class WidgetType(val displayName: String, val description: String, val icon
     SYSTEM_TOGGLES("System Toggles", "Battery, Wi-Fi, Bluetooth, Torch", "⚡"),
     MINDFULNESS_QUOTE("Daily Reflection", "Mindfulness quotes and wellbeing stats", "🧘"),
     DAILY_HABITS("Habit Tracker", "Check off daily tasks & habits", "✅"),
-    DUAL_CLOCK("World Time", "Local time & secondary timezone", "🌍")
+    DUAL_CLOCK("World Time", "Local time & secondary timezone", "🌍"),
+    SYSTEM_APPWIDGET("System Widget", "Native Android system widget from installed apps", "📱")
 }
 
 data class CustomWidgetConfig(
@@ -200,6 +204,10 @@ data class CustomWidgetConfig(
     val type: WidgetType,
     val title: String,
     val content: String = "",
-    val isEnabled: Boolean = true
+    val isEnabled: Boolean = true,
+    val appWidgetId: Int = -1,
+    val providerPackage: String? = null,
+    val providerClass: String? = null,
+    val linkedPackageName: String? = null
 )
 

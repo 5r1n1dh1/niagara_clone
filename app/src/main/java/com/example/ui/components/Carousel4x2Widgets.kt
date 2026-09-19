@@ -89,6 +89,16 @@ fun Carousel4x2WidgetCard(
                 WidgetType.DUAL_CLOCK -> {
                     DualClock4x2Widget()
                 }
+                WidgetType.SYSTEM_APPWIDGET -> {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text(
+                            text = "System Android Widget",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
             }
 
             // Subtle customize indicator on top-right

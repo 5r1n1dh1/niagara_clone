@@ -32,6 +32,27 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     val leftWidgets = repository.leftWidgets
     val carouselWidgets = repository.carouselWidgets
 
+    val widgetIntegrations = com.example.util.WidgetIntegrationsManager(application)
+
+    private val _isSystemWidgetPickerOpen = MutableStateFlow(false)
+    val isSystemWidgetPickerOpen: StateFlow<Boolean> = _isSystemWidgetPickerOpen.asStateFlow()
+
+    fun openSystemWidgetPicker() {
+        _isSystemWidgetPickerOpen.value = true
+    }
+
+    fun closeSystemWidgetPicker() {
+        _isSystemWidgetPickerOpen.value = false
+    }
+
+    fun addLeftSystemWidget(providerItem: com.example.util.SystemWidgetProviderItem, appWidgetId: Int) {
+        repository.addLeftSystemWidget(providerItem, appWidgetId)
+    }
+
+    fun launchIntegration(category: com.example.util.IntegrationCategory) {
+        widgetIntegrations.launch(category)
+    }
+
     val dockApps: StateFlow<List<AppItem>> = combine(allApps, repository.dockPackageNames) { apps, pkgs ->
         val list = mutableListOf<AppItem>()
         for (pkg in pkgs) {
@@ -196,8 +217,12 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
             @SuppressLint("WrongConstant")
             val statusBarService = context.getSystemService("statusbar")
             val statusBarManagerClass = Class.forName("android.app.StatusBarManager")
-            val expandNotificationsPanel = statusBarManagerClass.getMethod("expandNotificationsPanel")
-            expandNotificationsPanel.invoke(statusBarService)
+            val method = try {
+                statusBarManagerClass.getMethod("expandNotificationsPanel")
+            } catch (_: NoSuchMethodException) {
+                statusBarManagerClass.getMethod("expand")
+            }
+            method.invoke(statusBarService)
         } catch (_: Throwable) {
             // Falls back smoothly to our custom rich NotificationCenterSheet
         }

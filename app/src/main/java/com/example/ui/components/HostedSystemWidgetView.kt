@@ -1,0 +1,79 @@
+package com.example.ui.components
+
+import android.appwidget.AppWidgetHostView
+import android.content.ComponentName
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
+import com.example.util.SystemWidgetManager
+
+@Composable
+fun HostedSystemWidgetView(
+    appWidgetId: Int,
+    providerPackage: String?,
+    providerClass: String?,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val providerInfo = remember(appWidgetId, providerPackage, providerClass) {
+        if (appWidgetId > 0) {
+            SystemWidgetManager.getAppWidgetInfo(context, appWidgetId)
+        } else null
+    }
+
+    if (appWidgetId > 0 && providerInfo != null) {
+        Surface(
+            shape = RoundedCornerShape(18.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+            modifier = modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(18.dp))
+        ) {
+            AndroidView(
+                factory = { ctx ->
+                    val hostView = SystemWidgetManager.createWidgetHostView(ctx, appWidgetId, providerInfo)
+                    hostView ?: AppWidgetHostView(ctx)
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 120.dp, max = 240.dp)
+                    .padding(8.dp)
+            )
+        }
+    } else {
+        Surface(
+            shape = RoundedCornerShape(18.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+            modifier = modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "System Widget (${providerPackage ?: "unknown"})",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
