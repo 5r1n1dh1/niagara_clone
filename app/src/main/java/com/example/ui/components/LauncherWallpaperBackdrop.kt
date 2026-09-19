@@ -29,6 +29,7 @@ fun LauncherWallpaperBackdrop(
     wallpaperStyle: WallpaperStyle = WallpaperStyle.SYSTEM_DEVICE,
     systemWallpaperBitmap: ImageBitmap? = null,
     blurRadius: Dp = 0.dp,
+    backgroundBlurStrength: Float = 25f,
     modifier: Modifier = Modifier
 ) {
     val primaryColor = themePreset.primary
@@ -37,7 +38,8 @@ fun LauncherWallpaperBackdrop(
     val surfaceColor = themePreset.surface
 
     val isFrosted = themePreset == LauncherThemePreset.FROSTED_GLASS
-    val effectiveBlur = if (isFrosted) (blurRadius + 24.dp) else blurRadius
+    val baseBlur = if (isFrosted) backgroundBlurStrength.dp else (backgroundBlurStrength * 0.4f).dp
+    val effectiveBlur = baseBlur + blurRadius
 
     val blurModifier = if (effectiveBlur > 0.5.dp && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
         Modifier.blur(effectiveBlur)
@@ -142,7 +144,7 @@ fun LauncherWallpaperBackdrop(
             }
         }
 
-        // Translucent Frosted Glass tint scrim overlay
+        // Translucent Frosted Glass neutral scrim overlay
         if (isFrosted) {
             Box(
                 modifier = Modifier
@@ -150,9 +152,9 @@ fun LauncherWallpaperBackdrop(
                     .background(
                         Brush.verticalGradient(
                             listOf(
-                                Color(0x330B1220),
-                                Color(0x4D1E293B),
-                                Color(0x660B1220)
+                                Color(0x3B18181B),
+                                Color(0x4D27272A),
+                                Color(0x6618181B)
                             )
                         )
                     )

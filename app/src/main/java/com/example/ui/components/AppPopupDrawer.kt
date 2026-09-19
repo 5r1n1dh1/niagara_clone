@@ -7,8 +7,11 @@ import android.provider.AlarmClock
 import android.provider.MediaStore
 import android.provider.Settings
 import androidx.compose.animation.*
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -85,7 +88,7 @@ fun detectAppCategory(packageName: String, label: String = ""): AppCategoryType 
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun AppPopupDrawer(
     app: AppItem,
@@ -95,6 +98,8 @@ fun AppPopupDrawer(
     notifications: List<NotificationItem> = emptyList(),
     onReplyNotification: ((String) -> Unit)? = null,
     onDismissNotification: (() -> Unit)? = null,
+    onDismissNotificationKey: ((String) -> Unit)? = null,
+    onReplyNotificationKey: ((String, String) -> Unit)? = null,
     onDismiss: () -> Unit,
     onToggleFavorite: () -> Unit,
     onToggleHide: () -> Unit,
@@ -122,6 +127,11 @@ fun AppPopupDrawer(
         } else {
             emptyList()
         }
+    }
+
+    // Active selected chat head for messaging apps
+    var selectedChatHeadKey by remember(effectiveNotifications) {
+        mutableStateOf<String?>(null)
     }
 
     ModalBottomSheet(
@@ -189,149 +199,318 @@ fun AppPopupDrawer(
                 onDismiss = onDismiss
             )
 
-            // 3. Active Notifications Section (Shows ALL available notifications compactly)
+            // 3. Messaging Chat Heads or Standard Notification Section
             if (effectiveNotifications.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(12.dp))
-                Surface(
-                    shape = RoundedCornerShape(14.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)),
-                    modifier = Modifier.fillMaxWidth().testTag("popup_notification_card")
-                ) {
-                    Column(modifier = Modifier.padding(12.dp)) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.Notifications,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(15.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = if (effectiveNotifications.size > 1) "NOTIFICATIONS (${effectiveNotifications.size})" else "NOTIFICATION",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 0.8.sp,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.weight(1f)
-                            )
-                            if (onDismissNotification != null) {
-                                IconButton(
-                                    onClick = onDismissNotification,
-                                    modifier = Modifier.size(22.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Filled.Close,
-                                        contentDescription = "Dismiss all",
-                                        modifier = Modifier.size(13.dp),
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
-                        }
 
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        // Compact list of all notifications
-                        effectiveNotifications.take(4).forEachIndexed { index, notifItem ->
-                            if (index > 0) {
-                                HorizontalDivider(
-                                    modifier = Modifier.padding(vertical = 8.dp),
-                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
-                                )
-                            }
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = notifItem.sender,
-                                        fontWeight = FontWeight.SemiBold,
-                                        fontSize = 13.sp,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                    Text(
-                                        text = notifItem.message,
-                                        fontSize = 12.sp,
-                                        lineHeight = 16.sp,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                                Text(
-                                    text = notifItem.timeAgo,
-                                    fontSize = 10.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
-                                    modifier = Modifier.padding(start = 8.dp)
-                                )
-                            }
-                        }
-
-                        // Inline Quick Reply if messaging
-                        val canReply = category == AppCategoryType.MESSAGING || effectiveNotifications.any { it.canReply }
-                        if (canReply) {
-                            Spacer(modifier = Modifier.height(10.dp))
+                if (category == AppCategoryType.MESSAGING) {
+                    // Chat Heads UI for Messaging Apps
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)),
+                        modifier = Modifier.fillMaxWidth().testTag("popup_chat_heads_card")
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                OutlinedTextField(
-                                    value = replyInput,
-                                    onValueChange = {
-                                        replyInput = it
-                                        replySentConfirmation = false
-                                    },
-                                    placeholder = { Text("Quick reply...", fontSize = 12.sp) },
-                                    singleLine = true,
-                                    shape = RoundedCornerShape(10.dp),
-                                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 12.sp),
-                                    modifier = Modifier.weight(1f).height(46.dp).testTag("popup_reply_input"),
-                                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                                    keyboardActions = KeyboardActions(onSend = {
-                                        if (replyInput.isNotBlank()) {
-                                            onReplyNotification?.invoke(replyInput)
-                                            replyInput = ""
-                                            replySentConfirmation = true
-                                        }
-                                    })
+                                Icon(
+                                    imageVector = Icons.Filled.Chat,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(15.dp)
                                 )
-
                                 Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "CONVERSATIONS (${effectiveNotifications.size})",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 0.8.sp,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                Text(
+                                    text = "Tap or long press to expand",
+                                    fontSize = 10.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                )
+                            }
 
-                                IconButton(
-                                    onClick = {
-                                        if (replyInput.isNotBlank()) {
-                                            onReplyNotification?.invoke(replyInput)
-                                            replyInput = ""
-                                            replySentConfirmation = true
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            // Horizontal list of Chat Heads
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                effectiveNotifications.forEach { notifItem ->
+                                    val isSelected = selectedChatHeadKey == notifItem.key || (selectedChatHeadKey == null && effectiveNotifications.size == 1)
+                                    val initial = notifItem.sender.firstOrNull()?.uppercaseChar()?.toString() ?: "💬"
+
+                                    @OptIn(ExperimentalFoundationApi::class)
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        modifier = Modifier
+                                            .combinedClickable(
+                                                onClick = {
+                                                    selectedChatHeadKey = if (selectedChatHeadKey == notifItem.key) null else notifItem.key
+                                                    replySentConfirmation = false
+                                                },
+                                                onLongClick = {
+                                                    selectedChatHeadKey = notifItem.key
+                                                    replySentConfirmation = false
+                                                }
+                                            )
+                                            .testTag("chat_head_${notifItem.id}")
+                                    ) {
+                                        Box(
+                                            contentAlignment = Alignment.Center,
+                                            modifier = Modifier
+                                                .size(46.dp)
+                                                .clip(CircleShape)
+                                                .background(
+                                                    if (isSelected) MaterialTheme.colorScheme.primaryContainer
+                                                    else MaterialTheme.colorScheme.surface
+                                                )
+                                                .border(
+                                                    width = if (isSelected) 2.dp else 1.dp,
+                                                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                                                    shape = CircleShape
+                                                )
+                                        ) {
+                                            Text(
+                                                text = initial,
+                                                fontSize = 18.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                                            )
                                         }
-                                    },
-                                    enabled = replyInput.isNotBlank(),
-                                    colors = IconButtonDefaults.filledIconButtonColors(
-                                        containerColor = MaterialTheme.colorScheme.primary,
-                                        disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant
-                                    ),
-                                    modifier = Modifier.size(38.dp).testTag("popup_reply_send_button")
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.AutoMirrored.Filled.Send,
-                                        contentDescription = "Send",
-                                        modifier = Modifier.size(16.dp)
-                                    )
+
+                                        Spacer(modifier = Modifier.height(4.dp))
+
+                                        Text(
+                                            text = notifItem.sender.take(8),
+                                            fontSize = 10.sp,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 1
+                                        )
+                                    }
                                 }
                             }
 
-                            if (replySentConfirmation) {
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = "✓ Reply sent",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = MaterialTheme.colorScheme.primary
+                            // Expanded detail view for the focused chat head
+                            val activeNotif = effectiveNotifications.find { it.key == selectedChatHeadKey }
+                                ?: if (effectiveNotifications.size == 1 && selectedChatHeadKey == null) effectiveNotifications.first() else null
+
+                            if (activeNotif != null) {
+                                Spacer(modifier = Modifier.height(12.dp))
+                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                                Spacer(modifier = Modifier.height(10.dp))
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.Top
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = activeNotif.sender,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 13.sp,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(
+                                            text = activeNotif.message,
+                                            fontSize = 12.sp,
+                                            lineHeight = 16.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.width(8.dp))
+
+                                    // Dismiss Button for this specific notification
+                                    Button(
+                                        onClick = {
+                                            if (onDismissNotificationKey != null) {
+                                                onDismissNotificationKey(activeNotif.key)
+                                            } else {
+                                                onDismissNotification?.invoke()
+                                            }
+                                            selectedChatHeadKey = null
+                                        },
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.8f),
+                                            contentColor = MaterialTheme.colorScheme.error
+                                        ),
+                                        shape = RoundedCornerShape(10.dp),
+                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                        modifier = Modifier.height(30.dp).testTag("popup_chat_head_dismiss_button")
+                                    ) {
+                                        Icon(Icons.Filled.Close, contentDescription = "Dismiss", modifier = Modifier.size(13.dp))
+                                        Spacer(modifier = Modifier.width(3.dp))
+                                        Text("Dismiss", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                                    }
+                                }
+
+                                // Quick reply input
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    OutlinedTextField(
+                                        value = replyInput,
+                                        onValueChange = {
+                                            replyInput = it
+                                            replySentConfirmation = false
+                                        },
+                                        placeholder = { Text("Reply to ${activeNotif.sender}...", fontSize = 12.sp) },
+                                        singleLine = true,
+                                        shape = RoundedCornerShape(10.dp),
+                                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 12.sp),
+                                        modifier = Modifier.weight(1f).height(46.dp).testTag("popup_reply_input"),
+                                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                                        keyboardActions = KeyboardActions(onSend = {
+                                            if (replyInput.isNotBlank()) {
+                                                if (onReplyNotificationKey != null) {
+                                                    onReplyNotificationKey(activeNotif.key, replyInput)
+                                                } else {
+                                                    onReplyNotification?.invoke(replyInput)
+                                                }
+                                                replyInput = ""
+                                                replySentConfirmation = true
+                                            }
+                                        })
+                                    )
+
+                                    Spacer(modifier = Modifier.width(6.dp))
+
+                                    IconButton(
+                                        onClick = {
+                                            if (replyInput.isNotBlank()) {
+                                                if (onReplyNotificationKey != null) {
+                                                    onReplyNotificationKey(activeNotif.key, replyInput)
+                                                } else {
+                                                    onReplyNotification?.invoke(replyInput)
+                                                }
+                                                replyInput = ""
+                                                replySentConfirmation = true
+                                            }
+                                        },
+                                        enabled = replyInput.isNotBlank(),
+                                        colors = IconButtonDefaults.filledIconButtonColors(
+                                            containerColor = MaterialTheme.colorScheme.primary,
+                                            disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant
+                                        ),
+                                        modifier = Modifier.size(38.dp).testTag("popup_reply_send_button")
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.AutoMirrored.Filled.Send,
+                                            contentDescription = "Send",
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                }
+
+                                if (replySentConfirmation) {
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = "✓ Reply sent to ${activeNotif.sender}",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    // Standard notification card
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)),
+                        modifier = Modifier.fillMaxWidth().testTag("popup_notification_card")
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Notifications,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(15.dp)
                                 )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = if (effectiveNotifications.size > 1) "NOTIFICATIONS (${effectiveNotifications.size})" else "NOTIFICATION",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 0.8.sp,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                if (onDismissNotification != null) {
+                                    IconButton(
+                                        onClick = onDismissNotification,
+                                        modifier = Modifier.size(22.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Filled.Close,
+                                            contentDescription = "Dismiss all",
+                                            modifier = Modifier.size(13.dp),
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            // Compact list of all notifications
+                            effectiveNotifications.take(4).forEachIndexed { index, notifItem ->
+                                if (index > 0) {
+                                    HorizontalDivider(
+                                        modifier = Modifier.padding(vertical = 8.dp),
+                                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+                                    )
+                                }
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = notifItem.sender,
+                                            fontWeight = FontWeight.SemiBold,
+                                            fontSize = 13.sp,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Text(
+                                            text = notifItem.message,
+                                            fontSize = 12.sp,
+                                            lineHeight = 16.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    if (onDismissNotificationKey != null) {
+                                        IconButton(
+                                            onClick = { onDismissNotificationKey(notifItem.key) },
+                                            modifier = Modifier.size(24.dp)
+                                        ) {
+                                            Icon(Icons.Filled.Close, contentDescription = "Dismiss", modifier = Modifier.size(13.dp))
+                                        }
+                                    }
+                                }
                             }
                         }
                     }

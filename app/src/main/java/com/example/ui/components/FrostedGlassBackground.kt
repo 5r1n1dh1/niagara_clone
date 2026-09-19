@@ -37,9 +37,9 @@ fun FrostedGlassBackground(
                 Brush.verticalGradient(
                     if (isFrostedTheme) {
                         listOf(
-                            Color(0x330C1322),
-                            Color(0x4D1E293B),
-                            Color(0x660C1322)
+                            Color(0x3B18181B),
+                            Color(0x4D27272A),
+                            Color(0x6618181B)
                         )
                     } else {
                         listOf(
@@ -103,7 +103,7 @@ fun FrostedGlassCard(
             )
             .background(
                 if (isFrostedTheme) {
-                    Color(0x551E293B)
+                    Color(0x3B27272A)
                 } else {
                     MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f)
                 },

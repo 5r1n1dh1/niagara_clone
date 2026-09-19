@@ -63,7 +63,7 @@ enum class WallpaperStyle(val displayName: String) {
 }
 
 enum class LauncherThemePreset(val displayName: String, val primary: Color, val background: Color, val surface: Color, val accent: Color) {
-    FROSTED_GLASS("Frosted Glass", Color(0xFFBAE6FD), Color(0x660C1322), Color(0x731E293B), Color(0xFF38BDF8)),
+    FROSTED_GLASS("Frosted Glass", Color(0xFFFFFFFF), Color(0x3B18181B), Color(0x4D27272A), Color(0xFFE4E4E7)),
     FLUX_EMERALD("Flux Emerald", Color(0xFF6EE7B7), Color(0xFF0B211A), Color(0xFF163E33), Color(0xFFA7F3D0)),
     MIDNIGHT_OBSIDIAN("Midnight Obsidian", Color(0xFF38BDF8), Color(0xFF090D16), Color(0xFF131C2E), Color(0xFF00E5FF)),
     AMOLED_BLACK("Pitch Black AMOLED", Color(0xFFFFFFFF), Color(0xFF000000), Color(0xFF121212), Color(0xFF64B5F6)),
@@ -177,6 +177,8 @@ data class LauncherSettings(
     val isGoogleDiscoverEnabled: Boolean = true,
     // Advanced Customizations
     val appIconScale: Float = 1.0f,
+    val appSpacingScale: Float = 1.0f,
+    val backgroundBlurStrength: Float = 25f,
     val showAppNotificationBadges: Boolean = true,
     val compactAppRowSpacing: Boolean = false,
     val showDock: Boolean = true,

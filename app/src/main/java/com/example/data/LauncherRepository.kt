@@ -732,10 +732,11 @@ class LauncherRepository(private val context: Context) {
         }
     }
 
-    fun replyToNotification(packageName: String, replyText: String) {
-        val notif = _activeNotifications.value[packageName]
-        if (notif != null) {
-            com.example.service.FluxNotificationListenerService.instance?.replyNotificationByKey(notif.key, replyText)
+    fun replyToNotification(packageName: String, replyText: String, key: String? = null) {
+        if (key != null) {
+            com.example.service.FluxNotificationListenerService.instance?.replyNotificationByKey(key, replyText)
+        } else {
+            com.example.service.FluxNotificationListenerService.replyToPackage(packageName, replyText)
         }
         val current = _activeNotifications.value.toMutableMap()
         current.remove(packageName)
@@ -744,18 +745,24 @@ class LauncherRepository(private val context: Context) {
         _allApps.value = currentApps.map {
             if (it.packageName == packageName) it.copy(notification = null) else it
         }
+        _favorites.value = _favorites.value.map {
+            if (it.packageName == packageName) it.copy(notification = null) else it
+        }
     }
 
-    fun dismissNotification(packageName: String) {
-        val notif = _activeNotifications.value[packageName]
-        if (notif != null) {
-            com.example.service.FluxNotificationListenerService.instance?.dismissNotificationByKey(notif.key)
+    fun dismissNotification(packageName: String, key: String? = null) {
+        if (key != null) {
+            com.example.service.FluxNotificationListenerService.dismissNotification(key)
         }
+        com.example.service.FluxNotificationListenerService.dismissAllForPackage(packageName)
         val current = _activeNotifications.value.toMutableMap()
         current.remove(packageName)
         _activeNotifications.value = current
         val currentApps = _allApps.value
         _allApps.value = currentApps.map {
+            if (it.packageName == packageName) it.copy(notification = null) else it
+        }
+        _favorites.value = _favorites.value.map {
             if (it.packageName == packageName) it.copy(notification = null) else it
         }
     }

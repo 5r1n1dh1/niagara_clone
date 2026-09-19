@@ -329,7 +329,8 @@ fun NiagaraLauncherScreen(
                         onAppLongClick = { viewModel.openAppPopup(it) },
                         onReplyNotification = { pkg, text -> viewModel.replyToNotification(pkg, text) },
                         onDismissNotification = { pkg -> viewModel.dismissNotification(pkg) },
-                        onToggleFolderExpanded = { folderId -> viewModel.repository.toggleFolderExpanded(folderId) }
+                        onToggleFolderExpanded = { folderId -> viewModel.repository.toggleFolderExpanded(folderId) },
+                        onOpenSettings = { viewModel.openSettings() }
                     )
                 }
             }
@@ -548,6 +549,12 @@ fun NiagaraLauncherScreen(
                 },
                 onDismissNotification = {
                     viewModel.dismissNotification(app.packageName)
+                },
+                onReplyNotificationKey = { key, replyText ->
+                    viewModel.replyToNotification(app.packageName, replyText, key)
+                },
+                onDismissNotificationKey = { key ->
+                    viewModel.dismissNotification(app.packageName, key)
                 },
                 onDismiss = { viewModel.closeAppPopup() },
                 onToggleFavorite = { viewModel.toggleFavorite(app.packageName) },

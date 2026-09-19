@@ -373,9 +373,11 @@ private fun Calendar4x2Widget(event: CalendarEvent?, onClick: () -> Unit) {
 
 @Composable
 private fun SystemToggles4x2Widget(isHeadphones: Boolean, onToggleHeadphones: () -> Unit) {
-    var isWifiOn by remember { mutableStateOf(true) }
-    var isBluetoothOn by remember { mutableStateOf(true) }
-    var isFlashlightOn by remember { mutableStateOf(false) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    LaunchedEffect(Unit) {
+        com.example.util.DeviceControlsManager.initialize(context)
+    }
+    val controlsState by com.example.util.DeviceControlsManager.controlsState.collectAsState()
 
     Column(
         modifier = Modifier.fillMaxSize(),
@@ -393,10 +395,22 @@ private fun SystemToggles4x2Widget(isHeadphones: Boolean, onToggleHeadphones: ()
                 letterSpacing = 1.sp,
                 color = MaterialTheme.colorScheme.primary
             )
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Filled.BatteryChargingFull, contentDescription = null, tint = Color(0xFF4ADE80), modifier = Modifier.size(16.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.clickable { com.example.util.DeviceControlsManager.openBatterySettings(context) }
+            ) {
+                Icon(
+                    imageVector = if (controlsState.isBatteryCharging) Icons.Filled.BatteryChargingFull else Icons.Filled.BatteryFull,
+                    contentDescription = null,
+                    tint = if (controlsState.batteryPercent <= 20) MaterialTheme.colorScheme.error else Color(0xFF4ADE80),
+                    modifier = Modifier.size(16.dp)
+                )
                 Spacer(modifier = Modifier.width(4.dp))
-                Text("84% Battery", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                Text(
+                    text = "${controlsState.batteryPercent}%${if (controlsState.isBatteryCharging) " ⚡" else ""}",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
             }
         }
 
@@ -404,10 +418,36 @@ private fun SystemToggles4x2Widget(isHeadphones: Boolean, onToggleHeadphones: ()
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            ToggleCard(icon = Icons.Filled.Wifi, label = "Wi-Fi", isActive = isWifiOn) { isWifiOn = !isWifiOn }
-            ToggleCard(icon = Icons.Filled.Bluetooth, label = "Bluetooth", isActive = isBluetoothOn) { isBluetoothOn = !isBluetoothOn }
-            ToggleCard(icon = Icons.Filled.Headphones, label = "Audio", isActive = isHeadphones, onClick = onToggleHeadphones)
-            ToggleCard(icon = Icons.Filled.FlashlightOn, label = "Torch", isActive = isFlashlightOn) { isFlashlightOn = !isFlashlightOn }
+            ToggleCard(
+                icon = Icons.Filled.Wifi,
+                label = "Wi-Fi",
+                isActive = controlsState.isWifiOn
+            ) {
+                com.example.util.DeviceControlsManager.openWifiSettings(context)
+            }
+            ToggleCard(
+                icon = Icons.Filled.Bluetooth,
+                label = "Bluetooth",
+                isActive = controlsState.isBluetoothOn
+            ) {
+                com.example.util.DeviceControlsManager.openBluetoothSettings(context)
+            }
+            ToggleCard(
+                icon = if (isHeadphones) Icons.Filled.Headphones else Icons.Filled.VolumeUp,
+                label = if (isHeadphones) "Headset" else "Audio",
+                isActive = isHeadphones,
+                onClick = {
+                    com.example.util.DeviceControlsManager.toggleRingerMode(context)
+                    onToggleHeadphones()
+                }
+            )
+            ToggleCard(
+                icon = if (controlsState.isTorchOn) Icons.Filled.FlashlightOn else Icons.Filled.FlashlightOff,
+                label = "Torch",
+                isActive = controlsState.isTorchOn
+            ) {
+                com.example.util.DeviceControlsManager.toggleTorch(context)
+            }
         }
     }
 }
@@ -672,8 +712,7 @@ private fun Clock4x2Widget(
             verticalAlignment = Alignment.Top
         ) {
             Row(
-                verticalAlignment = Alignment.Bottom,
-                modifier = Modifier.clickable(onClick = onOpenSettings)
+                verticalAlignment = Alignment.Bottom
             ) {
                 Text(
                     text = timeFormat.format(currentTime.time),

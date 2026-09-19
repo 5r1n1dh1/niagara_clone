@@ -170,6 +170,39 @@ class FluxNotificationListenerService : NotificationListenerService() {
         private val _allLiveNotifications = MutableStateFlow<Map<String, List<NotificationItem>>>(emptyMap())
         val allLiveNotifications: StateFlow<Map<String, List<NotificationItem>>> = _allLiveNotifications.asStateFlow()
 
+        fun dismissNotification(key: String): Boolean {
+            val inst = instance ?: return false
+            inst.dismissNotificationByKey(key)
+            return true
+        }
+
+        fun dismissAllForPackage(packageName: String): Boolean {
+            val inst = instance ?: return false
+            try {
+                val sbns = inst.activeNotifications ?: return false
+                for (sbn in sbns) {
+                    if (sbn.packageName == packageName) {
+                        inst.cancelNotification(sbn.key)
+                    }
+                }
+                inst.syncNotifications()
+                return true
+            } catch (_: Throwable) {
+                return false
+            }
+        }
+
+        fun replyToPackage(packageName: String, replyText: String): Boolean {
+            val inst = instance ?: return false
+            try {
+                val sbns = inst.activeNotifications ?: return false
+                val sbn = sbns.firstOrNull { it.packageName == packageName } ?: return false
+                return inst.replyNotificationByKey(sbn.key, replyText)
+            } catch (_: Throwable) {
+                return false
+            }
+        }
+
         fun isNotificationAccessGranted(context: Context): Boolean {
             val enabledPackages = NotificationManagerCompat.getEnabledListenerPackages(context)
             return enabledPackages.contains(context.packageName)

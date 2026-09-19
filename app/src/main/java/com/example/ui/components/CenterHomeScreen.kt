@@ -66,76 +66,79 @@ fun CenterHomeScreen(
 
     val pagerState = rememberPagerState(pageCount = { 3 })
 
-    LazyColumn(
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
             .statusBarsPadding()
             .padding(horizontal = 16.dp)
-            .testTag("center_home_screen"),
-        contentPadding = PaddingValues(top = 8.dp, bottom = 110.dp)
+            .testTag("center_home_screen")
     ) {
-        // Flux Emblem breathing room
-        if (settings.wallpaperStyle == WallpaperStyle.FLUX_EMBLEM) {
-            item(key = "flux_wallpaper_emblem_spacer") {
-                Spacer(modifier = Modifier.height(130.dp))
+        val topOffset = maxHeight * 0.25f
+
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(bottom = 110.dp)
+        ) {
+            // Top offset spacer to place widgets exactly 25% below the top
+            item(key = "center_top_25_percent_spacer") {
+                Spacer(modifier = Modifier.height(topOffset))
             }
-        }
 
-        // 4.1 Swipable 4x2 Widgets Carousel (Exactly 3 widgets: Clock is Fixed #1)
-        item(key = "center_carousel_container") {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                HorizontalPager(
-                    state = pagerState,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("center_4x2_carousel")
-                ) { page ->
-                    val widgetType = displayWidgets.getOrNull(page) ?: WidgetType.CLOCK
-                    Carousel4x2WidgetCard(
-                        type = widgetType,
-                        weather = weather,
-                        mediaPlayer = mediaPlayer,
-                        calendarEvents = calendarEvents,
-                        isHeadphonesConnected = settings.isHeadphonesConnected,
-                        showSeconds = settings.showSeconds,
-                        onToggleMediaPlay = onToggleMediaPlay,
-                        onMediaNext = onMediaNext,
-                        onMediaPrev = onMediaPrev,
-                        onSeekMedia = onSeekMedia,
-                        onToggleHeadphones = onToggleHeadphones,
-                        onOpenWeather = onOpenWeather,
-                        onOpenCalendar = onOpenCalendar,
-                        onOpenCustomize = onOpenCarouselCustomize,
-                        onOpenSettings = onOpenSettings
-                    )
-                }
-
-                // Dot page indicator for 3 carousel widgets
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 10.dp, bottom = 8.dp),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    repeat(3) { idx ->
-                        val isSelected = pagerState.currentPage == idx
-                        Box(
-                            modifier = Modifier
-                                .padding(horizontal = 3.dp)
-                                .size(if (isSelected) 6.dp else 4.dp)
-                                .clip(CircleShape)
-                                .background(
-                                    if (isSelected) MaterialTheme.colorScheme.primary
-                                    else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f)
-                                )
+            // 4.1 Swipable 4x2 Widgets Carousel (Exactly 3 widgets: Clock is Fixed #1)
+            item(key = "center_carousel_container") {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    HorizontalPager(
+                        state = pagerState,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("center_4x2_carousel")
+                    ) { page ->
+                        val widgetType = displayWidgets.getOrNull(page) ?: WidgetType.CLOCK
+                        Carousel4x2WidgetCard(
+                            type = widgetType,
+                            weather = weather,
+                            mediaPlayer = mediaPlayer,
+                            calendarEvents = calendarEvents,
+                            isHeadphonesConnected = settings.isHeadphonesConnected,
+                            showSeconds = settings.showSeconds,
+                            onToggleMediaPlay = onToggleMediaPlay,
+                            onMediaNext = onMediaNext,
+                            onMediaPrev = onMediaPrev,
+                            onSeekMedia = onSeekMedia,
+                            onToggleHeadphones = onToggleHeadphones,
+                            onOpenWeather = onOpenWeather,
+                            onOpenCalendar = onOpenCalendar,
+                            onOpenCustomize = onOpenCarouselCustomize,
+                            onOpenSettings = onOpenSettings
                         )
+                    }
+
+                    // Dot page indicator for 3 carousel widgets
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 10.dp, bottom = 8.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        repeat(3) { idx ->
+                            val isSelected = pagerState.currentPage == idx
+                            Box(
+                                modifier = Modifier
+                                    .padding(horizontal = 3.dp)
+                                    .size(if (isSelected) 6.dp else 4.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        if (isSelected) MaterialTheme.colorScheme.primary
+                                        else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f)
+                                    )
+                            )
+                        }
                     }
                 }
             }
-        }
 
-        // 4. Center page ONLY shows favourite apps
+            // 4. Center page ONLY shows favourite apps
         if (isAppsLoading) {
             item(key = "loading_favorites") {
                 Box(
@@ -214,4 +217,5 @@ fun CenterHomeScreen(
             }
         }
     }
+}
 }

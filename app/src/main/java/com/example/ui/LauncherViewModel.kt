@@ -420,14 +420,14 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         vibrateClick()
     }
 
-    fun replyToNotification(packageName: String, text: String) {
-        repository.replyToNotification(packageName, text)
+    fun replyToNotification(packageName: String, text: String, key: String? = null) {
+        repository.replyToNotification(packageName, text, key)
         showToast("Reply sent: \"$text\"")
         vibrateClick()
     }
 
-    fun dismissNotification(packageName: String) {
-        repository.dismissNotification(packageName)
+    fun dismissNotification(packageName: String, key: String? = null) {
+        repository.dismissNotification(packageName, key)
         showToast("Notification dismissed")
     }
 
