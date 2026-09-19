@@ -62,30 +62,14 @@ fun LeftWidgetsScreen(
                 .fillMaxSize()
                 .statusBarsPadding()
         ) {
-        // Top Header
+        // Top Action Bar
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
+                .padding(horizontal = 20.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.End,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column {
-                Text(
-                    text = "WIDGETS DASHBOARD",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 1.sp,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Text(
-                    text = "Personalized Cards",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-            }
-
             Row(verticalAlignment = Alignment.CenterVertically) {
                 // Edit / Done toggle button
                 FilterChip(

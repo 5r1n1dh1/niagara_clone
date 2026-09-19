@@ -1,6 +1,7 @@
 package com.example.ui.components
 
 import android.graphics.drawable.Drawable
+import android.util.LruCache
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -37,6 +38,8 @@ import com.example.data.CustomPackPreset
 import com.example.data.IconPackType
 import com.example.data.IconShape
 import kotlin.math.abs
+
+private val iconBitmapCache = LruCache<String, androidx.compose.ui.graphics.ImageBitmap>(120)
 
 @Composable
 fun AppIconRenderer(
@@ -311,29 +314,35 @@ fun AppIconRenderer(
 
             IconPackType.DEFAULT_APP -> {
                 val context = LocalContext.current
-                val drawable = remember(app.packageName, app.iconDrawable) {
-                    app.iconDrawable ?: try {
-                        context.packageManager.getApplicationIcon(app.packageName)
-                    } catch (e: Exception) {
+                val cacheKey = "${app.packageName}_${size.value.toInt()}"
+                val cachedBitmap = iconBitmapCache.get(cacheKey)
+                val bitmap = remember(app.packageName, size.value, app.iconDrawable) {
+                    if (cachedBitmap != null) {
+                        cachedBitmap
+                    } else {
+                        val drawable = app.iconDrawable ?: try {
+                            context.packageManager.getApplicationIcon(app.packageName)
+                        } catch (e: Exception) {
+                            try {
+                                val intent = context.packageManager.getLaunchIntentForPackage(app.packageName)
+                                if (intent?.component != null) {
+                                    context.packageManager.getActivityIcon(intent.component!!)
+                                } else null
+                            } catch (e2: Exception) {
+                                null
+                            }
+                        }
                         try {
-                            val intent = context.packageManager.getLaunchIntentForPackage(app.packageName)
-                            if (intent?.component != null) {
-                                context.packageManager.getActivityIcon(intent.component!!)
-                            } else null
-                        } catch (e2: Exception) {
+                            drawable?.let { d ->
+                                val density = context.resources.displayMetrics.density
+                                val px = (size.value * density).toInt().coerceAtLeast(64)
+                                val converted = d.toBitmap(width = px, height = px).asImageBitmap()
+                                iconBitmapCache.put(cacheKey, converted)
+                                converted
+                            }
+                        } catch (e: Exception) {
                             null
                         }
-                    }
-                }
-                val bitmap = remember(drawable) {
-                    try {
-                        drawable?.let { d ->
-                            val density = context.resources.displayMetrics.density
-                            val px = (size.value * density).toInt().coerceAtLeast(64)
-                            d.toBitmap(width = px, height = px).asImageBitmap()
-                        }
-                    } catch (e: Exception) {
-                        null
                     }
                 }
 
@@ -345,17 +354,6 @@ fun AppIconRenderer(
                             .fillMaxSize()
                             .clip(RoundedCornerShape(size * 0.22f))
                     )
-                } else if (drawable != null) {
-                    Canvas(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .clip(RoundedCornerShape(size * 0.22f))
-                    ) {
-                        drawIntoCanvas { canvas ->
-                            drawable.setBounds(0, 0, this.size.width.toInt(), this.size.height.toInt())
-                            drawable.draw(canvas.nativeCanvas)
-                        }
-                    }
                 } else {
                     FallbackGlyph(app, size, primaryColor)
                 }

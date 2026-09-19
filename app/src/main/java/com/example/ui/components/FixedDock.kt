@@ -1,9 +1,14 @@
 package com.example.ui.components
 
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -16,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -72,14 +78,31 @@ fun FixedDock(
             ) {
                 for (index in 0..2) {
                     val app = displayApps.getOrNull(index)
+                    val interactionSource = remember { MutableInteractionSource() }
+                    val isPressed by interactionSource.collectIsPressedAsState()
+                    val slotScale by animateFloatAsState(
+                        targetValue = if (isPressed) 0.88f else 1.0f,
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                            stiffness = Spring.StiffnessLow
+                        ),
+                        label = "dock_slot_scale_$index"
+                    )
+
                     if (app != null) {
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center,
                             modifier = Modifier
                                 .width(54.dp)
+                                .graphicsLayer {
+                                    scaleX = slotScale
+                                    scaleY = slotScale
+                                }
                                 .clip(RoundedCornerShape(12.dp))
                                 .combinedClickable(
+                                    interactionSource = interactionSource,
+                                    indication = ripple(),
                                     onClick = { onAppClick(app) },
                                     onLongClick = { onAppLongClick(index) }
                                 )
@@ -111,8 +134,14 @@ fun FixedDock(
                         Box(
                             modifier = Modifier
                                 .size(if (showLabels) 40.dp else 50.dp)
+                                .graphicsLayer {
+                                    scaleX = slotScale
+                                    scaleY = slotScale
+                                }
                                 .clip(CircleShape)
                                 .combinedClickable(
+                                    interactionSource = interactionSource,
+                                    indication = ripple(),
                                     onClick = { onAppLongClick(index) },
                                     onLongClick = { onAppLongClick(index) }
                                 )

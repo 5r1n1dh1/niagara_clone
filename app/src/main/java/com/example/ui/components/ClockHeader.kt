@@ -47,10 +47,16 @@ fun ClockHeader(
 ) {
     var currentTime by remember { mutableStateOf(Calendar.getInstance()) }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(showSeconds) {
         while (true) {
             currentTime = Calendar.getInstance()
-            delay(1000)
+            if (showSeconds) {
+                delay(1000L)
+            } else {
+                val now = System.currentTimeMillis()
+                val delayMs = (60_000L - (now % 60_000L) + 50L).coerceIn(1000L, 60_000L)
+                delay(delayMs)
+            }
         }
     }
 

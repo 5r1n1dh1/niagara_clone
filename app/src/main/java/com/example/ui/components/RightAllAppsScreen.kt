@@ -105,30 +105,6 @@ fun RightAllAppsScreen(
                     .testTag("all_apps_lazy_column"),
                 contentPadding = PaddingValues(top = 10.dp, bottom = 86.dp)
             ) {
-                // Header (No search bar here, moved to bottom)
-                item(key = "all_apps_header") {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 8.dp, bottom = 10.dp, start = 4.dp, end = 4.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "ALL APPLICATIONS",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 1.sp,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Text(
-                            text = "${nonHiddenApps.size} apps",
-                            fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-
                 // Optional Folders section
                 if (folders.isNotEmpty() && filterText.isBlank()) {
                     item(key = "folders_header") {

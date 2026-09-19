@@ -148,39 +148,6 @@ fun CenterHomeScreen(
             }
         }
 
-        // Section Title: Favorite Apps
-        item(key = "center_fav_header") {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 16.dp, bottom = 8.dp, start = 8.dp, end = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Filled.Star,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(14.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = "FAVORITES",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.sp,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
-                Text(
-                    text = "${favorites.size} apps",
-                    fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-
         // 4. Center page ONLY shows favourite apps
         if (isAppsLoading) {
             item(key = "loading_favorites") {
