@@ -22,12 +22,14 @@ import androidx.compose.ui.unit.dp
 fun FrostedGlassBackground(
     modifier: Modifier = Modifier,
     isFrostedTheme: Boolean = false,
+    blurStrength: Float = 25f,
     content: @Composable BoxScope.() -> Unit
 ) {
     Box(modifier = modifier.fillMaxSize()) {
+        val effectiveBlur = blurStrength.coerceIn(0f, 60f).dp
         // Hardware blur scrim on supported Android versions
-        val blurModifier = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            Modifier.fillMaxSize().blur(28.dp)
+        val blurModifier = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && effectiveBlur > 0.5.dp) {
+            Modifier.fillMaxSize().blur(effectiveBlur)
         } else {
             Modifier.fillMaxSize()
         }
@@ -103,13 +105,21 @@ fun FrostedGlassCard(
             )
             .background(
                 if (isFrostedTheme) {
-                    Color(0x3B27272A)
+                    Color(0x401E293B)
                 } else {
                     MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f)
                 },
                 shape = shape
             )
     ) {
+        if (isFrostedTheme) {
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .then(blurModifier)
+                    .background(Color(0x22FFFFFF))
+            )
+        }
         content()
     }
 }
