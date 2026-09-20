@@ -95,6 +95,10 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         repository.addUserCategory(categoryName)
     }
 
+    fun updateUserCategoryName(oldName: String, newName: String) {
+        repository.updateUserCategoryName(oldName, newName)
+    }
+
     fun removeUserCategory(categoryName: String) {
         repository.removeUserCategory(categoryName)
     }

@@ -52,6 +52,7 @@ fun SettingsStudioSheet(
     onOpenSystemWidgetPicker: () -> Unit = {},
     userCategories: List<String> = emptyList(),
     onAddCategory: (String) -> Unit = {},
+    onRenameCategory: (String, String) -> Unit = { _, _ -> },
     onRemoveCategory: (String) -> Unit = {},
     onAssignCategory: (String, String) -> Unit = { _, _ -> },
     onDismiss: () -> Unit,
@@ -136,6 +137,7 @@ fun SettingsStudioSheet(
                 onOpenSystemWidgetPicker = onOpenSystemWidgetPicker,
                 userCategories = userCategories,
                 onAddCategory = onAddCategory,
+                onRenameCategory = onRenameCategory,
                 onRemoveCategory = onRemoveCategory,
                 onAssignCategory = onAssignCategory,
                 onClose = onDismiss,
@@ -164,6 +166,7 @@ fun SettingsContent(
     onOpenSystemWidgetPicker: () -> Unit = {},
     userCategories: List<String> = emptyList(),
     onAddCategory: (String) -> Unit = {},
+    onRenameCategory: (String, String) -> Unit = { _, _ -> },
     onRemoveCategory: (String) -> Unit = {},
     onAssignCategory: (String, String) -> Unit = { _, _ -> },
     onClose: (() -> Unit)? = null,
@@ -424,6 +427,255 @@ fun SettingsContent(
                 }
 
                 1 -> {
+                    // --- CATEGORIES MANAGEMENT ---
+                    item {
+                        SettingsCard(title = "Create New Category") {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                OutlinedTextField(
+                                    value = newCategoryInputText,
+                                    onValueChange = { newCategoryInputText = it },
+                                    placeholder = { Text("Category Name (e.g. Finance, Travel)", fontSize = 12.sp) },
+                                    singleLine = true,
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(10.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Button(
+                                    onClick = {
+                                        if (newCategoryInputText.isNotBlank()) {
+                                            onAddCategory(newCategoryInputText.trim())
+                                            newCategoryInputText = ""
+                                        }
+                                    },
+                                    shape = RoundedCornerShape(10.dp),
+                                    enabled = newCategoryInputText.isNotBlank()
+                                ) {
+                                    Text("Add", fontSize = 12.sp)
+                                }
+                            }
+                        }
+                    }
+
+                    item {
+                        SettingsCard(title = "Categories List (${userCategories.size})") {
+                            if (userCategories.isEmpty()) {
+                                Text(
+                                    text = "No custom categories created yet.",
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            } else {
+                                val renameCategoryFn = onRenameCategory
+                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    userCategories.forEach { category ->
+                                        val assignedCount = allApps.count { it.customCategory == category }
+                                        var isEditingThisCat by remember { mutableStateOf(false) }
+                                        var editedNameText by remember { mutableStateOf(category) }
+
+                                        Surface(
+                                            shape = RoundedCornerShape(12.dp),
+                                            color = MaterialTheme.colorScheme.surface,
+                                            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Column(modifier = Modifier.padding(10.dp)) {
+                                                 if (isEditingThisCat) {
+                                                    Row(
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        modifier = Modifier.fillMaxWidth()
+                                                    ) {
+                                                        OutlinedTextField(
+                                                            value = editedNameText,
+                                                            onValueChange = { editedNameText = it },
+                                                            singleLine = true,
+                                                            modifier = Modifier.weight(1f),
+                                                            shape = RoundedCornerShape(8.dp)
+                                                        )
+                                                        Spacer(modifier = Modifier.width(6.dp))
+                                                        IconButton(
+                                                            onClick = {
+                                                                if (editedNameText.isNotBlank() && editedNameText.trim() != category) {
+                                                                    renameCategoryFn(category, editedNameText.trim())
+                                                                }
+                                                                isEditingThisCat = false
+                                                            }
+                                                        ) {
+                                                            Icon(Icons.Filled.Check, contentDescription = "Save", tint = MaterialTheme.colorScheme.primary)
+                                                        }
+                                                        IconButton(
+                                                            onClick = {
+                                                                editedNameText = category
+                                                                isEditingThisCat = false
+                                                            }
+                                                        ) {
+                                                            Icon(Icons.Filled.Close, contentDescription = "Cancel", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                        }
+                                                    }
+                                                } else {
+                                                    Row(
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                                        modifier = Modifier.fillMaxWidth()
+                                                    ) {
+                                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                                            Text(
+                                                                text = category,
+                                                                fontWeight = FontWeight.Bold,
+                                                                fontSize = 14.sp,
+                                                                color = MaterialTheme.colorScheme.onSurface
+                                                            )
+                                                            Spacer(modifier = Modifier.width(8.dp))
+                                                            Surface(
+                                                                shape = RoundedCornerShape(10.dp),
+                                                                color = MaterialTheme.colorScheme.primaryContainer
+                                                            ) {
+                                                                Text(
+                                                                    text = "$assignedCount apps",
+                                                                    fontSize = 11.sp,
+                                                                    fontWeight = FontWeight.SemiBold,
+                                                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                                )
+                                                            }
+                                                        }
+
+                                                        Row {
+                                                            IconButton(
+                                                                onClick = {
+                                                                    editedNameText = category
+                                                                    isEditingThisCat = true
+                                                                },
+                                                                modifier = Modifier.size(32.dp)
+                                                            ) {
+                                                                Icon(
+                                                                    imageVector = Icons.Filled.Edit,
+                                                                    contentDescription = "Rename Category",
+                                                                    tint = MaterialTheme.colorScheme.primary,
+                                                                    modifier = Modifier.size(16.dp)
+                                                                )
+                                                            }
+                                                            IconButton(
+                                                                onClick = { onRemoveCategory(category) },
+                                                                modifier = Modifier.size(32.dp)
+                                                            ) {
+                                                                Icon(
+                                                                    imageVector = Icons.Filled.Delete,
+                                                                    contentDescription = "Delete Category",
+                                                                    tint = MaterialTheme.colorScheme.error,
+                                                                    modifier = Modifier.size(16.dp)
+                                                                )
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    item {
+                        SettingsCard(title = "App Assignment") {
+                            Text(
+                                text = "Select a category to view and assign installed apps.",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            androidx.compose.foundation.lazy.LazyRow(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                items(userCategories.size) { idx ->
+                                    val cat = userCategories[idx]
+                                    val isSelected = selectedCategoryForAppAssignment == cat
+                                    FilterChip(
+                                        selected = isSelected,
+                                        onClick = {
+                                            selectedCategoryForAppAssignment = if (isSelected) null else cat
+                                        },
+                                        label = { Text(cat, fontSize = 11.sp) }
+                                    )
+                                }
+                            }
+
+                            val targetCat = selectedCategoryForAppAssignment
+                            if (targetCat != null) {
+                                Spacer(modifier = Modifier.height(10.dp))
+                                HorizontalDivider()
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                var appSearchText by remember { mutableStateOf("") }
+                                OutlinedTextField(
+                                    value = appSearchText,
+                                    onValueChange = { appSearchText = it },
+                                    placeholder = { Text("Search apps to assign...", fontSize = 11.sp) },
+                                    leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                val filteredApps = remember(allApps, appSearchText) {
+                                    if (appSearchText.isBlank()) allApps.sortedBy { it.label.lowercase() }
+                                    else allApps.filter { it.label.contains(appSearchText, ignoreCase = true) }.sortedBy { it.label.lowercase() }
+                                }
+
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .heightIn(max = 240.dp),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    filteredApps.take(20).forEach { app ->
+                                        val isAssignedToThis = app.customCategory == targetCat
+                                        Surface(
+                                            shape = RoundedCornerShape(8.dp),
+                                            color = if (isAssignedToThis) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f) else MaterialTheme.colorScheme.surface,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clickable {
+                                                    if (isAssignedToThis) {
+                                                        onAssignCategory(app.packageName, "")
+                                                    } else {
+                                                        onAssignCategory(app.packageName, targetCat)
+                                                    }
+                                                }
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.SpaceBetween
+                                            ) {
+                                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                                    AppIconRenderer(app = app, iconPackType = settings.iconPackType, size = 24.dp)
+                                                    Spacer(modifier = Modifier.width(8.dp))
+                                                    Text(text = app.label, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                                                }
+                                                Text(
+                                                    text = if (isAssignedToThis) "✓ Assigned" else if (app.customCategory.isNotBlank()) app.customCategory else "+ Assign",
+                                                    fontSize = 11.sp,
+                                                    fontWeight = if (isAssignedToThis) FontWeight.Bold else FontWeight.Normal,
+                                                    color = if (isAssignedToThis) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                2 -> {
                     // --- DOCK CUSTOMIZATION ---
                     item {
                         SettingsCard(title = "Dock Layout & Visibility") {
@@ -611,7 +863,7 @@ fun SettingsContent(
                     }
                 }
 
-                2 -> {
+                3 -> {
                     // --- GESTURES & LOCK ---
                     item {
                         SettingsCard(title = "Gestures & Locking") {
@@ -716,7 +968,7 @@ fun SettingsContent(
                     }
                 }
 
-                3 -> {
+                4 -> {
                     // --- WIDGETS & CLOCK ---
                     item {
                         SettingsCard(title = "Clock Widget Customization") {
@@ -831,7 +1083,7 @@ fun SettingsContent(
                     }
                 }
 
-                4 -> {
+                5 -> {
                     // --- APP INTEGRATIONS ---
                     item {
                         val pm = context.packageManager
@@ -873,7 +1125,7 @@ fun SettingsContent(
                     }
                 }
 
-                5 -> {
+                6 -> {
                     // --- SYSTEM & PERMISSIONS & BACKUP ---
                     item {
                         SettingsCard(title = "System Permissions & Defaults") {

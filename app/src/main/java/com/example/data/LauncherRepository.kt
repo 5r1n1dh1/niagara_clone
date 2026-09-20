@@ -803,6 +803,26 @@ class LauncherRepository(private val context: Context) {
         }
     }
 
+    fun updateUserCategoryName(oldName: String, newName: String) {
+        val trimmedNew = newName.trim()
+        if (trimmedNew.isBlank() || oldName == trimmedNew) return
+        val current = _userCategories.value.toMutableList()
+        val index = current.indexOf(oldName)
+        if (index != -1) {
+            current[index] = trimmedNew
+            _userCategories.value = current
+            saveUserCategories(current)
+
+            val map = getCategoryMap().toMutableMap()
+            val updatedMap = map.mapValues { if (it.value == oldName) trimmedNew else it.value }
+            saveCategoryMap(updatedMap)
+
+            _allApps.value = _allApps.value.map {
+                if (it.customCategory == oldName) it.copy(customCategory = trimmedNew) else it
+            }
+        }
+    }
+
     fun removeUserCategory(categoryName: String) {
         val current = _userCategories.value.toMutableList()
         if (current.contains(categoryName)) {

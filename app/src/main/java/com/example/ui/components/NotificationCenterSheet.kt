@@ -64,15 +64,26 @@ fun NotificationCenterSheet(
     ModalBottomSheet(
         onDismissRequest = onClose,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = MaterialTheme.colorScheme.surface,
+        containerColor = Color.Transparent,
+        scrimColor = Color.Black.copy(alpha = 0.45f),
         modifier = modifier.testTag("notification_center_sheet")
     ) {
-        Column(
+        FrostedGlassPanel(
+            cornerRadius = 28.dp,
+            blurRadius = 22.dp,
+            translucency = 0.35f,
+            glassEffect = 0.35f,
             modifier = Modifier
                 .fillMaxWidth()
-                .navigationBarsPadding()
-                .padding(horizontal = 18.dp)
+                .padding(horizontal = 12.dp)
+                .padding(bottom = 16.dp)
         ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
+            ) {
             // Header Bar: Clock, Date, and Top Action Icons
             Row(
                 modifier = Modifier
@@ -405,6 +416,7 @@ fun NotificationCenterSheet(
             Spacer(modifier = Modifier.height(16.dp))
         }
     }
+}
 }
 
 @Composable

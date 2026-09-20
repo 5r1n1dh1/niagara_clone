@@ -483,6 +483,7 @@ fun NiagaraLauncherScreen(
                 onOpenSystemWidgetPicker = { viewModel.openSystemWidgetPicker() },
                 userCategories = userCategories,
                 onAddCategory = { viewModel.addUserCategory(it) },
+                onRenameCategory = { oldName, newName -> viewModel.updateUserCategoryName(oldName, newName) },
                 onRemoveCategory = { viewModel.removeUserCategory(it) },
                 onAssignCategory = { pkg, cat -> viewModel.setAppCategory(pkg, cat) },
                 onDismiss = { viewModel.closeSettings() }
