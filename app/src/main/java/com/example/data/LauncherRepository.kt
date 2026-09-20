@@ -517,12 +517,14 @@ class LauncherRepository(private val context: Context) {
         val favoritePackages = getSavedFavoritePackages()
         val hiddenPackages = getSavedHiddenPackages()
         val usageBreakerPackages = getSavedUsageBreakerPackages()
+        val categoryMap = getCategoryMap()
 
         val finalAppItems = installedAppItems.map { app ->
             app.copy(
                 isFavorite = favoritePackages.contains(app.packageName),
                 isHidden = hiddenPackages.contains(app.packageName),
-                isUsageBreakerActive = usageBreakerPackages.contains(app.packageName)
+                isUsageBreakerActive = usageBreakerPackages.contains(app.packageName),
+                customCategory = categoryMap[app.packageName] ?: ""
             )
         }
 

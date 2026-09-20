@@ -61,6 +61,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        com.example.util.SystemWidgetManager.init(applicationContext)
+        com.example.util.SystemWidgetManager.startListening()
         appWidgetHost = android.appwidget.AppWidgetHost(applicationContext, 1024)
         try {
             appWidgetHost?.startListening()
@@ -98,6 +100,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        com.example.util.SystemWidgetManager.stopListening()
         try {
             appWidgetHost?.stopListening()
         } catch (e: Exception) {
@@ -280,6 +283,9 @@ fun NiagaraLauncherScreen(
                         calendarEvents = calendarEvents,
                         isHeadphonesConnected = settings.isHeadphonesConnected,
                         isFrostedTheme = settings.themePreset == LauncherThemePreset.FROSTED_GLASS,
+                        blurRadius = settings.frostedBlurRadius,
+                        translucency = settings.frostedTranslucency,
+                        glassEffect = settings.frostedGlassEffect,
                         onAddWidgetClick = { viewModel.openAddWidgetDialog() },
                         onAddSystemWidgetClick = { viewModel.openSystemWidgetPicker() },
                         onDeleteWidget = { id -> viewModel.deleteLeftWidget(id) },

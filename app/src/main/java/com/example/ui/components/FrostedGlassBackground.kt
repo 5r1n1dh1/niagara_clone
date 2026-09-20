@@ -22,88 +22,11 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 /**
- * Reusable Jetpack Compose Modifier for High-Fidelity "Frosted Glass" (Glassmorphism).
- *
- * Requirements Met:
- * 1. Dynamic background blur underneath (Android 12+ RenderEffect + Hardware Layer, fallback blur).
- * 2. Semi-transparent white tint with custom alpha.
- * 3. Subtle thin white stroke border (0.5dp to 1dp) to define panel edges.
- * 4. Adjustable blur radius (sigma) & corner radius.
- * 5. Optimized for Android 12+ (RenderEffect) with backward-compatible fallback.
- * 6. Rendering optimizations: graphicsLayer bounds + drawWithCache to prevent lag during scrolling.
- */
-fun Modifier.frostedGlass(
-    cornerRadius: Dp = 20.dp,
-    blurRadius: Dp = 15.dp,
-    tintAlpha: Float = 0.25f,
-    glassEffectAlpha: Float = 0.30f,
-    borderWidth: Dp = 0.75.dp,
-    borderColor: Color = Color.White.copy(alpha = 0.35f),
-    shape: Shape? = null
-): Modifier = this.then(
-    Modifier
-        .graphicsLayer {
-            val blurPx = blurRadius.toPx()
-            if (blurPx > 0f && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                renderEffect = RenderEffect
-                    .createBlurEffect(blurPx, blurPx, Shader.TileMode.CLAMP)
-                    .asComposeRenderEffect()
-            }
-            clip = true
-            this.shape = shape ?: RoundedCornerShape(cornerRadius)
-        }
-        .drawWithCache {
-            val strokePx = borderWidth.toPx()
-
-            // Pre-baked cached brushes for zero allocations during scroll
-            val tintBrush = Brush.verticalGradient(
-                colors = listOf(
-                    Color.White.copy(alpha = (tintAlpha * 1.2f).coerceAtMost(0.95f)),
-                    Color.White.copy(alpha = (tintAlpha * 0.85f).coerceAtLeast(0.05f)),
-                    Color.White.copy(alpha = (tintAlpha * 1.0f).coerceIn(0.05f, 0.95f))
-                )
-            )
-
-            val specularBrush = Brush.linearGradient(
-                colors = listOf(
-                    Color.White.copy(alpha = (glassEffectAlpha * 0.45f).coerceAtMost(0.80f)),
-                    Color.Transparent,
-                    Color.White.copy(alpha = (glassEffectAlpha * 0.20f).coerceAtMost(0.40f))
-                )
-            )
-
-            val borderBrush = Brush.linearGradient(
-                colors = listOf(
-                    borderColor,
-                    Color.White.copy(alpha = 0.12f)
-                )
-            )
-
-            onDrawWithContent {
-                // 1. Render content
-                drawContent()
-
-                // 2. Render semi-transparent white tint overlay
-                drawRect(brush = tintBrush)
-
-                // 3. Render glass specular highlight
-                if (glassEffectAlpha > 0f) {
-                    drawRect(brush = specularBrush)
-                }
-
-                // 4. Render subtle 0.5dp-1dp white stroke border
-                if (strokePx > 0f) {
-                    drawRect(
-                        brush = borderBrush,
-                        style = Stroke(width = strokePx)
-                    )
-                }
-            }
-        }
-)
-
-/**
  * Reusable Frosted Glass Container Panel
+ *
+ * CRITICAL FIX: The background blur & specular tint is rendered on a separate
+ * background layer Box (`.matchParentSize()`). This ensures the backdrop underneath
+ * is blurred, while foreground `content()` (text, icons, buttons) is rendered completely sharp and unblurred!
  */
 @Composable
 fun FrostedGlassPanel(
@@ -117,16 +40,74 @@ fun FrostedGlassPanel(
     content: @Composable BoxScope.() -> Unit
 ) {
     Box(
-        modifier = modifier.frostedGlass(
-            cornerRadius = cornerRadius,
-            blurRadius = blurRadius,
-            tintAlpha = translucency,
-            glassEffectAlpha = glassEffect,
-            borderWidth = borderWidth,
-            shape = shape
-        )
+        modifier = modifier,
+        propagateMinConstraints = true
     ) {
-        content()
+        // 1. Background Blur & Specular Tint Layer (Only this layer is blurred)
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .graphicsLayer {
+                    val blurPx = blurRadius.toPx()
+                    if (blurPx > 0f && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        renderEffect = RenderEffect
+                            .createBlurEffect(blurPx, blurPx, Shader.TileMode.CLAMP)
+                            .asComposeRenderEffect()
+                    }
+                    clip = true
+                    this.shape = shape
+                }
+                .drawWithCache {
+                    val strokePx = borderWidth.toPx()
+
+                    val tintBrush = Brush.verticalGradient(
+                        colors = listOf(
+                            Color.White.copy(alpha = (translucency * 1.2f).coerceAtMost(0.95f)),
+                            Color.White.copy(alpha = (translucency * 0.85f).coerceAtLeast(0.05f)),
+                            Color.White.copy(alpha = (translucency * 1.0f).coerceIn(0.05f, 0.95f))
+                        )
+                    )
+
+                    val specularBrush = Brush.linearGradient(
+                        colors = listOf(
+                            Color.White.copy(alpha = (glassEffect * 0.45f).coerceAtMost(0.80f)),
+                            Color.Transparent,
+                            Color.White.copy(alpha = (glassEffect * 0.20f).coerceAtMost(0.40f))
+                        )
+                    )
+
+                    val borderBrush = Brush.linearGradient(
+                        colors = listOf(
+                            Color.White.copy(alpha = 0.35f),
+                            Color.White.copy(alpha = 0.12f)
+                        )
+                    )
+
+                    onDrawBehind {
+                        // Draw tint
+                        drawRect(brush = tintBrush)
+
+                        // Draw glass specular highlight
+                        if (glassEffect > 0f) {
+                            drawRect(brush = specularBrush)
+                        }
+
+                        // Draw subtle white stroke border
+                        if (strokePx > 0f) {
+                            drawRect(
+                                brush = borderBrush,
+                                style = Stroke(width = strokePx)
+                            )
+                        }
+                    }
+                }
+        )
+
+        // 2. Foreground Content Layer (Unblurred & Sharp)
+        Box(
+            modifier = Modifier,
+            content = content
+        )
     }
 }
 
@@ -170,21 +151,19 @@ fun FrostedGlassBackground(
         val baseAlpha = translucency.coerceIn(0.05f, 0.95f)
         val effectiveBlur = blurStrength.coerceAtLeast(0f).dp
 
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .frostedGlass(
-                    cornerRadius = 0.dp,
-                    blurRadius = effectiveBlur,
-                    tintAlpha = baseAlpha,
-                    glassEffectAlpha = glassEffect,
-                    borderWidth = 0.dp,
-                    shape = RoundedCornerShape(0.dp)
-                )
-        )
+        if (isFrostedTheme) {
+            FrostedGlassPanel(
+                modifier = Modifier.fillMaxSize(),
+                cornerRadius = 0.dp,
+                blurRadius = effectiveBlur,
+                translucency = baseAlpha,
+                glassEffect = glassEffect,
+                borderWidth = 0.dp,
+                shape = RoundedCornerShape(0.dp)
+            ) {
+                // Background fill
+            }
+        }
         content()
     }
 }
-
-
-

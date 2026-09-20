@@ -83,8 +83,36 @@ fun RightAllAppsScreen(
         }
     }
 
+    val letterToHeaderIndexMap = remember(displayAppsList, folders, categorizedGroupMap, filterText) {
+        val map = mutableMapOf<Char, Int>()
+        if (filterText.isNotBlank()) return@remember map
+
+        var currentIndex = 0
+        if (categorizedGroupMap.isNotEmpty()) {
+            currentIndex += categorizedGroupMap.size
+        }
+        if (folders.isNotEmpty()) {
+            currentIndex += folders.size
+        }
+
+        var lastChar: Char? = null
+        displayAppsList.forEach { app ->
+            val char = app.label.firstOrNull()?.uppercaseChar() ?: '#'
+            if (char != lastChar) {
+                lastChar = char
+                map[char] = currentIndex
+                currentIndex++ // header item
+            }
+            currentIndex++ // app item
+        }
+        map
+    }
+
     FrostedGlassBackground(
         isFrostedTheme = (settings.themePreset == LauncherThemePreset.FROSTED_GLASS),
+        blurStrength = settings.frostedBlurRadius,
+        translucency = settings.frostedTranslucency,
+        glassEffect = settings.frostedGlassEffect,
         modifier = modifier
             .fillMaxSize()
             .statusBarsPadding()
@@ -373,13 +401,15 @@ fun RightAllAppsScreen(
                                 } else {
                                     letter
                                 }
-                                val appIndex = displayAppsList.indexOfFirst {
-                                    it.label.firstOrNull()?.uppercaseChar() == targetChar
-                                }
-                                if (appIndex != -1) {
-                                    scope.launch {
-                                        val offset = (if (folders.isNotEmpty()) folders.size else 0) + categorizedGroupMap.size
-                                        listState.scrollToItem((appIndex + offset).coerceAtLeast(0))
+                                targetChar?.let { char ->
+                                    val targetIndex = letterToHeaderIndexMap[char] ?: run {
+                                        letterToHeaderIndexMap.entries
+                                            .minByOrNull { kotlin.math.abs(it.key.code - char.code) }?.value
+                                    }
+                                    if (targetIndex != null) {
+                                        scope.launch {
+                                            listState.scrollToItem(targetIndex)
+                                        }
                                     }
                                 }
                             },

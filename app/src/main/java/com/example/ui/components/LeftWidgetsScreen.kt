@@ -40,6 +40,9 @@ fun LeftWidgetsScreen(
     calendarEvents: List<CalendarEvent>,
     isHeadphonesConnected: Boolean,
     isFrostedTheme: Boolean = false,
+    blurRadius: Float = 15f,
+    translucency: Float = 0.30f,
+    glassEffect: Float = 0.30f,
     onAddWidgetClick: () -> Unit,
     onAddSystemWidgetClick: () -> Unit = {},
     onDeleteWidget: (String) -> Unit,
@@ -59,6 +62,9 @@ fun LeftWidgetsScreen(
 
     FrostedGlassBackground(
         isFrostedTheme = isFrostedTheme,
+        blurStrength = blurRadius,
+        translucency = translucency,
+        glassEffect = glassEffect,
         modifier = modifier.testTag("left_widgets_screen")
     ) {
         Column(

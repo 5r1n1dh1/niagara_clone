@@ -83,7 +83,7 @@ data class AppItem(
     val isHidden: Boolean = false,
     val isUsageBreakerActive: Boolean = false,
     val disguisedName: String? = null,
-    val customCategory: String = "General",
+    val customCategory: String = "",
     val customIconType: String? = null,
     val customIconColorHex: String? = null,
     val notification: NotificationItem? = null,
