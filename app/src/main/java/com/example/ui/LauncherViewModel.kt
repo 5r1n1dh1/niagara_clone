@@ -85,6 +85,10 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         repository.syncMusicIntegration()
     }
 
+    fun setAppCategory(packageName: String, categoryName: String) {
+        repository.setAppCategory(packageName, categoryName)
+    }
+
     val dockApps: StateFlow<List<AppItem>> = combine(allApps, repository.dockPackageNames, settings) { apps, pkgs, sett ->
         val maxSlots = sett.dockSlotCount.coerceIn(3, 5)
         val list = mutableListOf<AppItem>()
@@ -95,6 +99,17 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
             }
         }
         if (list.size < maxSlots) {
+            val phoneApp = apps.find { it.packageName.contains("dialer", true) || it.packageName.contains("phone", true) || it.label.contains("Phone", true) }
+            val msgApp = apps.find { it.packageName.contains("messaging", true) || it.packageName.contains("mms", true) || it.label.contains("Message", true) }
+            val camApp = apps.find { it.packageName.contains("camera", true) || it.label.contains("Camera", true) }
+            
+            val defaults = listOfNotNull(phoneApp, msgApp, camApp)
+            for (defApp in defaults) {
+                if (list.size >= maxSlots) break
+                if (list.none { it.packageName == defApp.packageName }) {
+                    list.add(defApp)
+                }
+            }
             for (app in apps) {
                 if (list.size >= maxSlots) break
                 if (list.none { it.packageName == app.packageName }) {

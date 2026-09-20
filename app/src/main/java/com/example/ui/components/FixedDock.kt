@@ -14,6 +14,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -225,14 +226,48 @@ fun DockAppPickerDialog(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            val nonHidden = allApps.filter { !it.isHidden }
+            var searchQuery by remember { mutableStateOf("") }
+
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                placeholder = { Text("Search apps for dock...", fontSize = 13.sp) },
+                singleLine = true,
+                leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { searchQuery = "" }, modifier = Modifier.size(20.dp)) {
+                            Icon(Icons.Filled.Close, contentDescription = "Clear", modifier = Modifier.size(16.dp))
+                        }
+                    }
+                },
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                    focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                ),
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            val filteredApps = remember(allApps, searchQuery) {
+                val nonHidden = allApps.filter { !it.isHidden }
+                if (searchQuery.isBlank()) {
+                    nonHidden
+                } else {
+                    val q = searchQuery.trim().lowercase()
+                    nonHidden.filter { it.label.lowercase().contains(q) || it.packageName.lowercase().contains(q) }
+                }
+            }
+
             androidx.compose.foundation.lazy.LazyColumn(
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(max = 360.dp)
             ) {
-                items(nonHidden.size) { i ->
-                    val app = nonHidden[i]
+                items(filteredApps.size) { i ->
+                    val app = filteredApps[i]
                     Surface(
                         shape = RoundedCornerShape(12.dp),
                         color = Color.Transparent,

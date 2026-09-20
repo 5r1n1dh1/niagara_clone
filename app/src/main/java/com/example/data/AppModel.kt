@@ -64,13 +64,7 @@ enum class WallpaperStyle(val displayName: String) {
 
 enum class LauncherThemePreset(val displayName: String, val primary: Color, val background: Color, val surface: Color, val accent: Color) {
     FROSTED_GLASS("Frosted Glass", Color(0xFFFFFFFF), Color(0x3B18181B), Color(0x4D27272A), Color(0xFFE4E4E7)),
-    FLUX_EMERALD("Flux Emerald", Color(0xFF6EE7B7), Color(0xFF0B211A), Color(0xFF163E33), Color(0xFFA7F3D0)),
-    MIDNIGHT_OBSIDIAN("Midnight Obsidian", Color(0xFF38BDF8), Color(0xFF090D16), Color(0xFF131C2E), Color(0xFF00E5FF)),
-    AMOLED_BLACK("Pitch Black AMOLED", Color(0xFFFFFFFF), Color(0xFF000000), Color(0xFF121212), Color(0xFF64B5F6)),
-    NORDIC_PINE("Nordic Forest", Color(0xFF4ADE80), Color(0xFF0A1410), Color(0xFF14241C), Color(0xFF34D399)),
-    SUNSET_HORIZON("Sunset Twilight", Color(0xFFFB923C), Color(0xFF120E1C), Color(0xFF221A33), Color(0xFFF472B6)),
-    PAPER_MONOCHROME("Paper Monochrome", Color(0xFFF8FAFC), Color(0xFF0F172A), Color(0xFF1E293B), Color(0xFF94A3B8)),
-    CYBER_NEON("Cyber Neon", Color(0xFFE879F9), Color(0xFF0B0817), Color(0xFF1A122E), Color(0xFF22D3EE))
+    FLUX_EMERALD("Flux Emerald", Color(0xFF6EE7B7), Color(0xFF0B211A), Color(0xFF163E33), Color(0xFFA7F3D0))
 }
 
 enum class AppFontFamily(val displayName: String) {
@@ -94,6 +88,7 @@ data class AppItem(
     val customIconColorHex: String? = null,
     val notification: NotificationItem? = null,
     val shortcuts: List<String> = emptyList(),
+    val isDualApp: Boolean = false,
     @Transient val iconDrawable: Drawable? = null
 )
 
@@ -149,7 +144,7 @@ data class MediaPlaybackState(
     val isPlaying: Boolean = true,
     val trackTitle: String = "Midnight City",
     val artistName: String = "M83",
-    val appName: String = "Spotify",
+    val appName: String = "YouTube Music",
     val progressPercent: Float = 0.42f,
     val durationText: String = "4:03",
     val currentTimeText: String = "1:42"
@@ -162,6 +157,8 @@ data class LauncherSettings(
     val showSeconds: Boolean = false,
     val showDate: Boolean = true,
     val showClockHeader: Boolean = true,
+    val clockScale: Float = 1.0f,
+    val clockColorTintHex: String = "#FFFFFF",
     val iconPackType: IconPackType = IconPackType.DEFAULT_APP,
     val themePreset: LauncherThemePreset = LauncherThemePreset.FLUX_EMERALD,
     val wallpaperStyle: WallpaperStyle = WallpaperStyle.FLUX_EMBLEM,
@@ -179,6 +176,9 @@ data class LauncherSettings(
     val appIconScale: Float = 1.0f,
     val appSpacingScale: Float = 1.0f,
     val backgroundBlurStrength: Float = 25f,
+    val frostedTranslucency: Float = 0.30f,
+    val frostedBlurRadius: Float = 15f,
+    val frostedGlassEffect: Float = 0.30f,
     val showAppNotificationBadges: Boolean = true,
     val compactAppRowSpacing: Boolean = false,
     val showDock: Boolean = true,

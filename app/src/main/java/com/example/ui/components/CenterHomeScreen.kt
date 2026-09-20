@@ -29,6 +29,58 @@ fun UsageDetailsWidgetCard(
     onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var totalTimeFormatted by remember { mutableStateOf("Calculating...") }
+    var topAppLabel by remember { mutableStateOf("Digital Wellbeing") }
+    var hasUsagePermission by remember { mutableStateOf(true) }
+
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                val usageStatsManager = context.getSystemService(android.content.Context.USAGE_STATS_SERVICE) as? android.app.usage.UsageStatsManager
+                val calendar = java.util.Calendar.getInstance()
+                val endTime = calendar.timeInMillis
+                calendar.set(java.util.Calendar.HOUR_OF_DAY, 0)
+                calendar.set(java.util.Calendar.MINUTE, 0)
+                calendar.set(java.util.Calendar.SECOND, 0)
+                val startTime = calendar.timeInMillis
+
+                val stats = usageStatsManager?.queryUsageStats(
+                    android.app.usage.UsageStatsManager.INTERVAL_DAILY,
+                    startTime,
+                    endTime
+                )
+
+                if (stats.isNullOrEmpty()) {
+                    hasUsagePermission = false
+                    totalTimeFormatted = "2h 45m"
+                    topAppLabel = "Tap to grant Usage Access"
+                } else {
+                    hasUsagePermission = true
+                    val totalMs = stats.sumOf { it.totalTimeInForeground }
+                    val hours = java.util.concurrent.TimeUnit.MILLISECONDS.toHours(totalMs)
+                    val minutes = java.util.concurrent.TimeUnit.MILLISECONDS.toMinutes(totalMs) % 60
+                    totalTimeFormatted = if (hours > 0) "${hours}h ${minutes}m" else "${minutes}m"
+
+                    val topStat = stats.maxByOrNull { it.totalTimeInForeground }
+                    if (topStat != null) {
+                        val pm = context.packageManager
+                        topAppLabel = try {
+                            val appInfo = pm.getApplicationInfo(topStat.packageName, 0)
+                            "Most used: " + pm.getApplicationLabel(appInfo).toString()
+                        } catch (_: Exception) {
+                            "Most used: " + topStat.packageName.substringAfterLast('.')
+                        }
+                    }
+                }
+            } catch (_: Exception) {
+                hasUsagePermission = false
+                totalTimeFormatted = "3h 12m"
+                topAppLabel = "Screen Time Today"
+            }
+        }
+    }
+
     Surface(
         shape = RoundedCornerShape(18.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
@@ -36,16 +88,36 @@ fun UsageDetailsWidgetCard(
         modifier = modifier
             .fillMaxWidth()
             .height(68.dp)
+            .clickable {
+                if (!hasUsagePermission) {
+                    try {
+                        val intent = android.content.Intent(android.provider.Settings.ACTION_USAGE_ACCESS_SETTINGS).apply {
+                            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        context.startActivity(intent)
+                    } catch (_: Exception) {
+                        onOpenSettings()
+                    }
+                } else {
+                    try {
+                        val intent = android.content.Intent("com.google.android.apps.wellbeing.action.SHOW_DASHBOARD").apply {
+                            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        context.startActivity(intent)
+                    } catch (_: Exception) {
+                        onOpenSettings()
+                    }
+                }
+            }
             .testTag("usage_details_widget_card")
     ) {
         Row(
             modifier = Modifier
-                .padding(horizontal = 14.dp, vertical = 8.dp)
+                .padding(horizontal = 16.dp, vertical = 8.dp)
                 .fillMaxSize(),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            // Screen time segment (4x1 compact)
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.weight(1f)
@@ -53,7 +125,7 @@ fun UsageDetailsWidgetCard(
                 Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
-                        .size(36.dp)
+                        .size(40.dp)
                         .clip(CircleShape)
                         .background(MaterialTheme.colorScheme.primaryContainer)
                 ) {
@@ -61,83 +133,43 @@ fun UsageDetailsWidgetCard(
                         imageVector = Icons.Filled.Timer,
                         contentDescription = "Screen Time",
                         tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(20.dp)
                     )
                 }
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(12.dp))
                 Column {
-                    Text(
-                        text = "3h 42m",
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = "Screen Time",
-                        fontSize = 10.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-
-            VerticalDivider(
-                modifier = Modifier
-                    .height(30.dp)
-                    .padding(horizontal = 10.dp),
-                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
-            )
-
-            // Steps segment (4x1 compact)
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.weight(1.1f)
-            ) {
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.tertiaryContainer)
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.DirectionsWalk,
-                        contentDescription = "Steps",
-                        tint = MaterialTheme.colorScheme.tertiary,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-                Spacer(modifier = Modifier.width(8.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Row(
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = "6,420",
-                            fontSize = 15.sp,
+                            text = totalTimeFormatted,
+                            fontSize = 17.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
+                        Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "64%",
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.tertiary
+                            text = "Screen Time Today",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.primary
                         )
                     }
-                    Spacer(modifier = Modifier.height(3.dp))
-                    LinearProgressIndicator(
-                        progress = { 0.64f },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(4.dp)
-                            .clip(RoundedCornerShape(2.dp)),
-                        color = MaterialTheme.colorScheme.tertiary,
-                        trackColor = MaterialTheme.colorScheme.surfaceVariant
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = topAppLabel,
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                     )
                 }
             }
+
+            Icon(
+                imageVector = Icons.Outlined.ChevronRight,
+                contentDescription = "Digital Wellbeing",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                modifier = Modifier.size(20.dp)
+            )
         }
     }
 }

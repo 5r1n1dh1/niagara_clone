@@ -1,5 +1,7 @@
 package com.example.ui.components
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -16,6 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -250,7 +253,7 @@ private fun LeftWidgetCardWrapper(
                 // Edit controls & size picker chips
                 if (isEditMode) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        val sizes = listOf("4x1", "4x2", "4x3", "Full")
+                        val sizes = listOf("4x1", "4x2", "4x3", "4x4")
                         sizes.forEach { sz ->
                             Surface(
                                 shape = RoundedCornerShape(6.dp),
@@ -298,6 +301,7 @@ private fun LeftWidgetCardWrapper(
                 "4x1" -> Modifier.fillMaxWidth().heightIn(max = 90.dp)
                 "4x2" -> Modifier.fillMaxWidth().heightIn(max = 170.dp)
                 "4x3" -> Modifier.fillMaxWidth().heightIn(max = 250.dp)
+                "4x4" -> Modifier.fillMaxWidth().heightIn(max = 330.dp)
                 else -> Modifier.fillMaxWidth()
             }
 
@@ -493,6 +497,63 @@ private fun MediaWidgetBody(
                 modifier = Modifier.clickable(onClick = onToggleHeadphones)
             )
             Text(text = media.durationText, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+
+        Spacer(modifier = Modifier.height(6.dp))
+
+        // YouTube Music Quick Access Buttons (Requirement 12)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            val context = androidx.compose.ui.platform.LocalContext.current
+            OutlinedButton(
+                onClick = {
+                    try {
+                        val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://music.youtube.com/library")).apply {
+                            setPackage("com.google.android.apps.youtube.music")
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        context.startActivity(intent)
+                    } catch (_: Exception) {
+                        val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://music.youtube.com/library")).apply {
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        context.startActivity(intent)
+                    }
+                },
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                modifier = Modifier.weight(1f).height(28.dp),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Icon(Icons.Filled.VideoLibrary, contentDescription = null, modifier = Modifier.size(12.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("YT Library", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            }
+
+            OutlinedButton(
+                onClick = {
+                    try {
+                        val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://music.youtube.com/library/playlists")).apply {
+                            setPackage("com.google.android.apps.youtube.music")
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        context.startActivity(intent)
+                    } catch (_: Exception) {
+                        val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://music.youtube.com/library/playlists")).apply {
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        context.startActivity(intent)
+                    }
+                },
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                modifier = Modifier.weight(1f).height(28.dp),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Icon(Icons.Filled.PlaylistPlay, contentDescription = null, modifier = Modifier.size(12.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("Playlists", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            }
         }
     }
 }
@@ -883,7 +944,8 @@ private data class NewsStory(
     val source: String,
     val timeAgo: String,
     val category: String,
-    val imageUrl: String
+    val imageUrl: String,
+    val linkUrl: String = ""
 )
 
 private val sampleNewsStories = listOf(
@@ -892,28 +954,112 @@ private val sampleNewsStories = listOf(
         source = "Space & Science Daily",
         timeAgo = "18m ago",
         category = "SPACE",
-        imageUrl = "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=600&q=80"
+        imageUrl = "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=600&q=80",
+        linkUrl = "https://news.google.com"
     ),
     NewsStory(
         title = "Next-Gen Quantum Chips Achieve Record 99.9% Gate Fidelity at Room Temp",
         source = "Tech Discovery Wire",
         timeAgo = "42m ago",
         category = "TECH",
-        imageUrl = "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&q=80"
+        imageUrl = "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&q=80",
+        linkUrl = "https://news.google.com"
     ),
     NewsStory(
         title = "Global Clean Energy Power Grid Surpasses 2 Terawatt Milestone Target",
         source = "World Eco Journal",
         timeAgo = "2h ago",
         category = "ENERGY",
-        imageUrl = "https://images.unsplash.com/photo-1497435334941-8c899ee9e8e9?w=600&q=80"
+        imageUrl = "https://images.unsplash.com/photo-1497435334941-8c899ee9e8e9?w=600&q=80",
+        linkUrl = "https://news.google.com"
     )
 )
 
 @Composable
 private fun NewsWidgetBody() {
-    var currentIndex by remember { mutableStateOf(0) }
-    val currentStory = sampleNewsStories[currentIndex % sampleNewsStories.size]
+    val context = LocalContext.current
+    var stories by remember { mutableStateOf(sampleNewsStories) }
+    var currentIndex by remember { mutableIntStateOf(0) }
+
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                val url = java.net.URL("https://news.google.com/rss?hl=en-US&gl=US&ceid=US:en")
+                val conn = url.openConnection() as java.net.HttpURLConnection
+                conn.connectTimeout = 4000
+                conn.readTimeout = 4000
+                val inputStream = conn.inputStream
+                val factory = org.xmlpull.v1.XmlPullParserFactory.newInstance()
+                val parser = factory.newPullParser()
+                parser.setInput(inputStream, "UTF-8")
+
+                val fetched = mutableListOf<NewsStory>()
+                var eventType = parser.eventType
+                var curTitle = ""
+                var curSource = "Google News"
+                var curPubDate = "Recent"
+                var curLink = "https://news.google.com"
+                var inItem = false
+
+                val cats = listOf("WORLD", "TECH", "BUSINESS", "SCIENCE", "TOP NEWS")
+                val imgs = listOf(
+                    "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=600&q=80",
+                    "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&q=80",
+                    "https://images.unsplash.com/photo-1497435334941-8c899ee9e8e9?w=600&q=80",
+                    "https://images.unsplash.com/photo-1504384308090-c894fdcc538d?w=600&q=80"
+                )
+
+                while (eventType != org.xmlpull.v1.XmlPullParser.END_DOCUMENT && fetched.size < 8) {
+                    val tag = parser.name
+                    when (eventType) {
+                        org.xmlpull.v1.XmlPullParser.START_TAG -> {
+                            if ("item".equals(tag, true)) {
+                                inItem = true
+                                curTitle = ""
+                                curSource = "Google News"
+                                curPubDate = "Recent"
+                                curLink = "https://news.google.com"
+                            } else if (inItem) {
+                                when (tag?.lowercase()) {
+                                    "title" -> curTitle = parser.nextText().trim()
+                                    "source" -> curSource = parser.nextText().trim()
+                                    "pubdate" -> {
+                                        val pd = parser.nextText().trim()
+                                        curPubDate = if (pd.length > 16) pd.substring(0, 16) else pd
+                                    }
+                                    "link" -> curLink = parser.nextText().trim()
+                                }
+                            }
+                        }
+                        org.xmlpull.v1.XmlPullParser.END_TAG -> {
+                            if ("item".equals(tag, true)) {
+                                inItem = false
+                                if (curTitle.isNotBlank()) {
+                                    fetched.add(
+                                        NewsStory(
+                                            title = curTitle,
+                                            source = curSource,
+                                            timeAgo = curPubDate,
+                                            category = cats[fetched.size % cats.size],
+                                            imageUrl = imgs[fetched.size % imgs.size],
+                                            linkUrl = curLink
+                                        )
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    eventType = parser.next()
+                }
+                conn.disconnect()
+                if (fetched.isNotEmpty()) {
+                    stories = fetched
+                }
+            } catch (_: Exception) {}
+        }
+    }
+
+    val currentStory = stories[currentIndex % stories.size]
 
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
@@ -921,10 +1067,17 @@ private fun NewsWidgetBody() {
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(14.dp))
                 .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.6f))
+                .clickable {
+                    try {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(currentStory.linkUrl)).apply {
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        context.startActivity(intent)
+                    } catch (_: Exception) {}
+                }
                 .padding(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Render News Photo using Coil AsyncImage
             Box(
                 modifier = Modifier
                     .size(width = 86.dp, height = 72.dp)
@@ -959,7 +1112,8 @@ private fun NewsWidgetBody() {
                     Text(
                         text = "${currentStory.source} • ${currentStory.timeAgo}",
                         fontSize = 10.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1
                     )
                 }
 
@@ -988,7 +1142,7 @@ private fun NewsWidgetBody() {
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                sampleNewsStories.indices.forEach { index ->
+                stories.indices.forEach { index ->
                     Box(
                         modifier = Modifier
                             .size(if (index == currentIndex) 16.dp else 6.dp, 6.dp)
@@ -1003,13 +1157,13 @@ private fun NewsWidgetBody() {
 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(
-                    onClick = { currentIndex = (currentIndex - 1 + sampleNewsStories.size) % sampleNewsStories.size },
+                    onClick = { currentIndex = (currentIndex - 1 + stories.size) % stories.size },
                     modifier = Modifier.size(28.dp)
                 ) {
                     Icon(Icons.Filled.KeyboardArrowLeft, contentDescription = "Previous story", modifier = Modifier.size(18.dp))
                 }
                 IconButton(
-                    onClick = { currentIndex = (currentIndex + 1) % sampleNewsStories.size },
+                    onClick = { currentIndex = (currentIndex + 1) % stories.size },
                     modifier = Modifier.size(28.dp)
                 ) {
                     Icon(Icons.Filled.KeyboardArrowRight, contentDescription = "Next story", modifier = Modifier.size(18.dp))

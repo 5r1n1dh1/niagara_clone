@@ -73,14 +73,13 @@ fun WaveAlphabet(
                         onLetterConfirmed(letter)
                     },
                     onDragEnd = {
-                        val finalLetter = selectedLetter ?: 'A'
-                        onLetterConfirmed(finalLetter)
+                        selectedLetter?.let { letter ->
+                            onLetterConfirmed(letter)
+                        }
                         currentTouchY = null
-                        onLetterSelected(null)
                     },
                     onDragCancel = {
                         currentTouchY = null
-                        onLetterSelected(null)
                     }
                 )
             }
@@ -95,7 +94,6 @@ fun WaveAlphabet(
                         onLetterConfirmed(letter)
                         tryAwaitRelease()
                         currentTouchY = null
-                        onLetterSelected(null)
                     }
                 )
             },

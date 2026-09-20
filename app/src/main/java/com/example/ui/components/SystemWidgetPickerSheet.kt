@@ -210,18 +210,38 @@ fun SystemWidgetPickerSheet(
 
                                     Spacer(modifier = Modifier.width(12.dp))
 
-                                    Column {
+                                    val cols = ((item.minWidth + 30) / 70).coerceIn(1, 4)
+                                    val rows = ((item.minHeight + 30) / 70).coerceIn(1, 4)
+                                    val sizeLabel = "${cols}x${rows}"
+
+                                    Column(modifier = Modifier.weight(1f)) {
                                         Text(
                                             text = item.widgetLabel,
                                             fontWeight = FontWeight.SemiBold,
                                             fontSize = 14.sp,
                                             color = MaterialTheme.colorScheme.onSurface
                                         )
-                                        Text(
-                                            text = item.appLabel,
-                                            fontSize = 12.sp,
-                                            color = MaterialTheme.colorScheme.primary
-                                        )
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text(
+                                                text = item.appLabel,
+                                                fontSize = 12.sp,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Surface(
+                                                shape = RoundedCornerShape(4.dp),
+                                                color = MaterialTheme.colorScheme.primaryContainer,
+                                                modifier = Modifier.padding(vertical = 2.dp)
+                                            ) {
+                                                Text(
+                                                    text = sizeLabel,
+                                                    fontSize = 9.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                                )
+                                            }
+                                        }
                                     }
                                 }
 

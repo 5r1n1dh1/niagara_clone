@@ -147,6 +147,8 @@ class LauncherRepository(private val context: Context) {
             showSeconds = prefs.getBoolean("show_seconds", false),
             showDate = prefs.getBoolean("show_date", true),
             showClockHeader = prefs.getBoolean("show_clock_header", true),
+            clockScale = prefs.getFloat("clock_scale", 1.0f),
+            clockColorTintHex = prefs.getString("clock_tint_hex", "#FFFFFF") ?: "#FFFFFF",
             iconPackType = IconPackType.entries.getOrElse(prefs.getInt("icon_pack", 0)) { IconPackType.MATERIAL },
             themePreset = LauncherThemePreset.entries.getOrElse(prefs.getInt("theme_preset", LauncherThemePreset.FLUX_EMERALD.ordinal)) { LauncherThemePreset.FLUX_EMERALD },
             wallpaperStyle = WallpaperStyle.entries.getOrElse(prefs.getInt("wallpaper_style", WallpaperStyle.FLUX_EMBLEM.ordinal)) { WallpaperStyle.FLUX_EMBLEM },
@@ -161,6 +163,10 @@ class LauncherRepository(private val context: Context) {
             isHeadphonesConnected = prefs.getBoolean("headphones_connected", false),
             isGoogleDiscoverEnabled = prefs.getBoolean("google_discover", true),
             appIconScale = prefs.getFloat("app_icon_scale", 1.0f),
+            backgroundBlurStrength = prefs.getFloat("bg_blur_strength", 25f),
+            frostedTranslucency = prefs.getFloat("frosted_translucency", 0.30f),
+            frostedBlurRadius = prefs.getFloat("frosted_blur_radius", 15f),
+            frostedGlassEffect = prefs.getFloat("frosted_glass_effect", 0.30f),
             showAppNotificationBadges = prefs.getBoolean("app_notif_badges", true),
             compactAppRowSpacing = prefs.getBoolean("compact_row_spacing", false),
             showDock = prefs.getBoolean("show_dock", true),
@@ -183,6 +189,8 @@ class LauncherRepository(private val context: Context) {
             .putBoolean("show_seconds", newSettings.showSeconds)
             .putBoolean("show_date", newSettings.showDate)
             .putBoolean("show_clock_header", newSettings.showClockHeader)
+            .putFloat("clock_scale", newSettings.clockScale)
+            .putString("clock_tint_hex", newSettings.clockColorTintHex)
             .putInt("icon_pack", newSettings.iconPackType.ordinal)
             .putInt("theme_preset", newSettings.themePreset.ordinal)
             .putInt("wallpaper_style", newSettings.wallpaperStyle.ordinal)
@@ -197,6 +205,10 @@ class LauncherRepository(private val context: Context) {
             .putBoolean("headphones_connected", newSettings.isHeadphonesConnected)
             .putBoolean("google_discover", newSettings.isGoogleDiscoverEnabled)
             .putFloat("app_icon_scale", newSettings.appIconScale)
+            .putFloat("bg_blur_strength", newSettings.backgroundBlurStrength)
+            .putFloat("frosted_translucency", newSettings.frostedTranslucency)
+            .putFloat("frosted_blur_radius", newSettings.frostedBlurRadius)
+            .putFloat("frosted_glass_effect", newSettings.frostedGlassEffect)
             .putBoolean("app_notif_badges", newSettings.showAppNotificationBadges)
             .putBoolean("compact_row_spacing", newSettings.compactAppRowSpacing)
             .putBoolean("show_dock", newSettings.showDock)
@@ -399,29 +411,37 @@ class LauncherRepository(private val context: Context) {
     private fun loadInstalledAppsInternal() {
         val pm = context.packageManager
         val installedAppItems = mutableListOf<AppItem>()
-        val seenPackages = mutableSetOf<String>()
+        val seenKeys = mutableSetOf<String>()
+        val myUser = Process.myUserHandle()
 
         // 1. Primary: query via LauncherApps service (the official Android API for Home Screen apps)
         try {
             val launcherApps = context.getSystemService(Context.LAUNCHER_APPS_SERVICE) as? LauncherApps
             val userManager = context.getSystemService(Context.USER_SERVICE) as? UserManager
-            val profiles = userManager?.userProfiles ?: listOf(Process.myUserHandle())
+            val profiles = userManager?.userProfiles ?: listOf(myUser)
 
             for (profile in profiles) {
+                val isSecondaryProfile = (profile != myUser)
                 val activityList = launcherApps?.getActivityList(null, profile) ?: emptyList()
                 for (activityInfo in activityList) {
                     val pkg = activityInfo.applicationInfo.packageName
-                    if (pkg == context.packageName || seenPackages.contains(pkg)) continue
-                    seenPackages.add(pkg)
+                    val key = "$pkg:${profile.hashCode()}"
+                    if (pkg == context.packageName || seenKeys.contains(key)) continue
+                    seenKeys.add(key)
 
-                    val label = try {
+                    var label = try {
                         activityInfo.label?.toString()?.trim()?.takeIf { it.isNotEmpty() }
                             ?: pm.getApplicationLabel(activityInfo.applicationInfo).toString()
                     } catch (t: Throwable) {
                         pkg
                     }
 
-                    if (label.equals("Flux Settings", true) || label.equals("Launcher Settings", true)) continue
+                    if (label.contains("Flux Launcher", true) || label.contains("Flux Settings", true) || label.contains("Launcher Settings", true)) continue
+
+                    val isDual = isSecondaryProfile || pkg.contains("dual", true) || pkg.contains("clone", true) || pkg.contains("parallel", true)
+                    if (isDual && !label.contains("(Dual)", true)) {
+                        label = "$label (Dual)"
+                    }
 
                     val iconDrawable = try {
                         activityInfo.getBadgedIcon(context.resources.displayMetrics.densityDpi)
@@ -439,6 +459,7 @@ class LauncherRepository(private val context: Context) {
                             activityName = activityInfo.componentName.className,
                             label = label,
                             shortcuts = listOf("App info", "Share", "Open"),
+                            isDualApp = isDual,
                             iconDrawable = iconDrawable,
                             notification = _activeNotifications.value[pkg]
                         )
@@ -455,8 +476,8 @@ class LauncherRepository(private val context: Context) {
             val resolveInfos = pm.queryIntentActivities(intent, 0)
             for (info in resolveInfos) {
                 val pkg = try { info.activityInfo?.packageName } catch (t: Throwable) { null } ?: continue
-                if (pkg == context.packageName || seenPackages.contains(pkg)) continue
-                seenPackages.add(pkg)
+                if (pkg == context.packageName || seenKeys.any { it.startsWith(pkg) }) continue
+                seenKeys.add(pkg)
 
                 val actName = try { info.activityInfo?.name ?: "" } catch (t: Throwable) { "" }
                 val label = try {
@@ -467,7 +488,7 @@ class LauncherRepository(private val context: Context) {
                     pkg
                 }
 
-                if (label.equals("Flux Settings", true) || label.equals("Launcher Settings", true)) continue
+                if (label.contains("Flux Launcher", true) || label.contains("Flux Settings", true) || label.contains("Launcher Settings", true)) continue
 
                 val iconDrawable = try {
                     info.loadIcon(pm)
@@ -737,6 +758,40 @@ class LauncherRepository(private val context: Context) {
         }
     }
 
+    fun setAppCategory(packageName: String, categoryName: String) {
+        val map = getCategoryMap().toMutableMap()
+        if (categoryName.isBlank()) {
+            map.remove(packageName)
+        } else {
+            map[packageName] = categoryName
+        }
+        saveCategoryMap(map)
+        _allApps.value = _allApps.value.map {
+            if (it.packageName == packageName) it.copy(customCategory = categoryName) else it
+        }
+        _favorites.value = _favorites.value.map {
+            if (it.packageName == packageName) it.copy(customCategory = categoryName) else it
+        }
+    }
+
+    private fun getCategoryMap(): Map<String, String> {
+        val json = prefs.getString("app_categories_json", null) ?: return emptyMap()
+        val result = mutableMapOf<String, String>()
+        try {
+            val obj = org.json.JSONObject(json)
+            obj.keys().forEach { k ->
+                result[k] = obj.getString(k)
+            }
+        } catch (_: Exception) {}
+        return result
+    }
+
+    private fun saveCategoryMap(map: Map<String, String>) {
+        val obj = org.json.JSONObject()
+        map.forEach { (k, v) -> obj.put(k, v) }
+        prefs.edit().putString("app_categories_json", obj.toString()).apply()
+    }
+
     fun replyToNotification(packageName: String, replyText: String, key: String? = null) {
         if (key != null) {
             com.example.service.FluxNotificationListenerService.instance?.replyNotificationByKey(key, replyText)
@@ -788,15 +843,17 @@ class LauncherRepository(private val context: Context) {
     }
 
     fun togglePlayPauseMedia() {
+        val currentlyPlaying = _mediaPlayer.value.isPlaying
+        val keycode = if (currentlyPlaying) android.view.KeyEvent.KEYCODE_MEDIA_PAUSE else android.view.KeyEvent.KEYCODE_MEDIA_PLAY
         val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? android.media.AudioManager
         try {
-            val downEvent = android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)
-            val upEvent = android.view.KeyEvent(android.view.KeyEvent.ACTION_UP, android.view.KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)
+            val downEvent = android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, keycode)
+            val upEvent = android.view.KeyEvent(android.view.KeyEvent.ACTION_UP, keycode)
             audioManager?.dispatchMediaKeyEvent(downEvent)
             audioManager?.dispatchMediaKeyEvent(upEvent)
         } catch (_: Exception) {}
 
-        val newPlayingState = !_mediaPlayer.value.isPlaying
+        val newPlayingState = !currentlyPlaying
         val musicPkg = widgetIntegrations.getPackage(IntegrationCategory.MUSIC)
         val appLabel = if (musicPkg != null) {
             try {
@@ -826,7 +883,7 @@ class LauncherRepository(private val context: Context) {
         } catch (_: Exception) {}
 
         val musicPkg = widgetIntegrations.getPackage(IntegrationCategory.MUSIC)
-        val currentApp = if (musicPkg != null) widgetIntegrations.getAppLabel(IntegrationCategory.MUSIC, context.packageManager) else "Spotify"
+        val currentApp = if (musicPkg != null) widgetIntegrations.getAppLabel(IntegrationCategory.MUSIC, context.packageManager) else "YouTube Music"
 
         val tracks = listOf(
             MediaPlaybackState(true, "Midnight City", "M83", currentApp, 0.35f, "4:03", "1:25"),
@@ -862,7 +919,7 @@ class LauncherRepository(private val context: Context) {
         } catch (_: Exception) {}
 
         val musicPkg = widgetIntegrations.getPackage(IntegrationCategory.MUSIC)
-        val currentApp = if (musicPkg != null) widgetIntegrations.getAppLabel(IntegrationCategory.MUSIC, context.packageManager) else "Spotify"
+        val currentApp = if (musicPkg != null) widgetIntegrations.getAppLabel(IntegrationCategory.MUSIC, context.packageManager) else "YouTube Music"
         val tracks = listOf(
             MediaPlaybackState(true, "Resonance", "HOME", currentApp, 0.10f, "3:32", "0:21"),
             MediaPlaybackState(true, "Solar Power", "Lorde", currentApp, 0.05f, "3:12", "0:10"),
@@ -1221,11 +1278,11 @@ class LauncherRepository(private val context: Context) {
             }
         }
 
-        // Default dock icons
+        // Default dock icons (Phone, Message, Camera)
         _dockPackageNames.value = listOf(
             "com.google.android.dialer",
             "com.google.android.apps.messaging",
-            "com.android.chrome"
+            "com.google.android.GoogleCamera"
         )
     }
 
@@ -1263,7 +1320,7 @@ class LauncherRepository(private val context: Context) {
         val defaults = listOf(
             "com.google.android.dialer",
             "com.google.android.apps.messaging",
-            "com.android.chrome"
+            "com.google.android.GoogleCamera"
         )
         _dockPackageNames.value = defaults
         saveDockPackages(defaults)

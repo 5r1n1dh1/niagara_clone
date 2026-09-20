@@ -322,13 +322,62 @@ fun SettingsContent(
                                         onClick = { onUpdateSettings(settings.copy(themePreset = preset)) },
                                         label = {
                                             Text(
-                                                preset.name.replace("_", " ").lowercase().replaceFirstChar { it.uppercase() },
+                                                preset.displayName,
                                                 fontSize = 11.sp
                                             )
                                         }
                                     )
                                 }
                             }
+
+                            // Frosted Glass Customization Sliders
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Text(
+                                "Frosted Glass Sliders",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("Translucency", fontSize = 12.sp)
+                                Text("${(settings.frostedTranslucency * 100).toInt()}%", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+                            Slider(
+                                value = settings.frostedTranslucency,
+                                onValueChange = { onUpdateSettings(settings.copy(frostedTranslucency = it)) },
+                                valueRange = 0.10f..0.85f
+                            )
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("Blur Radius", fontSize = 12.sp)
+                                Text("${settings.frostedBlurRadius.toInt()} px", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+                            Slider(
+                                value = settings.frostedBlurRadius,
+                                onValueChange = { onUpdateSettings(settings.copy(frostedBlurRadius = it)) },
+                                valueRange = 0f..30f
+                            )
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("Glass Effect Specular", fontSize = 12.sp)
+                                Text("${(settings.frostedGlassEffect * 100).toInt()}%", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+                            Slider(
+                                value = settings.frostedGlassEffect,
+                                onValueChange = { onUpdateSettings(settings.copy(frostedGlassEffect = it)) },
+                                valueRange = 0f..1f
+                            )
 
                             Spacer(modifier = Modifier.height(12.dp))
                             Text("Icon Style", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
@@ -655,7 +704,91 @@ fun SettingsContent(
                 3 -> {
                     // --- WIDGETS & CLOCK ---
                     item {
-                        SettingsCard(title = "Home Screen Widgets") {
+                        SettingsCard(title = "Clock Widget Customization") {
+                            Text(
+                                text = "Clock Style Preset",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+
+                            androidx.compose.foundation.lazy.LazyRow(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                items(ClockStyle.entries.size) { idx ->
+                                    val style = ClockStyle.entries[idx]
+                                    FilterChip(
+                                        selected = settings.clockStyle == style,
+                                        onClick = { onUpdateSettings(settings.copy(clockStyle = style)) },
+                                        label = { Text(style.displayName, fontSize = 11.sp) }
+                                    )
+                                }
+                            }
+
+                            HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("Clock Font Size Scale", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                                Text("${(settings.clockScale * 100).toInt()}%", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+                            Slider(
+                                value = settings.clockScale,
+                                onValueChange = { onUpdateSettings(settings.copy(clockScale = it)) },
+                                valueRange = 0.7f..1.5f
+                            )
+
+                            HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp))
+
+                            Text(
+                                text = "Clock Accent Tint",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                listOf("#FFFFFF" to "White", "#6EE7B7" to "Emerald", "#FBBF24" to "Gold", "#38BDF8" to "Cyan", "#F472B6" to "Pink", "#A78BFA" to "Purple").forEach { (hex, name) ->
+                                    val isSelected = settings.clockColorTintHex.equals(hex, ignoreCase = true)
+                                    FilterChip(
+                                        selected = isSelected,
+                                        onClick = { onUpdateSettings(settings.copy(clockColorTintHex = hex)) },
+                                        label = { Text(name, fontSize = 11.sp) },
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+                            }
+
+                            HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp))
+
+                            SettingsToggleRow(
+                                title = "Show Running Seconds",
+                                subtitle = "Display live ticking seconds in clock view",
+                                checked = settings.showSeconds,
+                                onCheckedChange = { onUpdateSettings(settings.copy(showSeconds = it)) }
+                            )
+
+                            HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp))
+
+                            SettingsToggleRow(
+                                title = "Show Calendar Date Header",
+                                subtitle = "Display day of week and month below clock time",
+                                checked = settings.showDate,
+                                onCheckedChange = { onUpdateSettings(settings.copy(showDate = it)) }
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        SettingsCard(title = "Home Screen & System Widgets") {
                             Text(
                                 text = "Favorites Screen 3-Widget Carousel",
                                 fontSize = 13.sp,
@@ -669,15 +802,6 @@ fun SettingsContent(
                             )
 
                             Spacer(modifier = Modifier.height(10.dp))
-
-                            SettingsToggleRow(
-                                title = "Show Seconds",
-                                subtitle = "Display live running seconds in clock widget",
-                                checked = settings.showSeconds,
-                                onCheckedChange = { onUpdateSettings(settings.copy(showSeconds = it)) }
-                            )
-
-                            HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp))
 
                             OutlinedButton(
                                 onClick = onOpenSystemWidgetPicker,

@@ -105,11 +105,14 @@ fun AppPopupDrawer(
     onToggleHide: () -> Unit,
     onToggleUsageBreaker: () -> Unit,
     onDisguiseApp: (String?) -> Unit,
+    onAssignCategory: ((String) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     var isFavoriteState by remember(app.isFavorite, app.packageName) { mutableStateOf(app.isFavorite) }
     var showDisguiseDialog by remember { mutableStateOf(false) }
+    var showCategoryDialog by remember { mutableStateOf(false) }
+    var customCategoryText by remember { mutableStateOf(app.customCategory) }
     var disguiseText by remember { mutableStateOf(app.disguisedName ?: "") }
     var replyInput by remember { mutableStateOf("") }
     var replySentConfirmation by remember { mutableStateOf(false) }
@@ -254,6 +257,7 @@ fun AppPopupDrawer(
                             ) {
                                 effectiveNotifications.forEach { notifItem ->
                                     val initial = notifItem.sender.firstOrNull()?.uppercaseChar()?.toString() ?: "💬"
+                                    val isSelected = (selectedChatHeadKey == notifItem.key)
 
                                     Column(
                                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -265,22 +269,30 @@ fun AppPopupDrawer(
                                                 modifier = Modifier
                                                     .size(48.dp)
                                                     .clip(CircleShape)
-                                                    .background(MaterialTheme.colorScheme.primaryContainer)
+                                                    .background(if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primaryContainer)
                                                     .border(
                                                         width = 1.5.dp,
                                                         color = MaterialTheme.colorScheme.primary,
                                                         shape = CircleShape
+                                                    )
+                                                    .combinedClickable(
+                                                        onClick = {
+                                                            selectedChatHeadKey = if (selectedChatHeadKey == notifItem.key) null else notifItem.key
+                                                        },
+                                                        onLongClick = {
+                                                            selectedChatHeadKey = if (selectedChatHeadKey == notifItem.key) null else notifItem.key
+                                                        }
                                                     )
                                             ) {
                                                 Text(
                                                     text = initial,
                                                     fontSize = 18.sp,
                                                     fontWeight = FontWeight.Bold,
-                                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onPrimaryContainer
                                                 )
                                             }
 
-                                            // Individual dismiss button on top end of chat head
+                                            // Compact dismiss button (reduced size for requirement 9)
                                             IconButton(
                                                 onClick = {
                                                     if (onDismissNotificationKey != null) {
@@ -290,7 +302,7 @@ fun AppPopupDrawer(
                                                     }
                                                 },
                                                 modifier = Modifier
-                                                    .size(20.dp)
+                                                    .size(14.dp)
                                                     .clip(CircleShape)
                                                     .background(MaterialTheme.colorScheme.errorContainer)
                                                     .testTag("dismiss_chat_head_${notifItem.id}")
@@ -299,7 +311,7 @@ fun AppPopupDrawer(
                                                     imageVector = Icons.Filled.Close,
                                                     contentDescription = "Dismiss",
                                                     tint = MaterialTheme.colorScheme.error,
-                                                    modifier = Modifier.size(11.dp)
+                                                    modifier = Modifier.size(8.dp)
                                                 )
                                             }
                                         }
@@ -312,6 +324,44 @@ fun AppPopupDrawer(
                                             fontWeight = FontWeight.Medium,
                                             color = MaterialTheme.colorScheme.onSurface,
                                             maxLines = 1
+                                        )
+                                    }
+                                }
+                            }
+
+                            // Revealed Message Content (for long press on chat head)
+                            effectiveNotifications.find { it.key == selectedChatHeadKey }?.let { selectedNotif ->
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = MaterialTheme.colorScheme.surface,
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)),
+                                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
+                                ) {
+                                    Column(modifier = Modifier.padding(10.dp)) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Text(
+                                                text = selectedNotif.sender,
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 12.sp,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                            Text(
+                                                text = "Long pressed",
+                                                fontSize = 10.sp,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            text = selectedNotif.message,
+                                            fontSize = 13.sp,
+                                            lineHeight = 17.sp,
+                                            color = MaterialTheme.colorScheme.onSurface
                                         )
                                     }
                                 }
@@ -429,6 +479,15 @@ fun AppPopupDrawer(
                     onClick = onToggleHide
                 )
 
+                // Category Tag button
+                ActionPillButton(
+                    icon = Icons.Outlined.Folder,
+                    label = if (app.customCategory.isNotBlank()) app.customCategory else "Category",
+                    isActive = app.customCategory.isNotBlank(),
+                    modifier = Modifier.weight(1f),
+                    onClick = { showCategoryDialog = true }
+                )
+
                 // Disguise Name button
                 ActionPillButton(
                     icon = Icons.Outlined.DriveFileRenameOutline,
@@ -456,6 +515,56 @@ fun AppPopupDrawer(
                 )
             }
         }
+    }
+
+    if (showCategoryDialog) {
+        AlertDialog(
+            onDismissRequest = { showCategoryDialog = false },
+            title = { Text("Assign App Category", fontSize = 17.sp, fontWeight = FontWeight.Bold) },
+            text = {
+                Column {
+                    Text("Select or enter custom category for ${app.label}:", fontSize = 13.sp)
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    val presetCategories = listOf("Social", "Work", "Games", "Media", "Utilities", "Tools", "Productivity")
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        presetCategories.take(4).forEach { cat ->
+                            SuggestionChip(
+                                onClick = { customCategoryText = cat },
+                                label = { Text(cat, fontSize = 11.sp) }
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    OutlinedTextField(
+                        value = customCategoryText,
+                        onValueChange = { customCategoryText = it },
+                        placeholder = { Text("e.g. Finance, Games, Travel") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(onClick = {
+                    val finalCat = customCategoryText.trim()
+                    onAssignCategory?.invoke(finalCat)
+                    showCategoryDialog = false
+                }) {
+                    Text("Save")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCategoryDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 
     if (showDisguiseDialog) {

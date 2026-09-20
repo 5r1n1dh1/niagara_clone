@@ -562,7 +562,8 @@ fun NiagaraLauncherScreen(
                 onToggleFavorite = { viewModel.toggleFavorite(app.packageName) },
                 onToggleHide = { viewModel.toggleHideApp(app.packageName) },
                 onToggleUsageBreaker = { viewModel.toggleUsageBreaker(app.packageName) },
-                onDisguiseApp = { newName -> viewModel.repository.disguiseApp(app.packageName, newName) }
+                onDisguiseApp = { newName -> viewModel.repository.disguiseApp(app.packageName, newName) },
+                onAssignCategory = { cat -> viewModel.setAppCategory(app.packageName, cat) }
             )
         }
 
