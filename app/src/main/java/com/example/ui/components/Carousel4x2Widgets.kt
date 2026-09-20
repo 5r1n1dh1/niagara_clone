@@ -78,6 +78,16 @@ fun Carousel4x2WidgetCard(
                 WidgetType.WEATHER_FORECAST -> {
                     Weather4x2Widget(weather = weather, onClick = onOpenWeather)
                 }
+                WidgetType.NEWS_FEED -> {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text(
+                            text = "📰 Top News Highlights",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
                 WidgetType.MEDIA_PLAYER -> {
                     MediaPlayer4x2Widget(
                         media = mediaPlayer,

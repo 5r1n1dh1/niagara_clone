@@ -21,14 +21,14 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun FrostedGlassBackground(
     modifier: Modifier = Modifier,
-    isFrostedTheme: Boolean = false,
+    isFrostedTheme: Boolean = true,
     blurStrength: Float = 25f,
     content: @Composable BoxScope.() -> Unit
 ) {
     Box(modifier = modifier.fillMaxSize()) {
-        val effectiveBlur = blurStrength.coerceIn(0f, 60f).dp
-        // Hardware blur scrim on supported Android versions
-        val blurModifier = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && effectiveBlur > 0.5.dp) {
+        val effectiveBlur = blurStrength.coerceAtLeast(18f).dp
+        // Hardware blur scrim forced across all themes
+        val blurModifier = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             Modifier.fillMaxSize().blur(effectiveBlur)
         } else {
             Modifier.fillMaxSize()
@@ -37,19 +37,11 @@ fun FrostedGlassBackground(
         Box(
             modifier = blurModifier.background(
                 Brush.verticalGradient(
-                    if (isFrostedTheme) {
-                        listOf(
-                            Color(0x3B18181B),
-                            Color(0x4D27272A),
-                            Color(0x6618181B)
-                        )
-                    } else {
-                        listOf(
-                            MaterialTheme.colorScheme.background.copy(alpha = 0.55f),
-                            MaterialTheme.colorScheme.surface.copy(alpha = 0.70f),
-                            MaterialTheme.colorScheme.background.copy(alpha = 0.80f)
-                        )
-                    }
+                    listOf(
+                        MaterialTheme.colorScheme.background.copy(alpha = 0.45f),
+                        MaterialTheme.colorScheme.surface.copy(alpha = 0.60f),
+                        MaterialTheme.colorScheme.background.copy(alpha = 0.75f)
+                    )
                 )
             )
         )
@@ -61,9 +53,9 @@ fun FrostedGlassBackground(
                 .background(
                     Brush.linearGradient(
                         listOf(
-                            Color.White.copy(alpha = 0.08f),
+                            Color.White.copy(alpha = 0.12f),
                             Color.Transparent,
-                            Color.White.copy(alpha = 0.04f)
+                            Color.White.copy(alpha = 0.06f)
                         )
                     )
                 )
@@ -84,8 +76,9 @@ fun FrostedGlassCard(
     blurRadius: Dp = 16.dp,
     content: @Composable BoxScope.() -> Unit
 ) {
-    val blurModifier = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && blurRadius > 0.dp) {
-        Modifier.blur(blurRadius)
+    val effectiveBlur = blurRadius.coerceAtLeast(12.dp)
+    val blurModifier = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        Modifier.blur(effectiveBlur)
     } else {
         Modifier
     }
@@ -97,29 +90,23 @@ fun FrostedGlassCard(
                 width = 1.dp,
                 brush = Brush.linearGradient(
                     listOf(
-                        Color.White.copy(alpha = 0.30f),
-                        Color.White.copy(alpha = 0.08f)
+                        Color.White.copy(alpha = 0.35f),
+                        Color.White.copy(alpha = 0.10f)
                     )
                 ),
                 shape = shape
             )
             .background(
-                if (isFrostedTheme) {
-                    Color(0x401E293B)
-                } else {
-                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f)
-                },
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.50f),
                 shape = shape
             )
     ) {
-        if (isFrostedTheme) {
-            Box(
-                modifier = Modifier
-                    .matchParentSize()
-                    .then(blurModifier)
-                    .background(Color(0x22FFFFFF))
-            )
-        }
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .then(blurModifier)
+                .background(Color(0x22FFFFFF))
+        )
         content()
     }
 }

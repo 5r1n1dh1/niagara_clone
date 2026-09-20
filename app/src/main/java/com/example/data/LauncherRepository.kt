@@ -292,6 +292,7 @@ class LauncherRepository(private val context: Context) {
             }
             WidgetType.MEDIA_PLAYER -> true
             WidgetType.WEATHER_FORECAST -> true
+            WidgetType.NEWS_FEED -> true
             WidgetType.SYSTEM_TOGGLES -> true
             WidgetType.QUICK_NOTE -> true
             WidgetType.CLOCK -> true
@@ -420,6 +421,8 @@ class LauncherRepository(private val context: Context) {
                         pkg
                     }
 
+                    if (label.equals("Flux Settings", true) || label.equals("Launcher Settings", true)) continue
+
                     val iconDrawable = try {
                         activityInfo.getBadgedIcon(context.resources.displayMetrics.densityDpi)
                     } catch (t: Throwable) {
@@ -463,6 +466,8 @@ class LauncherRepository(private val context: Context) {
                 } catch (t: Throwable) {
                     pkg
                 }
+
+                if (label.equals("Flux Settings", true) || label.equals("Launcher Settings", true)) continue
 
                 val iconDrawable = try {
                     info.loadIcon(pm)
@@ -1019,7 +1024,8 @@ class LauncherRepository(private val context: Context) {
                             appWidgetId = obj.optInt("appWidgetId", -1),
                             providerPackage = if (obj.has("providerPackage")) obj.optString("providerPackage") else null,
                             providerClass = if (obj.has("providerClass")) obj.optString("providerClass") else null,
-                            linkedPackageName = if (obj.has("linkedPackageName")) obj.optString("linkedPackageName") else null
+                            linkedPackageName = if (obj.has("linkedPackageName")) obj.optString("linkedPackageName") else null,
+                            heightCategory = obj.optString("heightCategory", "4x2")
                         )
                     )
                 }
@@ -1034,22 +1040,18 @@ class LauncherRepository(private val context: Context) {
 
         // Default Left Page widgets
         _leftWidgets.value = listOf(
-            CustomWidgetConfig("w_weather", WidgetType.WEATHER_FORECAST, "Weather & Forecast"),
-            CustomWidgetConfig("w_media", WidgetType.MEDIA_PLAYER, "Media Player"),
-            CustomWidgetConfig("w_agenda", WidgetType.CALENDAR_AGENDA, "Upcoming Agenda"),
+            CustomWidgetConfig("w_weather", WidgetType.WEATHER_FORECAST, "Weather & Forecast", heightCategory = "4x2"),
+            CustomWidgetConfig("w_news", WidgetType.NEWS_FEED, "Top News Highlights", heightCategory = "4x2"),
+            CustomWidgetConfig("w_media", WidgetType.MEDIA_PLAYER, "Media Player", heightCategory = "4x2"),
+            CustomWidgetConfig("w_agenda", WidgetType.CALENDAR_AGENDA, "Upcoming Agenda", heightCategory = "4x2"),
             CustomWidgetConfig(
                 id = "w_note",
                 type = WidgetType.QUICK_NOTE,
                 title = "Quick Scratchpad",
-                content = "Swipe right to All Apps • Long press dock to swap icons • Swipe left to customize widgets."
+                content = "Swipe right to All Apps • Long press dock to swap icons • Swipe left to customize widgets.",
+                heightCategory = "4x2"
             ),
-            CustomWidgetConfig("w_toggles", WidgetType.SYSTEM_TOGGLES, "Quick Device Controls"),
-            CustomWidgetConfig(
-                id = "w_habits",
-                type = WidgetType.DAILY_HABITS,
-                title = "Daily Habits",
-                content = "Morning walk & stretch\nReview calendar\nRead 20 pages"
-            )
+            CustomWidgetConfig("w_toggles", WidgetType.SYSTEM_TOGGLES, "Quick Device Controls", heightCategory = "4x1")
         )
     }
 
@@ -1063,6 +1065,7 @@ class LauncherRepository(private val context: Context) {
             obj.put("content", w.content)
             obj.put("isEnabled", w.isEnabled)
             obj.put("appWidgetId", w.appWidgetId)
+            obj.put("heightCategory", w.heightCategory)
             w.providerPackage?.let { obj.put("providerPackage", it) }
             w.providerClass?.let { obj.put("providerClass", it) }
             w.linkedPackageName?.let { obj.put("linkedPackageName", it) }
@@ -1097,9 +1100,15 @@ class LauncherRepository(private val context: Context) {
         saveLeftWidgets(updated)
     }
 
-    fun updateLeftWidget(id: String, newTitle: String, newContent: String) {
+    fun updateLeftWidget(id: String, newTitle: String = "", newContent: String = "", newHeightCategory: String? = null) {
         val updated = _leftWidgets.value.map {
-            if (it.id == id) it.copy(title = newTitle, content = newContent) else it
+            if (it.id == id) {
+                it.copy(
+                    title = if (newTitle.isNotEmpty()) newTitle else it.title,
+                    content = if (newContent.isNotEmpty()) newContent else it.content,
+                    heightCategory = newHeightCategory ?: it.heightCategory
+                )
+            } else it
         }
         _leftWidgets.value = updated
         saveLeftWidgets(updated)

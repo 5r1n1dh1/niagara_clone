@@ -136,6 +136,7 @@ fun NiagaraLauncherScreen(
     }
 
     LaunchedEffect(Unit) {
+        com.example.service.FluxNotificationListenerService.triggerSync()
         val permissionsToRequest = buildList {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 add(Manifest.permission.POST_NOTIFICATIONS)
@@ -285,7 +286,8 @@ fun NiagaraLauncherScreen(
                         onToggleHeadphones = { viewModel.toggleHeadphonesConnected() },
                         onRefreshWeather = { viewModel.showToast("Updated weather for ${weather.location} ⛅") },
                         onOpenWeather = { viewModel.launchIntegration(com.example.util.IntegrationCategory.WEATHER) },
-                        onOpenCalendar = { viewModel.launchIntegration(com.example.util.IntegrationCategory.CALENDAR) }
+                        onOpenCalendar = { viewModel.launchIntegration(com.example.util.IntegrationCategory.CALENDAR) },
+                        onUpdateWidgetSize = { id, size -> viewModel.updateLeftWidgetSize(id, size) }
                     )
                 }
                 1 -> {

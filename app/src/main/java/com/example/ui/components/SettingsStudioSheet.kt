@@ -13,6 +13,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
+import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -52,28 +53,89 @@ fun SettingsStudioSheet(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        containerColor = MaterialTheme.colorScheme.surface,
-        modifier = modifier.testTag("settings_studio_sheet")
+    Surface(
+        color = MaterialTheme.colorScheme.background,
+        modifier = modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+            .navigationBarsPadding()
+            .testTag("settings_studio_sheet")
     ) {
-        SettingsContent(
-            settings = settings,
-            allApps = allApps,
-            dockApps = dockApps,
-            widgetIntegrations = widgetIntegrations,
-            onUpdateSettings = onUpdateSettings,
-            onSelectDockSlot = onSelectDockSlot,
-            onClearDockSlot = onClearDockSlot,
-            onResetDockDefaults = onResetDockDefaults,
-            onExportBackup = onExportBackup,
-            onImportBackup = onImportBackup,
-            onResetDefaults = onResetDefaults,
-            onOpenSetupGuide = onOpenSetupGuide,
-            onOpenSystemWidgetPicker = onOpenSystemWidgetPicker,
-            onClose = onDismiss,
-            modifier = Modifier.padding(bottom = 24.dp)
-        )
+        Column(modifier = Modifier.fillMaxSize()) {
+            // Fullscreen Top Header Bar
+            Surface(
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 2.dp,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 12.dp)
+                ) {
+                    IconButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.testTag("settings_back_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back to Home",
+                            tint = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Flux Settings",
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "Customize launcher layout, gestures & haptics",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    IconButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.testTag("settings_close_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Close,
+                            contentDescription = "Close Settings",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+            SettingsContent(
+                settings = settings,
+                allApps = allApps,
+                dockApps = dockApps,
+                widgetIntegrations = widgetIntegrations,
+                onUpdateSettings = onUpdateSettings,
+                onSelectDockSlot = onSelectDockSlot,
+                onClearDockSlot = onClearDockSlot,
+                onResetDockDefaults = onResetDockDefaults,
+                onExportBackup = onExportBackup,
+                onImportBackup = onImportBackup,
+                onResetDefaults = onResetDefaults,
+                onOpenSetupGuide = onOpenSetupGuide,
+                onOpenSystemWidgetPicker = onOpenSystemWidgetPicker,
+                onClose = onDismiss,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 12.dp)
+            )
+        }
     }
 }
 
@@ -540,6 +602,52 @@ fun SettingsContent(
                                 checked = settings.hideStatusBar,
                                 onCheckedChange = { onUpdateSettings(settings.copy(hideStatusBar = it)) }
                             )
+
+                            HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp))
+
+                            // Haptics Settings Section
+                            Text(
+                                text = "Haptic Feedback & Tactile Response",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+
+                            SettingsToggleRow(
+                                title = "Interaction Haptics",
+                                subtitle = "Vibrate on app launch, drawer popout, and button taps",
+                                checked = settings.hapticFeedback,
+                                onCheckedChange = { onUpdateSettings(settings.copy(hapticFeedback = it)) }
+                            )
+
+                            if (settings.hapticFeedback) {
+                                Spacer(modifier = Modifier.height(10.dp))
+
+                                Text(
+                                    text = "Alphabet Wave Scrollbar Vibration: Level ${settings.waveAlphabetHapticIntensity}",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(top = 6.dp)
+                                ) {
+                                    listOf(0 to "Off", 1 to "Light", 2 to "Medium", 3 to "Heavy").forEach { (level, name) ->
+                                        val isSelected = settings.waveAlphabetHapticIntensity == level
+                                        FilterChip(
+                                            selected = isSelected,
+                                            onClick = { onUpdateSettings(settings.copy(waveAlphabetHapticIntensity = level)) },
+                                            label = { Text(name, fontSize = 11.sp) },
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }

@@ -204,7 +204,7 @@ fun AppPopupDrawer(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 if (category == AppCategoryType.MESSAGING) {
-                    // Chat Heads UI for Messaging Apps
+                    // Chat Heads ONLY for Messaging Apps (no message content text shown, individually dismissible)
                     Surface(
                         shape = RoundedCornerShape(16.dp),
                         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
@@ -224,208 +224,96 @@ fun AppPopupDrawer(
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
-                                    text = "CONVERSATIONS (${effectiveNotifications.size})",
+                                    text = "CHAT HEADS (${effectiveNotifications.size})",
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
                                     letterSpacing = 0.8.sp,
                                     color = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.weight(1f)
                                 )
-                                Text(
-                                    text = "Tap or long press to expand",
-                                    fontSize = 10.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                                )
+
+                                // Clear All Notifications Button for messaging app
+                                TextButton(
+                                    onClick = { onDismissNotification?.invoke() },
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                    modifier = Modifier.height(28.dp).testTag("clear_all_messaging_notifs")
+                                ) {
+                                    Icon(Icons.Filled.DeleteSweep, contentDescription = null, modifier = Modifier.size(14.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Clear All", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                                }
                             }
 
-                            Spacer(modifier = Modifier.height(10.dp))
+                            Spacer(modifier = Modifier.height(12.dp))
 
-                            // Horizontal list of Chat Heads
+                            // Horizontal list of Chat Heads with individual dismiss buttons
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                horizontalArrangement = Arrangement.spacedBy(14.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 effectiveNotifications.forEach { notifItem ->
-                                    val isSelected = selectedChatHeadKey == notifItem.key || (selectedChatHeadKey == null && effectiveNotifications.size == 1)
                                     val initial = notifItem.sender.firstOrNull()?.uppercaseChar()?.toString() ?: "💬"
 
-                                    @OptIn(ExperimentalFoundationApi::class)
                                     Column(
                                         horizontalAlignment = Alignment.CenterHorizontally,
-                                        modifier = Modifier
-                                            .combinedClickable(
-                                                onClick = {
-                                                    selectedChatHeadKey = if (selectedChatHeadKey == notifItem.key) null else notifItem.key
-                                                    replySentConfirmation = false
-                                                },
-                                                onLongClick = {
-                                                    selectedChatHeadKey = notifItem.key
-                                                    replySentConfirmation = false
-                                                }
-                                            )
-                                            .testTag("chat_head_${notifItem.id}")
+                                        modifier = Modifier.testTag("chat_head_${notifItem.id}")
                                     ) {
-                                        Box(
-                                            contentAlignment = Alignment.Center,
-                                            modifier = Modifier
-                                                .size(46.dp)
-                                                .clip(CircleShape)
-                                                .background(
-                                                    if (isSelected) MaterialTheme.colorScheme.primaryContainer
-                                                    else MaterialTheme.colorScheme.surface
+                                        Box(contentAlignment = Alignment.TopEnd) {
+                                            Box(
+                                                contentAlignment = Alignment.Center,
+                                                modifier = Modifier
+                                                    .size(48.dp)
+                                                    .clip(CircleShape)
+                                                    .background(MaterialTheme.colorScheme.primaryContainer)
+                                                    .border(
+                                                        width = 1.5.dp,
+                                                        color = MaterialTheme.colorScheme.primary,
+                                                        shape = CircleShape
+                                                    )
+                                            ) {
+                                                Text(
+                                                    text = initial,
+                                                    fontSize = 18.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = MaterialTheme.colorScheme.onPrimaryContainer
                                                 )
-                                                .border(
-                                                    width = if (isSelected) 2.dp else 1.dp,
-                                                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
-                                                    shape = CircleShape
+                                            }
+
+                                            // Individual dismiss button on top end of chat head
+                                            IconButton(
+                                                onClick = {
+                                                    if (onDismissNotificationKey != null) {
+                                                        onDismissNotificationKey(notifItem.key)
+                                                    } else {
+                                                        onDismissNotification?.invoke()
+                                                    }
+                                                },
+                                                modifier = Modifier
+                                                    .size(20.dp)
+                                                    .clip(CircleShape)
+                                                    .background(MaterialTheme.colorScheme.errorContainer)
+                                                    .testTag("dismiss_chat_head_${notifItem.id}")
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Filled.Close,
+                                                    contentDescription = "Dismiss",
+                                                    tint = MaterialTheme.colorScheme.error,
+                                                    modifier = Modifier.size(11.dp)
                                                 )
-                                        ) {
-                                            Text(
-                                                text = initial,
-                                                fontSize = 18.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
-                                            )
+                                            }
                                         }
 
                                         Spacer(modifier = Modifier.height(4.dp))
 
                                         Text(
-                                            text = notifItem.sender.take(8),
-                                            fontSize = 10.sp,
-                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                            text = notifItem.sender.take(10),
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = MaterialTheme.colorScheme.onSurface,
                                             maxLines = 1
                                         )
                                     }
-                                }
-                            }
-
-                            // Expanded detail view for the focused chat head
-                            val activeNotif = effectiveNotifications.find { it.key == selectedChatHeadKey }
-                                ?: if (effectiveNotifications.size == 1 && selectedChatHeadKey == null) effectiveNotifications.first() else null
-
-                            if (activeNotif != null) {
-                                Spacer(modifier = Modifier.height(12.dp))
-                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-                                Spacer(modifier = Modifier.height(10.dp))
-
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.Top
-                                ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = activeNotif.sender,
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 13.sp,
-                                            color = MaterialTheme.colorScheme.onSurface
-                                        )
-                                        Spacer(modifier = Modifier.height(2.dp))
-                                        Text(
-                                            text = activeNotif.message,
-                                            fontSize = 12.sp,
-                                            lineHeight = 16.sp,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-
-                                    Spacer(modifier = Modifier.width(8.dp))
-
-                                    // Dismiss Button for this specific notification
-                                    Button(
-                                        onClick = {
-                                            if (onDismissNotificationKey != null) {
-                                                onDismissNotificationKey(activeNotif.key)
-                                            } else {
-                                                onDismissNotification?.invoke()
-                                            }
-                                            selectedChatHeadKey = null
-                                        },
-                                        colors = ButtonDefaults.buttonColors(
-                                            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.8f),
-                                            contentColor = MaterialTheme.colorScheme.error
-                                        ),
-                                        shape = RoundedCornerShape(10.dp),
-                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                                        modifier = Modifier.height(30.dp).testTag("popup_chat_head_dismiss_button")
-                                    ) {
-                                        Icon(Icons.Filled.Close, contentDescription = "Dismiss", modifier = Modifier.size(13.dp))
-                                        Spacer(modifier = Modifier.width(3.dp))
-                                        Text("Dismiss", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-                                    }
-                                }
-
-                                // Quick reply input
-                                Spacer(modifier = Modifier.height(10.dp))
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    OutlinedTextField(
-                                        value = replyInput,
-                                        onValueChange = {
-                                            replyInput = it
-                                            replySentConfirmation = false
-                                        },
-                                        placeholder = { Text("Reply to ${activeNotif.sender}...", fontSize = 12.sp) },
-                                        singleLine = true,
-                                        shape = RoundedCornerShape(10.dp),
-                                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 12.sp),
-                                        modifier = Modifier.weight(1f).height(46.dp).testTag("popup_reply_input"),
-                                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                                        keyboardActions = KeyboardActions(onSend = {
-                                            if (replyInput.isNotBlank()) {
-                                                if (onReplyNotificationKey != null) {
-                                                    onReplyNotificationKey(activeNotif.key, replyInput)
-                                                } else {
-                                                    onReplyNotification?.invoke(replyInput)
-                                                }
-                                                replyInput = ""
-                                                replySentConfirmation = true
-                                            }
-                                        })
-                                    )
-
-                                    Spacer(modifier = Modifier.width(6.dp))
-
-                                    IconButton(
-                                        onClick = {
-                                            if (replyInput.isNotBlank()) {
-                                                if (onReplyNotificationKey != null) {
-                                                    onReplyNotificationKey(activeNotif.key, replyInput)
-                                                } else {
-                                                    onReplyNotification?.invoke(replyInput)
-                                                }
-                                                replyInput = ""
-                                                replySentConfirmation = true
-                                            }
-                                        },
-                                        enabled = replyInput.isNotBlank(),
-                                        colors = IconButtonDefaults.filledIconButtonColors(
-                                            containerColor = MaterialTheme.colorScheme.primary,
-                                            disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant
-                                        ),
-                                        modifier = Modifier.size(38.dp).testTag("popup_reply_send_button")
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.AutoMirrored.Filled.Send,
-                                            contentDescription = "Send",
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                    }
-                                }
-
-                                if (replySentConfirmation) {
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text(
-                                        text = "✓ Reply sent to ${activeNotif.sender}",
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
                                 }
                             }
                         }
@@ -458,17 +346,16 @@ fun AppPopupDrawer(
                                     color = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.weight(1f)
                                 )
+
                                 if (onDismissNotification != null) {
-                                    IconButton(
+                                    TextButton(
                                         onClick = onDismissNotification,
-                                        modifier = Modifier.size(22.dp)
+                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                        modifier = Modifier.height(28.dp).testTag("clear_all_app_notifs")
                                     ) {
-                                        Icon(
-                                            imageVector = Icons.Filled.Close,
-                                            contentDescription = "Dismiss all",
-                                            modifier = Modifier.size(13.dp),
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
+                                        Icon(Icons.Filled.DeleteSweep, contentDescription = null, modifier = Modifier.size(14.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("Clear All", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                                     }
                                 }
                             }

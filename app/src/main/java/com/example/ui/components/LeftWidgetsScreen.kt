@@ -49,6 +49,7 @@ fun LeftWidgetsScreen(
     onRefreshWeather: () -> Unit,
     onOpenWeather: () -> Unit = {},
     onOpenCalendar: () -> Unit = {},
+    onUpdateWidgetSize: (String, String) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier
 ) {
     var isEditMode by remember { mutableStateOf(false) }
@@ -62,7 +63,7 @@ fun LeftWidgetsScreen(
                 .fillMaxSize()
                 .statusBarsPadding()
         ) {
-        // Top Action Bar
+        // Combined 1 Top Action Button with Dropdown Menu
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -70,33 +71,63 @@ fun LeftWidgetsScreen(
             horizontalArrangement = Arrangement.End,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                // Edit / Done toggle button
-                FilterChip(
-                    selected = isEditMode,
-                    onClick = { isEditMode = !isEditMode },
-                    label = { Text(if (isEditMode) "Done" else "Customize") },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = if (isEditMode) Icons.Filled.Check else Icons.Filled.Tune,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                FilledTonalIconButton(
-                    onClick = onAddSystemWidgetClick,
-                    modifier = Modifier.size(36.dp)
+            var menuExpanded by remember { mutableStateOf(false) }
+
+            Box {
+                FilledTonalButton(
+                    onClick = { menuExpanded = true },
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+                    modifier = Modifier.testTag("manage_widgets_button")
                 ) {
-                    Icon(Icons.Filled.Widgets, contentDescription = "Add System Widget", modifier = Modifier.size(18.dp))
+                    Icon(
+                        imageVector = if (isEditMode) Icons.Filled.Check else Icons.Filled.Widgets,
+                        contentDescription = "Manage Widgets",
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = if (isEditMode) "Done Editing" else "Manage Widgets",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Icon(
+                        imageVector = Icons.Filled.ArrowDropDown,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
                 }
-                Spacer(modifier = Modifier.width(6.dp))
-                FilledTonalIconButton(
-                    onClick = onAddWidgetClick,
-                    modifier = Modifier.size(36.dp)
+
+                DropdownMenu(
+                    expanded = menuExpanded,
+                    onDismissRequest = { menuExpanded = false },
+                    modifier = Modifier.background(MaterialTheme.colorScheme.surfaceContainerHigh)
                 ) {
-                    Icon(Icons.Filled.Add, contentDescription = "Add Widget", modifier = Modifier.size(20.dp))
+                    DropdownMenuItem(
+                        text = { Text("Add Custom Widget") },
+                        leadingIcon = { Icon(Icons.Filled.Add, contentDescription = null) },
+                        onClick = {
+                            menuExpanded = false
+                            onAddWidgetClick()
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Add System Widget") },
+                        leadingIcon = { Icon(Icons.Filled.Apps, contentDescription = null) },
+                        onClick = {
+                            menuExpanded = false
+                            onAddSystemWidgetClick()
+                        }
+                    )
+                    HorizontalDivider()
+                    DropdownMenuItem(
+                        text = { Text(if (isEditMode) "Exit Edit Mode" else "Customize & Resize") },
+                        leadingIcon = { Icon(if (isEditMode) Icons.Filled.Done else Icons.Filled.Tune, contentDescription = null) },
+                        onClick = {
+                            menuExpanded = false
+                            isEditMode = !isEditMode
+                        }
+                    )
                 }
             }
         }
@@ -119,7 +150,7 @@ fun LeftWidgetsScreen(
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = "Tap the + button to add customized widgets to your left screen",
+                        text = "Tap Manage Widgets to add customized or system widgets",
                         fontSize = 13.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center
@@ -158,7 +189,8 @@ fun LeftWidgetsScreen(
                         onMediaNext = onMediaNext,
                         onMediaPrev = onMediaPrev,
                         onToggleHeadphones = onToggleHeadphones,
-                        onRefreshWeather = onRefreshWeather
+                        onRefreshWeather = onRefreshWeather,
+                        onUpdateSize = { newSize -> onUpdateWidgetSize(item.id, newSize) }
                     )
                 }
             }
@@ -185,7 +217,8 @@ private fun LeftWidgetCardWrapper(
     onMediaNext: () -> Unit,
     onMediaPrev: () -> Unit,
     onToggleHeadphones: () -> Unit,
-    onRefreshWeather: () -> Unit
+    onRefreshWeather: () -> Unit,
+    onUpdateSize: (String) -> Unit = {}
 ) {
     Surface(
         shape = RoundedCornerShape(20.dp),
@@ -214,26 +247,45 @@ private fun LeftWidgetCardWrapper(
                     )
                 }
 
-                // Edit controls
+                // Edit controls & size picker chips
                 if (isEditMode) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
+                        val sizes = listOf("4x1", "4x2", "4x3", "Full")
+                        sizes.forEach { sz ->
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = if (widget.heightCategory == sz) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                                modifier = Modifier
+                                    .padding(horizontal = 2.dp)
+                                    .clickable { onUpdateSize(sz) }
+                            ) {
+                                Text(
+                                    text = sz,
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (widget.heightCategory == sz) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(4.dp))
                         if (index > 0) {
-                            IconButton(onClick = onMoveUp, modifier = Modifier.size(28.dp)) {
-                                Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "Move up", modifier = Modifier.size(18.dp))
+                            IconButton(onClick = onMoveUp, modifier = Modifier.size(24.dp)) {
+                                Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "Move up", modifier = Modifier.size(16.dp))
                             }
                         }
                         if (index < totalCount - 1) {
-                            IconButton(onClick = onMoveDown, modifier = Modifier.size(28.dp)) {
-                                Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "Move down", modifier = Modifier.size(18.dp))
+                            IconButton(onClick = onMoveDown, modifier = Modifier.size(24.dp)) {
+                                Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "Move down", modifier = Modifier.size(16.dp))
                             }
                         }
                         if (widget.type == WidgetType.QUICK_NOTE) {
-                            IconButton(onClick = onEditNote, modifier = Modifier.size(28.dp)) {
-                                Icon(Icons.Filled.Edit, contentDescription = "Edit note", modifier = Modifier.size(16.dp))
+                            IconButton(onClick = onEditNote, modifier = Modifier.size(24.dp)) {
+                                Icon(Icons.Filled.Edit, contentDescription = "Edit note", modifier = Modifier.size(15.dp))
                             }
                         }
-                        IconButton(onClick = onDelete, modifier = Modifier.size(28.dp)) {
-                            Icon(Icons.Filled.Delete, contentDescription = "Delete widget", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
+                        IconButton(onClick = onDelete, modifier = Modifier.size(24.dp)) {
+                            Icon(Icons.Filled.Delete, contentDescription = "Delete widget", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
                         }
                     }
                 }
@@ -241,49 +293,62 @@ private fun LeftWidgetCardWrapper(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Body depending on widget type
-            when (widget.type) {
-                WidgetType.CLOCK -> {
-                    ClockWidgetBody()
-                }
-                WidgetType.WEATHER_FORECAST -> {
-                    WeatherWidgetBody(weather = weather, onRefresh = onRefreshWeather)
-                }
-                WidgetType.MEDIA_PLAYER -> {
-                    MediaWidgetBody(
-                        media = mediaPlayer,
-                        isHeadphones = isHeadphonesConnected,
-                        onTogglePlay = onToggleMediaPlay,
-                        onNext = onMediaNext,
-                        onPrev = onMediaPrev,
-                        onToggleHeadphones = onToggleHeadphones
-                    )
-                }
-                WidgetType.CALENDAR_AGENDA -> {
-                    CalendarAgendaWidgetBody(events = calendarEvents)
-                }
-                WidgetType.QUICK_NOTE -> {
-                    QuickNoteWidgetBody(content = widget.content, onEdit = onEditNote)
-                }
-                WidgetType.SYSTEM_TOGGLES -> {
-                    SystemTogglesWidgetBody(isHeadphones = isHeadphonesConnected, onToggleHeadphones = onToggleHeadphones)
-                }
-                WidgetType.MINDFULNESS_QUOTE -> {
-                    MindfulnessWidgetBody()
-                }
-                WidgetType.DAILY_HABITS -> {
-                    DailyHabitsWidgetBody(initialHabits = widget.content)
-                }
-                WidgetType.DUAL_CLOCK -> {
-                    DualClockWidgetBody()
-                }
-                WidgetType.SYSTEM_APPWIDGET -> {
-                    HostedSystemWidgetView(
-                        appWidgetId = widget.appWidgetId,
-                        providerPackage = widget.providerPackage,
-                        providerClass = widget.providerClass,
-                        modifier = Modifier.fillMaxWidth()
-                    )
+            // Container size constraints based on heightCategory
+            val bodyModifier = when (widget.heightCategory) {
+                "4x1" -> Modifier.fillMaxWidth().heightIn(max = 90.dp)
+                "4x2" -> Modifier.fillMaxWidth().heightIn(max = 170.dp)
+                "4x3" -> Modifier.fillMaxWidth().heightIn(max = 250.dp)
+                else -> Modifier.fillMaxWidth()
+            }
+
+            Box(modifier = bodyModifier) {
+                // Body depending on widget type
+                when (widget.type) {
+                    WidgetType.CLOCK -> {
+                        ClockWidgetBody()
+                    }
+                    WidgetType.WEATHER_FORECAST -> {
+                        WeatherWidgetBody(weather = weather, onRefresh = onRefreshWeather)
+                    }
+                    WidgetType.NEWS_FEED -> {
+                        NewsWidgetBody()
+                    }
+                    WidgetType.MEDIA_PLAYER -> {
+                        MediaWidgetBody(
+                            media = mediaPlayer,
+                            isHeadphones = isHeadphonesConnected,
+                            onTogglePlay = onToggleMediaPlay,
+                            onNext = onMediaNext,
+                            onPrev = onMediaPrev,
+                            onToggleHeadphones = onToggleHeadphones
+                        )
+                    }
+                    WidgetType.CALENDAR_AGENDA -> {
+                        CalendarAgendaWidgetBody(events = calendarEvents)
+                    }
+                    WidgetType.QUICK_NOTE -> {
+                        QuickNoteWidgetBody(content = widget.content, onEdit = onEditNote)
+                    }
+                    WidgetType.SYSTEM_TOGGLES -> {
+                        SystemTogglesWidgetBody(isHeadphones = isHeadphonesConnected, onToggleHeadphones = onToggleHeadphones)
+                    }
+                    WidgetType.MINDFULNESS_QUOTE -> {
+                        MindfulnessWidgetBody()
+                    }
+                    WidgetType.DAILY_HABITS -> {
+                        DailyHabitsWidgetBody(initialHabits = widget.content)
+                    }
+                    WidgetType.DUAL_CLOCK -> {
+                        DualClockWidgetBody()
+                    }
+                    WidgetType.SYSTEM_APPWIDGET -> {
+                        HostedSystemWidgetView(
+                            appWidgetId = widget.appWidgetId,
+                            providerPackage = widget.providerPackage,
+                            providerClass = widget.providerClass,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
                 }
             }
         }
@@ -811,4 +876,145 @@ fun EditNoteDialog(
             }
         }
     )
+}
+
+private data class NewsStory(
+    val title: String,
+    val source: String,
+    val timeAgo: String,
+    val category: String,
+    val imageUrl: String
+)
+
+private val sampleNewsStories = listOf(
+    NewsStory(
+        title = "NASA's James Webb Telescope Discovers Atmospheric Water Vapor on Exoplanet",
+        source = "Space & Science Daily",
+        timeAgo = "18m ago",
+        category = "SPACE",
+        imageUrl = "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=600&q=80"
+    ),
+    NewsStory(
+        title = "Next-Gen Quantum Chips Achieve Record 99.9% Gate Fidelity at Room Temp",
+        source = "Tech Discovery Wire",
+        timeAgo = "42m ago",
+        category = "TECH",
+        imageUrl = "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&q=80"
+    ),
+    NewsStory(
+        title = "Global Clean Energy Power Grid Surpasses 2 Terawatt Milestone Target",
+        source = "World Eco Journal",
+        timeAgo = "2h ago",
+        category = "ENERGY",
+        imageUrl = "https://images.unsplash.com/photo-1497435334941-8c899ee9e8e9?w=600&q=80"
+    )
+)
+
+@Composable
+private fun NewsWidgetBody() {
+    var currentIndex by remember { mutableStateOf(0) }
+    val currentStory = sampleNewsStories[currentIndex % sampleNewsStories.size]
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(14.dp))
+                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.6f))
+                .padding(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Render News Photo using Coil AsyncImage
+            Box(
+                modifier = Modifier
+                    .size(width = 86.dp, height = 72.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                coil.compose.AsyncImage(
+                    model = currentStory.imageUrl,
+                    contentDescription = currentStory.title,
+                    contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+
+            Spacer(modifier = Modifier.width(10.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Surface(
+                        shape = RoundedCornerShape(4.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        modifier = Modifier.padding(end = 6.dp)
+                    ) {
+                        Text(
+                            text = currentStory.category,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                        )
+                    }
+                    Text(
+                        text = "${currentStory.source} • ${currentStory.timeAgo}",
+                        fontSize = 10.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Text(
+                    text = currentStory.title,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 2,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    lineHeight = 16.sp,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                sampleNewsStories.indices.forEach { index ->
+                    Box(
+                        modifier = Modifier
+                            .size(if (index == currentIndex) 16.dp else 6.dp, 6.dp)
+                            .clip(CircleShape)
+                            .background(
+                                if (index == currentIndex) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                            )
+                    )
+                }
+            }
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(
+                    onClick = { currentIndex = (currentIndex - 1 + sampleNewsStories.size) % sampleNewsStories.size },
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(Icons.Filled.KeyboardArrowLeft, contentDescription = "Previous story", modifier = Modifier.size(18.dp))
+                }
+                IconButton(
+                    onClick = { currentIndex = (currentIndex + 1) % sampleNewsStories.size },
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(Icons.Filled.KeyboardArrowRight, contentDescription = "Next story", modifier = Modifier.size(18.dp))
+                }
+            }
+        }
+    }
 }

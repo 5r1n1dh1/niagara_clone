@@ -76,12 +76,21 @@ class FluxNotificationListenerService : NotificationListenerService() {
                     val notif = sbn.notification ?: continue
                     val extras = notif.extras ?: Bundle()
 
+                    val appLabel = try {
+                        packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString()
+                    } catch (_: Throwable) {
+                        pkg
+                    }
+
                     val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()
                         ?: extras.getCharSequence(Notification.EXTRA_CONVERSATION_TITLE)?.toString()
-                        ?: pkg
+                        ?: extras.getCharSequence(Notification.EXTRA_TITLE_BIG)?.toString()
+                        ?: appLabel
 
                     val text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString()
                         ?: extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString()
+                        ?: extras.getCharSequence(Notification.EXTRA_SUB_TEXT)?.toString()
+                        ?: extras.getCharSequence(Notification.EXTRA_SUMMARY_TEXT)?.toString()
                         ?: ""
 
                     if (title.isBlank() && text.isBlank()) continue
@@ -169,6 +178,12 @@ class FluxNotificationListenerService : NotificationListenerService() {
 
         private val _allLiveNotifications = MutableStateFlow<Map<String, List<NotificationItem>>>(emptyMap())
         val allLiveNotifications: StateFlow<Map<String, List<NotificationItem>>> = _allLiveNotifications.asStateFlow()
+
+        fun triggerSync(): Boolean {
+            val inst = instance ?: return false
+            inst.syncNotifications()
+            return true
+        }
 
         fun dismissNotification(key: String): Boolean {
             val inst = instance ?: return false

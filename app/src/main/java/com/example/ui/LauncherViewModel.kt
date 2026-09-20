@@ -514,6 +514,11 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         vibrateClick()
     }
 
+    fun updateLeftWidgetSize(id: String, newSize: String) {
+        repository.updateLeftWidget(id, newHeightCategory = newSize)
+        vibrateClick()
+    }
+
     fun reorderLeftWidget(fromIndex: Int, toIndex: Int) {
         repository.reorderLeftWidgets(fromIndex, toIndex)
         vibrateTick()
