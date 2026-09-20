@@ -85,8 +85,18 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         repository.syncMusicIntegration()
     }
 
+    val userCategories: StateFlow<List<String>> = repository.userCategories
+
     fun setAppCategory(packageName: String, categoryName: String) {
         repository.setAppCategory(packageName, categoryName)
+    }
+
+    fun addUserCategory(categoryName: String) {
+        repository.addUserCategory(categoryName)
+    }
+
+    fun removeUserCategory(categoryName: String) {
+        repository.removeUserCategory(categoryName)
     }
 
     val dockApps: StateFlow<List<AppItem>> = combine(allApps, repository.dockPackageNames, settings) { apps, pkgs, sett ->

@@ -66,13 +66,19 @@ fun RightAllAppsScreen(
 
     val isSearchAtTop = isSearchFocused || filterText.isNotEmpty() || isKeyboardOpen
 
-    val nonHiddenApps = remember(allApps, filterText) {
-        val base = allApps.filter { !it.isHidden }
+    val categorizedGroupMap = remember(allApps) {
+        allApps.filter { !it.isHidden && it.customCategory.isNotBlank() }
+            .groupBy { it.customCategory }
+    }
+
+    val displayAppsList = remember(allApps, filterText) {
         if (filterText.isBlank()) {
-            base.sortedBy { it.label.lowercase() }
+            // Apps in categories are hidden from the main uncategorized list below
+            allApps.filter { !it.isHidden && it.customCategory.isBlank() }
+                .sortedBy { it.label.lowercase() }
         } else {
             val q = filterText.trim().lowercase()
-            base.filter { it.label.lowercase().contains(q) || it.customCategory.lowercase().contains(q) }
+            allApps.filter { !it.isHidden && (it.label.lowercase().contains(q) || it.customCategory.lowercase().contains(q)) }
                 .sortedBy { it.label.lowercase() }
         }
     }
@@ -212,6 +218,89 @@ fun RightAllAppsScreen(
                             .testTag("all_apps_list"),
                         contentPadding = PaddingValues(top = 4.dp, bottom = 90.dp)
                     ) {
+                        // Top Category Cards
+                        if (filterText.isBlank() && categorizedGroupMap.isNotEmpty()) {
+                            itemsIndexed(
+                                items = categorizedGroupMap.keys.sorted(),
+                                key = { _, cat -> "category_card_$cat" }
+                            ) { _, categoryName ->
+                                val catApps = categorizedGroupMap[categoryName] ?: emptyList()
+                                var isExpanded by remember { mutableStateOf(false) }
+
+                                Surface(
+                                    shape = RoundedCornerShape(16.dp),
+                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(bottom = 8.dp)
+                                ) {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(12.dp)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clickable { isExpanded = !isExpanded },
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Text(
+                                                    text = categoryName.uppercase(),
+                                                    fontSize = (12 * settings.fontScale).sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    letterSpacing = 0.8.sp,
+                                                    color = MaterialTheme.colorScheme.primary
+                                                )
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                                Surface(
+                                                    shape = RoundedCornerShape(10.dp),
+                                                    color = MaterialTheme.colorScheme.primaryContainer
+                                                ) {
+                                                    Text(
+                                                        text = "${catApps.size}",
+                                                        fontSize = 11.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                    )
+                                                }
+                                            }
+                                            Text(
+                                                text = if (isExpanded) "Hide" else "Show All",
+                                                fontSize = 11.sp,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+
+                                        Spacer(modifier = Modifier.height(8.dp))
+
+                                        val appsToShow = if (isExpanded) catApps else catApps.take(4)
+                                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                            appsToShow.forEach { app ->
+                                                AppListItem(
+                                                    app = app,
+                                                    iconPackType = settings.iconPackType,
+                                                    customIconSettings = settings.customIconSettings,
+                                                    isLeftHanded = isLeftHanded,
+                                                    fontScale = settings.fontScale,
+                                                    iconScale = settings.appIconScale,
+                                                    showBadges = settings.showAppNotificationBadges,
+                                                    compactSpacing = settings.compactAppRowSpacing,
+                                                    onAppClick = { onAppClick(app) },
+                                                    onAppLongClick = { onAppLongClick(app) },
+                                                    onReplyNotification = { text -> onReplyNotification(app.packageName, text) },
+                                                    onDismissNotification = { onDismissNotification(app.packageName) }
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
                         // Categorized Folders
                         if (filterText.isBlank() && folders.isNotEmpty()) {
                             itemsIndexed(folders, key = { _, f -> "folder_${f.id}" }) { _, folder ->
@@ -231,9 +320,9 @@ fun RightAllAppsScreen(
                             }
                         }
 
-                        // App List Items with Alphabet Section Headers
+                        // Uncategorized App List Items with Alphabet Section Headers
                         var lastHeader: Char? = null
-                        nonHiddenApps.forEach { app ->
+                        displayAppsList.forEach { app ->
                             val currentInitial = app.label.firstOrNull()?.uppercaseChar() ?: '#'
                             val isFirstOfSection = currentInitial != lastHeader
 
@@ -280,16 +369,16 @@ fun RightAllAppsScreen(
                             onLetterSelected = onWaveLetterSelected,
                             onLetterConfirmed = { letter ->
                                 val targetChar = if (letter == '★') {
-                                    nonHiddenApps.firstOrNull()?.label?.firstOrNull()?.uppercaseChar()
+                                    displayAppsList.firstOrNull()?.label?.firstOrNull()?.uppercaseChar()
                                 } else {
                                     letter
                                 }
-                                val appIndex = nonHiddenApps.indexOfFirst {
+                                val appIndex = displayAppsList.indexOfFirst {
                                     it.label.firstOrNull()?.uppercaseChar() == targetChar
                                 }
                                 if (appIndex != -1) {
                                     scope.launch {
-                                        val offset = if (folders.isNotEmpty()) folders.size else 0
+                                        val offset = (if (folders.isNotEmpty()) folders.size else 0) + categorizedGroupMap.size
                                         listState.scrollToItem((appIndex + offset).coerceAtLeast(0))
                                     }
                                 }

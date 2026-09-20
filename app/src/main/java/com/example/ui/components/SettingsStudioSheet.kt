@@ -50,6 +50,10 @@ fun SettingsStudioSheet(
     onResetDefaults: () -> Unit,
     onOpenSetupGuide: () -> Unit = {},
     onOpenSystemWidgetPicker: () -> Unit = {},
+    userCategories: List<String> = emptyList(),
+    onAddCategory: (String) -> Unit = {},
+    onRemoveCategory: (String) -> Unit = {},
+    onAssignCategory: (String, String) -> Unit = { _, _ -> },
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -130,6 +134,10 @@ fun SettingsStudioSheet(
                 onResetDefaults = onResetDefaults,
                 onOpenSetupGuide = onOpenSetupGuide,
                 onOpenSystemWidgetPicker = onOpenSystemWidgetPicker,
+                userCategories = userCategories,
+                onAddCategory = onAddCategory,
+                onRemoveCategory = onRemoveCategory,
+                onAssignCategory = onAssignCategory,
                 onClose = onDismiss,
                 modifier = Modifier
                     .fillMaxSize()
@@ -154,6 +162,10 @@ fun SettingsContent(
     onResetDefaults: () -> Unit,
     onOpenSetupGuide: () -> Unit = {},
     onOpenSystemWidgetPicker: () -> Unit = {},
+    userCategories: List<String> = emptyList(),
+    onAddCategory: (String) -> Unit = {},
+    onRemoveCategory: (String) -> Unit = {},
+    onAssignCategory: (String, String) -> Unit = { _, _ -> },
     onClose: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
@@ -163,6 +175,9 @@ fun SettingsContent(
     var importDialogText by remember { mutableStateOf("") }
     var showImportDialog by remember { mutableStateOf(false) }
     var activeCategoryTab by remember { mutableIntStateOf(0) }
+
+    var newCategoryInputText by remember { mutableStateOf("") }
+    var selectedCategoryForAppAssignment by remember { mutableStateOf<String?>(null) }
 
     // State for app integration picker dialog
     var selectedIntegrationForPicker by remember { mutableStateOf<IntegrationCategory?>(null) }
@@ -178,7 +193,7 @@ fun SettingsContent(
         FluxAccessibilityService.isServiceRunning()
     }
 
-    val categories = listOf("Appearance", "Dock", "Gestures & Lock", "Widgets & Clock", "Integrations", "System")
+    val categories = listOf("Appearance", "Categories", "Dock", "Gestures & Lock", "Widgets & Clock", "Integrations", "System")
 
     Column(
         modifier = modifier

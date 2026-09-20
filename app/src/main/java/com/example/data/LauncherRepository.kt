@@ -774,6 +774,59 @@ class LauncherRepository(private val context: Context) {
         }
     }
 
+    private val _userCategories = MutableStateFlow<List<String>>(loadUserCategories())
+    val userCategories: StateFlow<List<String>> = _userCategories.asStateFlow()
+
+    private fun loadUserCategories(): List<String> {
+        val json = prefs.getString("user_categories_list", null)
+        if (json != null) {
+            try {
+                val arr = org.json.JSONArray(json)
+                val list = mutableListOf<String>()
+                for (i in 0 until arr.length()) {
+                    list.add(arr.getString(i))
+                }
+                if (list.isNotEmpty()) return list
+            } catch (_: Exception) {}
+        }
+        return listOf("Social", "Work", "Games", "Media", "Utilities", "Tools")
+    }
+
+    fun addUserCategory(categoryName: String) {
+        val trimmed = categoryName.trim()
+        if (trimmed.isBlank()) return
+        val current = _userCategories.value.toMutableList()
+        if (!current.contains(trimmed)) {
+            current.add(trimmed)
+            _userCategories.value = current
+            saveUserCategories(current)
+        }
+    }
+
+    fun removeUserCategory(categoryName: String) {
+        val current = _userCategories.value.toMutableList()
+        if (current.contains(categoryName)) {
+            current.remove(categoryName)
+            _userCategories.value = current
+            saveUserCategories(current)
+
+            val map = getCategoryMap().toMutableMap()
+            val keysToRemove = map.filterValues { it == categoryName }.keys
+            keysToRemove.forEach { map.remove(it) }
+            saveCategoryMap(map)
+
+            _allApps.value = _allApps.value.map {
+                if (it.customCategory == categoryName) it.copy(customCategory = "") else it
+            }
+        }
+    }
+
+    private fun saveUserCategories(list: List<String>) {
+        val arr = org.json.JSONArray()
+        list.forEach { arr.put(it) }
+        prefs.edit().putString("user_categories_list", arr.toString()).apply()
+    }
+
     private fun getCategoryMap(): Map<String, String> {
         val json = prefs.getString("app_categories_json", null) ?: return emptyMap()
         val result = mutableMapOf<String, String>()

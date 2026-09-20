@@ -126,6 +126,7 @@ fun NiagaraLauncherScreen(
     val leftWidgets by viewModel.leftWidgets.collectAsState()
     val carouselWidgets by viewModel.carouselWidgets.collectAsState()
     val dockApps by viewModel.dockApps.collectAsState()
+    val userCategories by viewModel.userCategories.collectAsState()
     val systemWallpaperBitmap by viewModel.systemWallpaperBitmap.collectAsState()
 
     val context = LocalContext.current
@@ -199,21 +200,25 @@ fun NiagaraLauncherScreen(
                 source: NestedScrollSource
             ): Offset {
                 if (!settings.swipeDownForNotificationCenter) return Offset.Zero
-                if (source == NestedScrollSource.UserInput && available.y > 0f) {
+                // Only trigger if no scrollable component consumed the drag (consumed.y == 0)
+                if (source == NestedScrollSource.UserInput && consumed.y == 0f && available.y > 0f) {
                     accumulatedDragY += available.y
-                    if (accumulatedDragY > 50f) {
+                    if (accumulatedDragY > 120f) {
                         accumulatedDragY = 0f
                         viewModel.openNotificationCenter()
                         return Offset(0f, available.y)
                     }
+                } else {
+                    accumulatedDragY = 0f
                 }
                 return Offset.Zero
             }
 
             override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
+                val isTopEdgeFling = accumulatedDragY > 0f && consumed.y == 0f
                 accumulatedDragY = 0f
                 if (!settings.swipeDownForNotificationCenter) return Velocity.Zero
-                if (available.y > 180f) {
+                if (isTopEdgeFling && available.y > 300f) {
                     viewModel.openNotificationCenter()
                     return available
                 }
@@ -476,6 +481,10 @@ fun NiagaraLauncherScreen(
                 onResetDefaults = { viewModel.repository.resetToDefaults() },
                 onOpenSetupGuide = { viewModel.openSetupGuide() },
                 onOpenSystemWidgetPicker = { viewModel.openSystemWidgetPicker() },
+                userCategories = userCategories,
+                onAddCategory = { viewModel.addUserCategory(it) },
+                onRemoveCategory = { viewModel.removeUserCategory(it) },
+                onAssignCategory = { pkg, cat -> viewModel.setAppCategory(pkg, cat) },
                 onDismiss = { viewModel.closeSettings() }
             )
         }

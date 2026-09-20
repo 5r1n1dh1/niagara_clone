@@ -18,6 +18,13 @@ import androidx.compose.ui.unit.dp
 import com.example.data.LauncherThemePreset
 import com.example.data.WallpaperStyle
 
+import androidx.compose.runtime.*
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.graphics.drawable.toBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+
 /**
  * Ambient Wallpaper Backdrop:
  * - Supports Live Device Wallpaper, Flux Emblem, Soft Gradient, and Solid Themes.
@@ -32,6 +39,24 @@ fun LauncherWallpaperBackdrop(
     backgroundBlurStrength: Float = 25f,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    var activeWallpaperBitmap by remember(systemWallpaperBitmap) { mutableStateOf(systemWallpaperBitmap) }
+
+    LaunchedEffect(systemWallpaperBitmap) {
+        if (systemWallpaperBitmap == null) {
+            withContext(Dispatchers.IO) {
+                try {
+                    val wpManager = android.app.WallpaperManager.getInstance(context)
+                    val drawable = wpManager.drawable ?: wpManager.peekDrawable()
+                    if (drawable != null) {
+                        val bitmap = drawable.toBitmap(720, 1280, android.graphics.Bitmap.Config.ARGB_8888)
+                        activeWallpaperBitmap = bitmap.asImageBitmap()
+                    }
+                } catch (_: Exception) {}
+            }
+        }
+    }
+
     val primaryColor = themePreset.primary
     val accentColor = themePreset.accent
     val bgColor = themePreset.background
@@ -58,9 +83,10 @@ fun LauncherWallpaperBackdrop(
                 .fillMaxSize()
                 .then(blurModifier)
         ) {
-            if (systemWallpaperBitmap != null && (wallpaperStyle == WallpaperStyle.SYSTEM_DEVICE || isFrosted)) {
+            val wpToUse = activeWallpaperBitmap ?: systemWallpaperBitmap
+            if (wpToUse != null && (wallpaperStyle == WallpaperStyle.SYSTEM_DEVICE || isFrosted)) {
                 Image(
-                    bitmap = systemWallpaperBitmap,
+                    bitmap = wpToUse,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize()
