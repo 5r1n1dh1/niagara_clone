@@ -158,12 +158,15 @@ data class MediaPlaybackState(
     val appName: String = "YouTube Music",
     val progressPercent: Float = 0.42f,
     val durationText: String = "4:03",
-    val currentTimeText: String = "1:42"
+    val currentTimeText: String = "1:42",
+    val albumArtBitmap: Bitmap? = null,
+    val packageName: String? = null
 )
 
 data class LauncherSettings(
     val leftHandedMode: Boolean = false,
     val hideStatusBar: Boolean = false,
+    val isLayoutLocked: Boolean = false,
     val clockStyle: ClockStyle = ClockStyle.FLUX_INLINE,
     val showSeconds: Boolean = false,
     val showDate: Boolean = true,

@@ -1036,6 +1036,15 @@ fun SettingsContent(
                     item {
                         SettingsCard(title = "Gestures & Locking") {
                             SettingsToggleRow(
+                                title = "Lock Layout (Widgets & Favorites)",
+                                subtitle = "Prevent accidental reordering, adding, or deleting of widgets and favorites",
+                                checked = settings.isLayoutLocked,
+                                onCheckedChange = { onUpdateSettings(settings.copy(isLayoutLocked = it)) }
+                            )
+
+                            HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp))
+
+                            SettingsToggleRow(
                                 title = "Double-Tap to Sleep",
                                 subtitle = "Turn off and lock screen on wallpaper double-tap",
                                 checked = settings.doubleTapToSleep,
@@ -1224,6 +1233,15 @@ fun SettingsContent(
                         Spacer(modifier = Modifier.height(12.dp))
 
                         SettingsCard(title = "Home Screen & System Widgets") {
+                            SettingsToggleRow(
+                                title = "Lock Layout",
+                                subtitle = "Lock widgets and favorite apps in place",
+                                checked = settings.isLayoutLocked,
+                                onCheckedChange = { onUpdateSettings(settings.copy(isLayoutLocked = it)) }
+                            )
+
+                            HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp))
+
                             Text(
                                 text = "Favorites Screen 3-Widget Carousel",
                                 fontSize = 13.sp,

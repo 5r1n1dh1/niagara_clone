@@ -515,7 +515,26 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     }
 
     // Left screen widget CRUD
+    fun toggleLockLayout() {
+        val current = settings.value.isLayoutLocked
+        val newLocked = !current
+        repository.updateSettings(settings.value.copy(isLayoutLocked = newLocked))
+        showToast(if (newLocked) "🔒 Home & Widget layouts locked" else "🔓 Layout unlocked")
+        vibrateClick()
+    }
+
+    fun setLayoutLocked(locked: Boolean) {
+        repository.updateSettings(settings.value.copy(isLayoutLocked = locked))
+        showToast(if (locked) "🔒 Home & Widget layouts locked" else "🔓 Layout unlocked")
+        vibrateClick()
+    }
+
     fun openAddWidgetDialog() {
+        if (settings.value.isLayoutLocked) {
+            showToast("🔒 Layout is locked. Unlock to add widgets.")
+            vibrateClick()
+            return
+        }
         _isAddWidgetOpen.value = true
         vibrateClick()
     }
@@ -525,6 +544,10 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun addLeftWidget(type: WidgetType) {
+        if (settings.value.isLayoutLocked) {
+            showToast("🔒 Layout is locked. Unlock to modify widgets.")
+            return
+        }
         repository.addLeftWidget(type)
         _isAddWidgetOpen.value = false
         showToast("Added ${type.displayName} widget")
@@ -532,6 +555,10 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun deleteLeftWidget(id: String) {
+        if (settings.value.isLayoutLocked) {
+            showToast("🔒 Layout is locked. Unlock to remove widgets.")
+            return
+        }
         repository.deleteLeftWidget(id)
         showToast("Widget removed")
         vibrateClick()
@@ -544,11 +571,19 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun updateLeftWidgetSize(id: String, newSize: String) {
+        if (settings.value.isLayoutLocked) {
+            showToast("🔒 Layout is locked. Unlock to resize widgets.")
+            return
+        }
         repository.updateLeftWidget(id, newHeightCategory = newSize)
         vibrateClick()
     }
 
     fun reorderLeftWidget(fromIndex: Int, toIndex: Int) {
+        if (settings.value.isLayoutLocked) {
+            showToast("🔒 Layout is locked. Unlock to reorder widgets.")
+            return
+        }
         repository.reorderLeftWidgets(fromIndex, toIndex)
         vibrateTick()
     }
@@ -564,6 +599,11 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
 
     // Center carousel widgets
     fun openCarouselCustomize() {
+        if (settings.value.isLayoutLocked) {
+            showToast("🔒 Layout is locked. Unlock to customize carousel.")
+            vibrateClick()
+            return
+        }
         _isCarouselCustomizeOpen.value = true
         vibrateClick()
     }
@@ -573,6 +613,10 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun addCarouselWidget(type: WidgetType) {
+        if (settings.value.isLayoutLocked) {
+            showToast("🔒 Layout is locked. Unlock to modify carousel.")
+            return
+        }
         if (carouselWidgets.value.size >= 5) {
             showToast("Maximum 5 widgets in carousel")
             return
@@ -583,6 +627,10 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun removeCarouselWidget(type: WidgetType) {
+        if (settings.value.isLayoutLocked) {
+            showToast("🔒 Layout is locked. Unlock to modify carousel.")
+            return
+        }
         if (carouselWidgets.value.size <= 1) {
             showToast("Carousel needs at least 1 widget")
             return
@@ -593,6 +641,10 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun reorderCarouselWidget(fromIndex: Int, toIndex: Int) {
+        if (settings.value.isLayoutLocked) {
+            showToast("🔒 Layout is locked. Unlock to reorder carousel.")
+            return
+        }
         repository.reorderCarouselWidgets(fromIndex, toIndex)
         vibrateTick()
     }

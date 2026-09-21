@@ -108,6 +108,7 @@ fun AppPopupDrawer(
     customIconSettings: CustomIconPackSettings = CustomIconPackSettings(),
     notification: NotificationItem? = app.notification,
     notifications: List<NotificationItem> = emptyList(),
+    mediaPlayer: com.example.data.MediaPlaybackState = com.example.data.MediaPlaybackState(),
     onReplyNotification: ((String) -> Unit)? = null,
     onDismissNotification: (() -> Unit)? = null,
     onDismissNotificationKey: ((String) -> Unit)? = null,
@@ -279,6 +280,7 @@ fun AppPopupDrawer(
                 category = category,
                 packageName = app.packageName,
                 context = context,
+                mediaPlayer = mediaPlayer,
                 onDismiss = onDismiss
             )
 
@@ -983,39 +985,83 @@ private fun AppSpecificOperationsBar(
     category: AppCategoryType,
     packageName: String,
     context: Context,
+    mediaPlayer: com.example.data.MediaPlaybackState = com.example.data.MediaPlaybackState(),
     onDismiss: () -> Unit
 ) {
     when (category) {
         AppCategoryType.MUSIC -> {
             Surface(
-                shape = RoundedCornerShape(14.dp),
-                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)),
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)),
                 modifier = Modifier.fillMaxWidth().testTag("media_controls_panel")
             ) {
-                Column(modifier = Modifier.padding(10.dp)) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    // Header with Album Art and Track Info
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Icon(
-                            Icons.Filled.MusicNote,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            "MEDIA PLAYBACK CONTROLS",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 0.6.sp,
-                            color = MaterialTheme.colorScheme.primary
-                        )
+                        // Album Art Image or Styled Vinyl Placeholder
+                        if (mediaPlayer.albumArtBitmap != null) {
+                            Image(
+                                bitmap = mediaPlayer.albumArtBitmap.asImageBitmap(),
+                                contentDescription = "Album Art",
+                                modifier = Modifier
+                                    .size(52.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f), RoundedCornerShape(10.dp)),
+                                contentScale = ContentScale.Crop
+                            )
+                        } else {
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier
+                                    .size(52.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(MaterialTheme.colorScheme.primaryContainer)
+                                    .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f), RoundedCornerShape(10.dp))
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.MusicNote,
+                                    contentDescription = "Album Art Placeholder",
+                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.size(28.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.width(10.dp))
+
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = mediaPlayer.trackTitle.ifBlank { "Now Playing" },
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = mediaPlayer.artistName.ifBlank { mediaPlayer.appName },
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = mediaPlayer.appName,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.primary,
+                                maxLines = 1
+                            )
+                        }
                     }
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
 
+                    // Playback Controls Row
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -1054,9 +1100,13 @@ private fun AppSpecificOperationsBar(
                             shape = RoundedCornerShape(10.dp),
                             contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
                         ) {
-                            Icon(Icons.Filled.PlayArrow, contentDescription = "Play/Pause", modifier = Modifier.size(16.dp))
+                            Icon(
+                                imageVector = if (mediaPlayer.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                                contentDescription = if (mediaPlayer.isPlaying) "Pause" else "Play",
+                                modifier = Modifier.size(16.dp)
+                            )
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("Play / Pause", fontSize = 11.sp, maxLines = 1)
+                            Text(if (mediaPlayer.isPlaying) "Pause" else "Play", fontSize = 11.sp, maxLines = 1)
                         }
 
                         FilledTonalButton(

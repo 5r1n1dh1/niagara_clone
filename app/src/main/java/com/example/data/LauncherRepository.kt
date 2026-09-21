@@ -113,6 +113,13 @@ class LauncherRepository(private val context: Context) {
                 _allActiveNotifications.value = multiMap
             }
         }
+        repositoryScope.launch {
+            com.example.service.FluxNotificationListenerService.liveMediaPlayback.collect { mediaState ->
+                if (mediaState != null) {
+                    _mediaPlayer.value = mediaState
+                }
+            }
+        }
     }
 
     private fun loadSettings(): LauncherSettings {
@@ -143,6 +150,7 @@ class LauncherRepository(private val context: Context) {
         return LauncherSettings(
             leftHandedMode = prefs.getBoolean("left_handed_mode", false),
             hideStatusBar = prefs.getBoolean("hide_status_bar", false),
+            isLayoutLocked = prefs.getBoolean("is_layout_locked", false),
             clockStyle = ClockStyle.entries.getOrElse(prefs.getInt("clock_style", ClockStyle.FLUX_INLINE.ordinal)) { ClockStyle.FLUX_INLINE },
             showSeconds = prefs.getBoolean("show_seconds", false),
             showDate = prefs.getBoolean("show_date", true),
@@ -185,6 +193,7 @@ class LauncherRepository(private val context: Context) {
         prefs.edit()
             .putBoolean("left_handed_mode", newSettings.leftHandedMode)
             .putBoolean("hide_status_bar", newSettings.hideStatusBar)
+            .putBoolean("is_layout_locked", newSettings.isLayoutLocked)
             .putInt("clock_style", newSettings.clockStyle.ordinal)
             .putBoolean("show_seconds", newSettings.showSeconds)
             .putBoolean("show_date", newSettings.showDate)

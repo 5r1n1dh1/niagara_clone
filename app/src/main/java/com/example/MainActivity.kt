@@ -581,6 +581,7 @@ fun NiagaraLauncherScreen(
                 customIconSettings = settings.customIconSettings,
                 notification = notif,
                 notifications = appNotifs,
+                mediaPlayer = mediaPlayer,
                 onReplyNotification = { replyText ->
                     viewModel.replyToNotification(app.packageName, replyText, isDualApp = app.isDualApp)
                 },

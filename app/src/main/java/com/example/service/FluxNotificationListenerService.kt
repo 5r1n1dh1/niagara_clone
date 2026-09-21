@@ -71,9 +71,9 @@ class FluxNotificationListenerService : NotificationListenerService() {
                 val map = mutableMapOf<String, NotificationItem>()
                 val multiMap = mutableMapOf<String, MutableList<NotificationItem>>()
                 val timeFormat = SimpleDateFormat("h:mm a", Locale.getDefault())
+                var detectedMedia: com.example.data.MediaPlaybackState? = null
 
                 for (sbn in activeSbns) {
-                    if (shouldFilter(sbn)) continue
                     val pkg = sbn.packageName ?: continue
                     val notif = sbn.notification ?: continue
                     val extras = notif.extras ?: Bundle()
@@ -83,6 +83,59 @@ class FluxNotificationListenerService : NotificationListenerService() {
                     } catch (_: Throwable) {
                         pkg
                     }
+
+                    // Check for media session / music player notification
+                    val isMedia = notif.category == Notification.CATEGORY_TRANSPORT ||
+                            extras.containsKey(Notification.EXTRA_MEDIA_SESSION) ||
+                            extras.containsKey("android.mediaSession") ||
+                            pkg.contains("spotify", true) ||
+                            pkg.contains("music", true) ||
+                            pkg.contains("audio", true) ||
+                            pkg.contains("podcast", true) ||
+                            pkg.contains("soundcloud", true) ||
+                            pkg.contains("deezer", true)
+
+                    if (isMedia && detectedMedia == null) {
+                        val trackTitle = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()
+                            ?: extras.getCharSequence(Notification.EXTRA_TITLE_BIG)?.toString()
+                            ?: ""
+                        val artistName = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString()
+                            ?: extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString()
+                            ?: extras.getCharSequence(Notification.EXTRA_SUB_TEXT)?.toString()
+                            ?: appLabel
+
+                        val albumArt: Bitmap? = try {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                extras.getParcelable(Notification.EXTRA_PICTURE, Bitmap::class.java)
+                            } else {
+                                @Suppress("DEPRECATION")
+                                extras.getParcelable(Notification.EXTRA_PICTURE) as? Bitmap
+                            } ?: (extras.get(Notification.EXTRA_PICTURE) as? Bitmap)
+                              ?: (extras.get(Notification.EXTRA_LARGE_ICON_BIG) as? Bitmap)
+                              ?: (extras.get(Notification.EXTRA_LARGE_ICON) as? Bitmap)
+                        } catch (_: Throwable) { null }
+
+                        if (trackTitle.isNotBlank()) {
+                            val isPlaying = notif.actions?.any {
+                                val actionTitle = it.title?.toString()?.lowercase() ?: ""
+                                actionTitle.contains("pause")
+                            } ?: true
+
+                            detectedMedia = com.example.data.MediaPlaybackState(
+                                isPlaying = isPlaying,
+                                trackTitle = trackTitle,
+                                artistName = artistName,
+                                appName = appLabel,
+                                packageName = pkg,
+                                albumArtBitmap = albumArt,
+                                progressPercent = 0.45f,
+                                durationText = "3:50",
+                                currentTimeText = "1:45"
+                            )
+                        }
+                    }
+
+                    if (shouldFilter(sbn)) continue
 
                     val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()
                         ?: extras.getCharSequence(Notification.EXTRA_CONVERSATION_TITLE)?.toString()
@@ -164,6 +217,9 @@ class FluxNotificationListenerService : NotificationListenerService() {
                 }
                 _liveNotifications.value = map
                 _allLiveNotifications.value = multiMap
+                if (detectedMedia != null) {
+                    _liveMediaPlayback.value = detectedMedia
+                }
             } catch (t: Throwable) {
                 // Safeguard against OS security exceptions
             }
@@ -229,6 +285,9 @@ class FluxNotificationListenerService : NotificationListenerService() {
 
         private val _allLiveNotifications = MutableStateFlow<Map<String, List<NotificationItem>>>(emptyMap())
         val allLiveNotifications: StateFlow<Map<String, List<NotificationItem>>> = _allLiveNotifications.asStateFlow()
+
+        private val _liveMediaPlayback = MutableStateFlow<com.example.data.MediaPlaybackState?>(null)
+        val liveMediaPlayback: StateFlow<com.example.data.MediaPlaybackState?> = _liveMediaPlayback.asStateFlow()
 
         fun triggerSync(): Boolean {
             val inst = instance ?: return false
