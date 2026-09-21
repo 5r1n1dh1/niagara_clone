@@ -291,7 +291,7 @@ fun NotificationCenterSheet(
                         .heightIn(max = 280.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(notifications.values.toList(), key = { it.packageName }) { notif ->
+                    items(notifications.values.toList(), key = { "${it.instanceKey}_${it.id}_${it.key}" }) { notif ->
                         Surface(
                             shape = RoundedCornerShape(14.dp),
                             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),

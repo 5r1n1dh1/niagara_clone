@@ -358,7 +358,7 @@ fun CenterHomeScreen(
                 }
             }
         } else {
-            itemsIndexed(favorites, key = { _, app -> "fav_${app.packageName}" }) { _, app ->
+            itemsIndexed(favorites, key = { _, app -> "fav_${app.uniqueKey}" }) { _, app ->
                 AppListItem(
                     app = app,
                     iconPackType = settings.iconPackType,

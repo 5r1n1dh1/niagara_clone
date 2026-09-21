@@ -314,9 +314,9 @@ fun AppIconRenderer(
 
             IconPackType.DEFAULT_APP -> {
                 val context = LocalContext.current
-                val cacheKey = "${app.packageName}_${size.value.toInt()}"
+                val cacheKey = "${app.instanceKey}_${app.userProfileId}_${size.value.toInt()}"
                 val cachedBitmap = iconBitmapCache.get(cacheKey)
-                val bitmap = remember(app.packageName, size.value, app.iconDrawable) {
+                val bitmap = remember(app.instanceKey, app.userProfileId, size.value, app.iconDrawable) {
                     if (cachedBitmap != null) {
                         cachedBitmap
                     } else {

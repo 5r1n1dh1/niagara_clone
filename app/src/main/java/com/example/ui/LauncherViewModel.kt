@@ -4,8 +4,11 @@ import android.annotation.SuppressLint
 import android.app.Application
 import android.app.WallpaperManager
 import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
+import android.content.pm.LauncherApps
 import android.net.Uri
+import android.os.UserManager
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.widget.Toast
@@ -386,6 +389,22 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     private fun executeAppLaunch(app: AppItem) {
         val context = getApplication<Application>()
         try {
+            // Check if this is a dual app or custom profile managed via LauncherApps
+            if (app.isDualApp && app.userProfileId != 0 && app.activityName.isNotBlank()) {
+                val launcherApps = context.getSystemService(Context.LAUNCHER_APPS_SERVICE) as? LauncherApps
+                val userManager = context.getSystemService(Context.USER_SERVICE) as? UserManager
+                val targetProfile = userManager?.userProfiles?.firstOrNull { it.hashCode() == app.userProfileId }
+                if (launcherApps != null && targetProfile != null) {
+                    launcherApps.startMainActivity(
+                        ComponentName(app.packageName, app.activityName),
+                        targetProfile,
+                        null,
+                        null
+                    )
+                    return
+                }
+            }
+
             val pm = context.packageManager
             var intent = pm.getLaunchIntentForPackage(app.packageName)
             if (intent == null && app.activityName.isNotBlank()) {

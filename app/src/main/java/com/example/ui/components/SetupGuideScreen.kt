@@ -799,7 +799,7 @@ private fun StepFavoritesSelection(
                     .fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                items(filteredApps, key = { it.packageName }) { app ->
+                items(filteredApps, key = { it.uniqueKey }) { app ->
                     val isFav = selectedPackageNames.contains(app.packageName)
 
                     Row(

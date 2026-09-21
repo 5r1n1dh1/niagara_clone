@@ -197,7 +197,7 @@ fun UnifiedSearchSheet(
                     .heightIn(max = 380.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                items(filteredApps, key = { it.packageName }) { app ->
+                items(filteredApps, key = { it.uniqueKey }) { app ->
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -219,11 +219,28 @@ fun UnifiedSearchSheet(
                                 fontSize = 15.sp,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
-                            Text(
-                                text = app.customCategory,
-                                fontSize = 11.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            if (app.customCategory.isNotBlank()) {
+                                Text(
+                                    text = app.customCategory,
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        if (app.isDualApp) {
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = MaterialTheme.colorScheme.secondaryContainer,
+                                modifier = Modifier.padding(end = 8.dp)
+                            ) {
+                                Text(
+                                    text = "Dual",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
                         }
                         if (app.isFavorite) {
                             Icon(

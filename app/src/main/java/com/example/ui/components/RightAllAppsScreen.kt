@@ -45,7 +45,7 @@ sealed class AppDrawerItem {
     }
 
     data class AppRow(val app: AppItem) : AppDrawerItem() {
-        override val key: String = "app_${app.packageName}"
+        override val key: String = app.uniqueKey
     }
 }
 

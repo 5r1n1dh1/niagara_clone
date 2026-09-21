@@ -85,7 +85,7 @@ fun AppListItem(
                 onLongClick = onAppLongClick
             )
             .padding(horizontal = 8.dp, vertical = if (compactSpacing) 3.dp else 6.dp)
-            .testTag("app_item_${app.packageName}")
+            .testTag("app_item_${app.instanceKey}")
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -104,6 +104,24 @@ fun AppListItem(
                         customIconSettings = customIconSettings,
                         size = (38 * iconScale).dp
                     )
+                    if (app.isDualApp) {
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier
+                                .size(11.dp)
+                                .align(Alignment.BottomEnd)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Filled.Person,
+                                    contentDescription = "Dual App",
+                                    tint = MaterialTheme.colorScheme.onSecondary,
+                                    modifier = Modifier.size(7.dp)
+                                )
+                            }
+                        }
+                    }
                     if (showBadges && app.notification != null) {
                         Surface(
                             shape = CircleShape,
@@ -188,6 +206,24 @@ fun AppListItem(
                         customIconSettings = customIconSettings,
                         size = (38 * iconScale).dp
                     )
+                    if (app.isDualApp) {
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier
+                                .size(11.dp)
+                                .align(Alignment.BottomStart)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Filled.Person,
+                                    contentDescription = "Dual App",
+                                    tint = MaterialTheme.colorScheme.onSecondary,
+                                    modifier = Modifier.size(7.dp)
+                                )
+                            }
+                        }
+                    }
                     if (showBadges && app.notification != null) {
                         Surface(
                             shape = CircleShape,

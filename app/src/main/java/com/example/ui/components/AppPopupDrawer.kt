@@ -252,7 +252,7 @@ fun AppPopupDrawer(
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = app.packageName,
+                        text = if (app.isDualApp) "${app.packageName} • Dual App" else app.packageName,
                         fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
