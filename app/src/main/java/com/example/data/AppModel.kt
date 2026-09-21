@@ -1,5 +1,6 @@
 package com.example.data
 
+import android.graphics.Bitmap
 import android.graphics.drawable.Drawable
 import androidx.compose.ui.graphics.Color
 
@@ -99,7 +100,11 @@ data class NotificationItem(
     val message: String,
     val timeAgo: String,
     val canReply: Boolean = true,
-    val key: String = id
+    val key: String = id,
+    val subText: String? = null,
+    val richText: String? = null,
+    @Transient val pictureBitmap: Bitmap? = null,
+    @Transient val senderIcon: Bitmap? = null
 )
 
 data class FolderItem(

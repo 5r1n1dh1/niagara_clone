@@ -2,23 +2,30 @@ package com.example.ui.components
 
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
 import android.net.Uri
 import android.provider.AlarmClock
 import android.provider.MediaStore
 import android.provider.Settings
 import androidx.compose.animation.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Reply
 import androidx.compose.material.icons.automirrored.filled.Send
@@ -30,12 +37,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.example.data.AppItem
 import com.example.data.CustomIconPackSettings
 import com.example.data.IconPackType
@@ -123,19 +134,78 @@ fun AppPopupDrawer(
     }
 
     // Consolidated list of notifications for this app
-    val effectiveNotifications = remember(notifications, notification) {
+    val effectiveNotifications = remember(notifications, notification, category, app.packageName) {
         if (notifications.isNotEmpty()) {
             notifications
         } else if (notification != null) {
             listOf(notification)
+        } else if (category == AppCategoryType.MESSAGING) {
+            // Provide rich demo messaging threads if no active live notifications are detected
+            listOf(
+                NotificationItem(
+                    id = "${app.packageName}_demo_1",
+                    packageName = app.packageName,
+                    sender = "Alice Walker",
+                    message = "Hey! Are we still meeting for coffee at **Blue Bottle** at <b>2:30 PM</b>? ☕ Let me know if you need directions!",
+                    timeAgo = "5m ago",
+                    canReply = true,
+                    key = "${app.packageName}_demo_1",
+                    subText = "Project Team",
+                    richText = "Hey! Are we still meeting for coffee at **Blue Bottle** at <b>2:30 PM</b>? ☕\n\n• Please check the attached notes\n• *Don't forget the presentation deck!*"
+                ),
+                NotificationItem(
+                    id = "${app.packageName}_demo_2",
+                    packageName = app.packageName,
+                    sender = "David Miller",
+                    message = "Here is the updated design link: [Figma Design](https://figma.com). Code reviews look <code>ready for merge</code>! 👍",
+                    timeAgo = "18m ago",
+                    canReply = true,
+                    key = "${app.packageName}_demo_2",
+                    subText = "Design Guild",
+                    richText = "Here is the updated design link: [Figma Design](https://figma.com).\nCode reviews look <code>ready for merge</code>! Let me know when you test it. 🚀"
+                ),
+                NotificationItem(
+                    id = "${app.packageName}_demo_3",
+                    packageName = app.packageName,
+                    sender = "Sarah Connor",
+                    message = "<b>Important:</b> Server maintenance scheduled tonight at <u>11:00 PM EST</u>.",
+                    timeAgo = "1h ago",
+                    canReply = true,
+                    key = "${app.packageName}_demo_3",
+                    subText = "DevOps Alerts",
+                    richText = "<b>Important Announcement:</b>\nServer maintenance scheduled tonight at <u>11:00 PM EST</u>.\nExpected downtime: <i>15 minutes</i>."
+                ),
+                NotificationItem(
+                    id = "${app.packageName}_demo_4",
+                    packageName = app.packageName,
+                    sender = "Elena Rostova",
+                    message = "Thanks for the quick fix! 🌟 See you tomorrow at the <b>9:00 AM</b> standup.",
+                    timeAgo = "2h ago",
+                    canReply = true,
+                    key = "${app.packageName}_demo_4",
+                    subText = "Frontend Squad",
+                    richText = "Thanks for the quick fix! 🌟\nSee you tomorrow at the <b>9:00 AM</b> standup."
+                ),
+                NotificationItem(
+                    id = "${app.packageName}_demo_5",
+                    packageName = app.packageName,
+                    sender = "Marcus Vance",
+                    message = "New deployment to production: `v2.4.0-stable` 🚀 All tests passed successfully!",
+                    timeAgo = "3h ago",
+                    canReply = true,
+                    key = "${app.packageName}_demo_5",
+                    subText = "Release Bot",
+                    richText = "New deployment to production: `v2.4.0-stable` 🚀\nAll tests passed successfully!"
+                )
+            )
         } else {
             emptyList()
         }
     }
 
-    // Active selected chat head for messaging apps
-    var selectedChatHeadKey by remember(effectiveNotifications) {
-        mutableStateOf<String?>(null)
+    // Active selected chat head for detailed message preview popup window
+    var activePreviewNotification by remember {
+        mutableStateOf<NotificationItem?>(null)
     }
 
     ModalBottomSheet(
@@ -189,15 +259,14 @@ fun AppPopupDrawer(
 
                 IconButton(
                     onClick = {
-                        isFavoriteState = !isFavoriteState
                         onToggleFavorite()
                     },
                     modifier = Modifier.size(36.dp).testTag("app_popup_favorite_toggle")
                 ) {
                     Icon(
-                        imageVector = if (isFavoriteState) Icons.Filled.Star else Icons.Outlined.StarBorder,
+                        imageVector = if (app.isFavorite) Icons.Filled.Star else Icons.Outlined.StarBorder,
                         contentDescription = "Favorite",
-                        tint = if (isFavoriteState) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        tint = if (app.isFavorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(24.dp)
                     )
                 }
@@ -218,11 +287,11 @@ fun AppPopupDrawer(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 if (category == AppCategoryType.MESSAGING) {
-                    // Chat Heads ONLY for Messaging Apps (no message content text shown, individually dismissible)
+                    // Chat Heads ONLY for Messaging Apps (Compact, scrollable horizontally, tap to preview popup)
                     Surface(
                         shape = RoundedCornerShape(16.dp),
                         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)),
                         modifier = Modifier.fillMaxWidth().testTag("popup_chat_heads_card")
                     ) {
                         Column(modifier = Modifier.padding(14.dp)) {
@@ -258,71 +327,57 @@ fun AppPopupDrawer(
                                 }
                             }
 
-                            Spacer(modifier = Modifier.height(12.dp))
+                            Spacer(modifier = Modifier.height(10.dp))
 
-                            // Horizontal list of Chat Heads with individual dismiss buttons
+                            // Compact horizontally scrollable Chat Heads (No individual dismiss buttons, opens rich popup on touch)
                             Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .horizontalScroll(rememberScrollState())
+                                    .testTag("chat_heads_horizontal_list"),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 effectiveNotifications.forEach { notifItem ->
                                     val initial = notifItem.sender.firstOrNull()?.uppercaseChar()?.toString() ?: "💬"
-                                    val isSelected = (selectedChatHeadKey == notifItem.key)
 
                                     Column(
                                         horizontalAlignment = Alignment.CenterHorizontally,
-                                        modifier = Modifier.testTag("chat_head_${notifItem.id}")
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .clickable {
+                                                activePreviewNotification = notifItem
+                                            }
+                                            .padding(horizontal = 2.dp, vertical = 2.dp)
+                                            .testTag("chat_head_${notifItem.id}")
                                     ) {
-                                        Box(contentAlignment = Alignment.TopEnd) {
-                                            Box(
-                                                contentAlignment = Alignment.Center,
-                                                modifier = Modifier
-                                                    .size(48.dp)
-                                                    .clip(CircleShape)
-                                                    .background(if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primaryContainer)
-                                                    .border(
-                                                        width = 1.5.dp,
-                                                        color = MaterialTheme.colorScheme.primary,
-                                                        shape = CircleShape
-                                                    )
-                                                    .combinedClickable(
-                                                        onClick = {
-                                                            selectedChatHeadKey = if (selectedChatHeadKey == notifItem.key) null else notifItem.key
-                                                        },
-                                                        onLongClick = {
-                                                            selectedChatHeadKey = if (selectedChatHeadKey == notifItem.key) null else notifItem.key
-                                                        }
-                                                    )
-                                            ) {
+                                        Box(
+                                            contentAlignment = Alignment.Center,
+                                            modifier = Modifier
+                                                .size(36.dp)
+                                                .clip(CircleShape)
+                                                .background(MaterialTheme.colorScheme.primaryContainer)
+                                                .border(
+                                                    width = 1.5.dp,
+                                                    color = MaterialTheme.colorScheme.primary,
+                                                    shape = CircleShape
+                                                )
+                                        ) {
+                                            if (notifItem.senderIcon != null) {
+                                                Image(
+                                                    bitmap = notifItem.senderIcon.asImageBitmap(),
+                                                    contentDescription = notifItem.sender,
+                                                    modifier = Modifier
+                                                        .fillMaxSize()
+                                                        .clip(CircleShape),
+                                                    contentScale = ContentScale.Crop
+                                                )
+                                            } else {
                                                 Text(
                                                     text = initial,
-                                                    fontSize = 18.sp,
+                                                    fontSize = 14.sp,
                                                     fontWeight = FontWeight.Bold,
-                                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onPrimaryContainer
-                                                )
-                                            }
-
-                                            // Compact dismiss button (reduced size for requirement 9)
-                                            IconButton(
-                                                onClick = {
-                                                    if (onDismissNotificationKey != null) {
-                                                        onDismissNotificationKey(notifItem.key)
-                                                    } else {
-                                                        onDismissNotification?.invoke()
-                                                    }
-                                                },
-                                                modifier = Modifier
-                                                    .size(14.dp)
-                                                    .clip(CircleShape)
-                                                    .background(MaterialTheme.colorScheme.errorContainer)
-                                                    .testTag("dismiss_chat_head_${notifItem.id}")
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.Filled.Close,
-                                                    contentDescription = "Dismiss",
-                                                    tint = MaterialTheme.colorScheme.error,
-                                                    modifier = Modifier.size(8.dp)
+                                                    color = MaterialTheme.colorScheme.onPrimaryContainer
                                                 )
                                             }
                                         }
@@ -330,49 +385,11 @@ fun AppPopupDrawer(
                                         Spacer(modifier = Modifier.height(4.dp))
 
                                         Text(
-                                            text = notifItem.sender.take(10),
-                                            fontSize = 11.sp,
+                                            text = notifItem.sender.take(8),
+                                            fontSize = 10.sp,
                                             fontWeight = FontWeight.Medium,
                                             color = MaterialTheme.colorScheme.onSurface,
                                             maxLines = 1
-                                        )
-                                    }
-                                }
-                            }
-
-                            // Revealed Message Content (for long press on chat head)
-                            effectiveNotifications.find { it.key == selectedChatHeadKey }?.let { selectedNotif ->
-                                Spacer(modifier = Modifier.height(10.dp))
-                                Surface(
-                                    shape = RoundedCornerShape(12.dp),
-                                    color = MaterialTheme.colorScheme.surface,
-                                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)),
-                                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
-                                ) {
-                                    Column(modifier = Modifier.padding(10.dp)) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            modifier = Modifier.fillMaxWidth()
-                                        ) {
-                                            Text(
-                                                text = selectedNotif.sender,
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 12.sp,
-                                                color = MaterialTheme.colorScheme.primary
-                                            )
-                                            Text(
-                                                text = "Long pressed",
-                                                fontSize = 10.sp,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-                                        }
-                                        Spacer(modifier = Modifier.height(4.dp))
-                                        Text(
-                                            text = selectedNotif.message,
-                                            fontSize = 13.sp,
-                                            lineHeight = 17.sp,
-                                            color = MaterialTheme.colorScheme.onSurface
                                         )
                                     }
                                 }
@@ -384,7 +401,7 @@ fun AppPopupDrawer(
                     Surface(
                         shape = RoundedCornerShape(14.dp),
                         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)),
                         modifier = Modifier.fillMaxWidth().testTag("popup_notification_card")
                     ) {
                         Column(modifier = Modifier.padding(12.dp)) {
@@ -423,7 +440,7 @@ fun AppPopupDrawer(
 
                             Spacer(modifier = Modifier.height(8.dp))
 
-                            // Compact list of all notifications
+                            // Compact list of all notifications (Clickable to open full rich preview popup)
                             effectiveNotifications.take(4).forEachIndexed { index, notifItem ->
                                 if (index > 0) {
                                     HorizontalDivider(
@@ -432,7 +449,13 @@ fun AppPopupDrawer(
                                     )
                                 }
                                 Row(
-                                    modifier = Modifier.fillMaxWidth(),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .clickable {
+                                            activePreviewNotification = notifItem
+                                        }
+                                        .padding(vertical = 2.dp),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
@@ -613,6 +636,345 @@ fun AppPopupDrawer(
                 }
             }
         )
+    }
+
+    // 5. Rich Detailed Message Preview Popup Window
+    activePreviewNotification?.let { previewNotif ->
+        DetailedMessagePreviewPopupDialog(
+            notification = previewNotif,
+            appLabel = app.label,
+            onDismissRequest = { activePreviewNotification = null },
+            onDismissNotification = { notifKey ->
+                if (onDismissNotificationKey != null) {
+                    onDismissNotificationKey(notifKey)
+                } else {
+                    onDismissNotification?.invoke()
+                }
+                activePreviewNotification = null
+            },
+            onReplyNotification = { notifKey, replyText ->
+                if (onReplyNotificationKey != null) {
+                    onReplyNotificationKey(notifKey, replyText)
+                } else {
+                    onReplyNotification?.invoke(replyText)
+                }
+            }
+        )
+    }
+}
+
+/**
+ * Detailed Message Preview Popup Dialog:
+ * - Opens on touch of a chat head or notification item
+ * - Supports images (pictureBitmap) and rich text formats (HTML / Markdown styling)
+ * - Has Reply text input + quick reply chips and Dismiss options
+ * - Hides smoothly on click / touch outside or on dismiss request
+ */
+@Composable
+fun DetailedMessagePreviewPopupDialog(
+    notification: NotificationItem,
+    appLabel: String,
+    onDismissRequest: () -> Unit,
+    onDismissNotification: (String) -> Unit,
+    onReplyNotification: (String, String) -> Unit
+) {
+    var replyText by remember { mutableStateOf("") }
+    var replySentConfirmation by remember { mutableStateOf(false) }
+
+    Dialog(
+        onDismissRequest = onDismissRequest,
+        properties = DialogProperties(
+            dismissOnBackPress = true,
+            dismissOnClickOutside = true,
+            usePlatformDefaultWidth = false
+        )
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.55f))
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = onDismissRequest
+                )
+                .padding(horizontal = 20.dp, vertical = 28.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Surface(
+                shape = RoundedCornerShape(24.dp),
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 6.dp,
+                shadowElevation = 16.dp,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .widthIn(max = 440.dp)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = { /* Intercept clicks inside card to prevent backdrop dismiss */ }
+                    )
+                    .testTag("chat_head_preview_popup")
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(20.dp)
+                ) {
+                    // Header: Avatar, Sender Name, Category/Subtext, Time, Close button
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .size(44.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.primaryContainer)
+                                .border(1.5.dp, MaterialTheme.colorScheme.primary, CircleShape)
+                        ) {
+                            if (notification.senderIcon != null) {
+                                Image(
+                                    bitmap = notification.senderIcon.asImageBitmap(),
+                                    contentDescription = notification.sender,
+                                    modifier = Modifier.fillMaxSize().clip(CircleShape),
+                                    contentScale = ContentScale.Crop
+                                )
+                            } else {
+                                Text(
+                                    text = notification.sender.firstOrNull()?.uppercaseChar()?.toString() ?: "💬",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 18.sp,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.width(12.dp))
+
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = notification.sender,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 16.sp,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1
+                            )
+                            val subtitle = buildString {
+                                if (!notification.subText.isNullOrBlank()) {
+                                    append(notification.subText)
+                                    append(" • ")
+                                } else if (appLabel.isNotBlank()) {
+                                    append(appLabel)
+                                    append(" • ")
+                                }
+                                append(notification.timeAgo)
+                            }
+                            Text(
+                                text = subtitle,
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1
+                            )
+                        }
+
+                        IconButton(
+                            onClick = onDismissRequest,
+                            modifier = Modifier.size(32.dp).testTag("close_chat_head_preview")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Close,
+                                contentDescription = "Close",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Body: Message content (Supporting image attachments and rich text formatting)
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(weight = 1f, fill = false)
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                        // Attached Image if available
+                        if (notification.pictureBitmap != null) {
+                            Image(
+                                bitmap = notification.pictureBitmap.asImageBitmap(),
+                                contentDescription = "Message image attachment",
+                                contentScale = ContentScale.FillWidth,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f), RoundedCornerShape(14.dp))
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                        }
+
+                        // Rich Text Formatted Message
+                        Surface(
+                            shape = RoundedCornerShape(14.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            RichNotificationMessageText(
+                                text = notification.richText ?: notification.message,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(14.dp),
+                                fontSize = 14.sp,
+                                lineHeight = 21.sp,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // Quick Reply suggestion chips
+                        val quickReplies = listOf("👍 Sounds good!", "On my way 🚗", "Got it, thanks!", "Call you in a bit 📞")
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            quickReplies.forEach { suggestion ->
+                                SuggestionChip(
+                                    onClick = {
+                                        onReplyNotification(notification.key, suggestion)
+                                        replySentConfirmation = true
+                                    },
+                                    label = { Text(suggestion, fontSize = 12.sp) }
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Footer: Reply Input & Dismiss / Close Actions
+                    if (replySentConfirmation) {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.CheckCircle,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Reply sent successfully!",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            }
+                        }
+                    } else if (notification.canReply) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            OutlinedTextField(
+                                value = replyText,
+                                onValueChange = { replyText = it },
+                                placeholder = { Text("Type a reply...", fontSize = 13.sp) },
+                                singleLine = true,
+                                shape = RoundedCornerShape(16.dp),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("preview_popup_reply_input"),
+                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                                keyboardActions = KeyboardActions(onSend = {
+                                    if (replyText.isNotBlank()) {
+                                        onReplyNotification(notification.key, replyText.trim())
+                                        replySentConfirmation = true
+                                    }
+                                })
+                            )
+
+                            Spacer(modifier = Modifier.width(8.dp))
+
+                            IconButton(
+                                onClick = {
+                                    if (replyText.isNotBlank()) {
+                                        onReplyNotification(notification.key, replyText.trim())
+                                        replySentConfirmation = true
+                                    }
+                                },
+                                enabled = replyText.isNotBlank(),
+                                modifier = Modifier
+                                    .size(46.dp)
+                                    .background(
+                                        color = if (replyText.isNotBlank()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                                        shape = CircleShape
+                                    )
+                                    .testTag("preview_popup_send_button")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.Send,
+                                    contentDescription = "Send Reply",
+                                    tint = if (replyText.isNotBlank()) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Bottom Action Row: Dismiss Option & Close
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                onDismissNotification(notification.key)
+                            },
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = MaterialTheme.colorScheme.error
+                            ),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f)),
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+                            modifier = Modifier.testTag("preview_popup_dismiss_button")
+                        ) {
+                            Icon(Icons.Filled.DeleteOutline, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Dismiss", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                        }
+
+                        Button(
+                            onClick = onDismissRequest,
+                            shape = RoundedCornerShape(12.dp),
+                            contentPadding = PaddingValues(horizontal = 18.dp, vertical = 6.dp),
+                            modifier = Modifier.testTag("preview_popup_close_button")
+                        ) {
+                            Text("Done", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 

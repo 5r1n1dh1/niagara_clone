@@ -181,26 +181,77 @@ fun LeftWidgetsScreen(
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 itemsIndexed(widgets, key = { _, w -> w.id }) { index, item ->
-                    LeftWidgetCardWrapper(
-                        widget = item,
-                        index = index,
-                        totalCount = widgets.size,
-                        isEditMode = isEditMode,
-                        weather = weather,
-                        mediaPlayer = mediaPlayer,
-                        calendarEvents = calendarEvents,
-                        isHeadphonesConnected = isHeadphonesConnected,
-                        onDelete = { onDeleteWidget(item.id) },
-                        onMoveUp = { onReorderWidget(index, index - 1) },
-                        onMoveDown = { onReorderWidget(index, index + 1) },
-                        onEditNote = { onEditNoteClick(item) },
-                        onToggleMediaPlay = onToggleMediaPlay,
-                        onMediaNext = onMediaNext,
-                        onMediaPrev = onMediaPrev,
-                        onToggleHeadphones = onToggleHeadphones,
-                        onRefreshWeather = onRefreshWeather,
-                        onUpdateSize = { newSize -> onUpdateWidgetSize(item.id, newSize) }
+                    val dismissState = rememberSwipeToDismissBoxState(
+                        confirmValueChange = { dismissValue ->
+                            when (dismissValue) {
+                                SwipeToDismissBoxValue.EndToStart -> {
+                                    onDeleteWidget(item.id)
+                                    true
+                                }
+                                SwipeToDismissBoxValue.StartToEnd -> {
+                                    val nextSize = when (item.heightCategory) {
+                                        "4x1" -> "4x2"
+                                        "4x2" -> "4x3"
+                                        "4x3" -> "4x4"
+                                        else -> "4x1"
+                                    }
+                                    onUpdateWidgetSize(item.id, nextSize)
+                                    false
+                                }
+                                SwipeToDismissBoxValue.Settled -> false
+                            }
+                        }
                     )
+
+                    SwipeToDismissBox(
+                        state = dismissState,
+                        backgroundContent = {
+                            val color = when (dismissState.dismissDirection) {
+                                SwipeToDismissBoxValue.EndToStart -> MaterialTheme.colorScheme.errorContainer
+                                SwipeToDismissBoxValue.StartToEnd -> MaterialTheme.colorScheme.primaryContainer
+                                else -> androidx.compose.ui.graphics.Color.Transparent
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .clip(RoundedCornerShape(20.dp))
+                                    .background(color)
+                                    .padding(horizontal = 20.dp),
+                                contentAlignment = if (dismissState.dismissDirection == SwipeToDismissBoxValue.StartToEnd) Alignment.CenterStart else Alignment.CenterEnd
+                            ) {
+                                if (dismissState.dismissDirection == SwipeToDismissBoxValue.EndToStart) {
+                                    Icon(Icons.Filled.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.onErrorContainer)
+                                } else if (dismissState.dismissDirection == SwipeToDismissBoxValue.StartToEnd) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Filled.AspectRatio, contentDescription = "Resize", tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Cycle Size", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                                    }
+                                }
+                            }
+                        }
+                    ) {
+                        LeftWidgetCardWrapper(
+                            widget = item,
+                            index = index,
+                            totalCount = widgets.size,
+                            isEditMode = isEditMode,
+                            weather = weather,
+                            mediaPlayer = mediaPlayer,
+                            calendarEvents = calendarEvents,
+                            isHeadphonesConnected = isHeadphonesConnected,
+                            onDelete = { onDeleteWidget(item.id) },
+                            onMoveUp = { onReorderWidget(index, index - 1) },
+                            onMoveDown = { onReorderWidget(index, index + 1) },
+                            onEditNote = { onEditNoteClick(item) },
+                            onToggleMediaPlay = onToggleMediaPlay,
+                            onMediaNext = onMediaNext,
+                            onMediaPrev = onMediaPrev,
+                            onToggleHeadphones = onToggleHeadphones,
+                            onRefreshWeather = onRefreshWeather,
+                            onUpdateSize = { newSize -> onUpdateWidgetSize(item.id, newSize) }
+                        )
+                    }
                 }
             }
         }
@@ -229,10 +280,78 @@ private fun LeftWidgetCardWrapper(
     onRefreshWeather: () -> Unit,
     onUpdateSize: (String) -> Unit = {}
 ) {
+    if (widget.type == WidgetType.SYSTEM_APPWIDGET) {
+        // System widgets (Outlook, Google Calendar, etc.) are rendered directly with ZERO extra padding
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(18.dp))
+                .testTag("left_widget_${widget.id}")
+        ) {
+            HostedSystemWidgetView(
+                appWidgetId = widget.appWidgetId,
+                providerPackage = widget.providerPackage,
+                providerClass = widget.providerClass,
+                heightCategory = widget.heightCategory,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            // Edit controls overlay when edit mode is toggled
+            if (isEditMode) {
+                Surface(
+                    shape = RoundedCornerShape(bottomStart = 12.dp),
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.90f),
+                    modifier = Modifier.align(Alignment.TopEnd)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp)
+                    ) {
+                        val sizes = listOf("4x1", "4x2", "4x3", "4x4")
+                        sizes.forEach { sz ->
+                            Surface(
+                                shape = RoundedCornerShape(4.dp),
+                                color = if (widget.heightCategory == sz) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                                modifier = Modifier
+                                    .padding(horizontal = 2.dp)
+                                    .clickable { onUpdateSize(sz) }
+                            ) {
+                                Text(
+                                    text = sz,
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (widget.heightCategory == sz) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(4.dp))
+                        if (index > 0) {
+                            IconButton(onClick = onMoveUp, modifier = Modifier.size(22.dp)) {
+                                Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "Move up", modifier = Modifier.size(14.dp))
+                            }
+                        }
+                        if (index < totalCount - 1) {
+                            IconButton(onClick = onMoveDown, modifier = Modifier.size(22.dp)) {
+                                Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "Move down", modifier = Modifier.size(14.dp))
+                            }
+                        }
+                        IconButton(onClick = onDelete, modifier = Modifier.size(22.dp)) {
+                            Icon(Icons.Filled.Delete, contentDescription = "Delete widget", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(14.dp))
+                        }
+                    }
+                }
+            }
+        }
+        return
+    }
+
+    val zIndexAlpha = (0.35f + (index.toFloat() / totalCount.coerceAtLeast(1) * 0.45f)).coerceIn(0.35f, 0.95f)
+
     Surface(
         shape = RoundedCornerShape(20.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-        tonalElevation = 2.dp,
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = zIndexAlpha),
+        tonalElevation = (2 + index).dp,
         modifier = Modifier
             .fillMaxWidth()
             .testTag("left_widget_${widget.id}")
@@ -356,6 +475,7 @@ private fun LeftWidgetCardWrapper(
                             appWidgetId = widget.appWidgetId,
                             providerPackage = widget.providerPackage,
                             providerClass = widget.providerClass,
+                            heightCategory = widget.heightCategory,
                             modifier = Modifier.fillMaxWidth()
                         )
                     }

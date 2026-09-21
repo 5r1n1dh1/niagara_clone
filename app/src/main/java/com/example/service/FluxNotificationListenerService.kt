@@ -5,6 +5,8 @@ import android.app.RemoteInput
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.service.notification.NotificationListenerService
@@ -105,6 +107,30 @@ class FluxNotificationListenerService : NotificationListenerService() {
                         "Just now"
                     }
 
+                    val subText = extras.getCharSequence(Notification.EXTRA_SUB_TEXT)?.toString()
+                        ?: extras.getCharSequence(Notification.EXTRA_INFO_TEXT)?.toString()
+
+                    val richText = extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString()
+                        ?: extras.getCharSequence(Notification.EXTRA_TEXT)?.toString()
+
+                    val pictureBitmap: Bitmap? = try {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            extras.getParcelable(Notification.EXTRA_PICTURE, Bitmap::class.java)
+                        } else {
+                            @Suppress("DEPRECATION")
+                            extras.getParcelable(Notification.EXTRA_PICTURE) as? Bitmap
+                        } ?: (extras.get(Notification.EXTRA_PICTURE) as? Bitmap)
+                          ?: (extras.get(Notification.EXTRA_LARGE_ICON_BIG) as? Bitmap)
+                    } catch (_: Throwable) {
+                        null
+                    }
+
+                    val senderIcon: Bitmap? = try {
+                        extras.get(Notification.EXTRA_LARGE_ICON) as? Bitmap
+                    } catch (_: Throwable) {
+                        null
+                    }
+
                     val item = NotificationItem(
                         id = sbn.key ?: "${pkg}_${sbn.id}",
                         packageName = pkg,
@@ -112,7 +138,11 @@ class FluxNotificationListenerService : NotificationListenerService() {
                         message = text,
                         timeAgo = postTime,
                         canReply = hasReply,
-                        key = sbn.key ?: ""
+                        key = sbn.key ?: "",
+                        subText = subText,
+                        richText = richText,
+                        pictureBitmap = pictureBitmap,
+                        senderIcon = senderIcon
                     )
 
                     // Store notification mapped by package name for app launcher badge/preview

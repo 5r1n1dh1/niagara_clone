@@ -29,6 +29,26 @@ import androidx.compose.ui.unit.sp
 import com.example.data.*
 import kotlinx.coroutines.launch
 
+sealed class AppDrawerItem {
+    abstract val key: String
+
+    data class CategoryCard(val name: String, val apps: List<AppItem>) : AppDrawerItem() {
+        override val key: String = "cat_card_$name"
+    }
+
+    data class FolderWrapper(val folder: FolderItem) : AppDrawerItem() {
+        override val key: String = "folder_${folder.id}"
+    }
+
+    data class LetterHeader(val letter: Char) : AppDrawerItem() {
+        override val key: String = "header_$letter"
+    }
+
+    data class AppRow(val app: AppItem) : AppDrawerItem() {
+        override val key: String = "app_${app.packageName}"
+    }
+}
+
 /**
  * Right-most Page: Lists all apps with strict left and right margins,
  * Wave Alphabet, and an adaptive search bar that smoothly slides to the top when focused/keyboard opened.
@@ -73,7 +93,6 @@ fun RightAllAppsScreen(
 
     val displayAppsList = remember(allApps, filterText) {
         if (filterText.isBlank()) {
-            // Apps in categories are hidden from the main uncategorized list below
             allApps.filter { !it.isHidden && it.customCategory.isBlank() }
                 .sortedBy { it.label.lowercase() }
         } else {
@@ -83,27 +102,35 @@ fun RightAllAppsScreen(
         }
     }
 
-    val letterToHeaderIndexMap = remember(displayAppsList, folders, categorizedGroupMap, filterText) {
-        val map = mutableMapOf<Char, Int>()
-        if (filterText.isNotBlank()) return@remember map
-
-        var currentIndex = 0
-        if (categorizedGroupMap.isNotEmpty()) {
-            currentIndex += categorizedGroupMap.size
-        }
-        if (folders.isNotEmpty()) {
-            currentIndex += folders.size
-        }
-
-        var lastChar: Char? = null
-        displayAppsList.forEach { app ->
-            val char = app.label.firstOrNull()?.uppercaseChar() ?: '#'
-            if (char != lastChar) {
-                lastChar = char
-                map[char] = currentIndex
-                currentIndex++ // header item
+    val flatList = remember(displayAppsList, folders, categorizedGroupMap, filterText) {
+        val items = mutableListOf<AppDrawerItem>()
+        if (filterText.isBlank()) {
+            categorizedGroupMap.keys.sorted().forEach { cat ->
+                val catApps = categorizedGroupMap[cat] ?: emptyList()
+                items.add(AppDrawerItem.CategoryCard(cat, catApps))
             }
-            currentIndex++ // app item
+            folders.forEach { folder ->
+                items.add(AppDrawerItem.FolderWrapper(folder))
+            }
+        }
+        var lastHeader: Char? = null
+        displayAppsList.forEach { app ->
+            val currentInitial = app.label.firstOrNull()?.uppercaseChar() ?: '#'
+            if (currentInitial != lastHeader) {
+                lastHeader = currentInitial
+                items.add(AppDrawerItem.LetterHeader(currentInitial))
+            }
+            items.add(AppDrawerItem.AppRow(app))
+        }
+        items
+    }
+
+    val letterToHeaderIndexMap = remember(flatList) {
+        val map = mutableMapOf<Char, Int>()
+        flatList.forEachIndexed { index, item ->
+            if (item is AppDrawerItem.LetterHeader) {
+                map[item.letter] = index
+            }
         }
         map
     }
@@ -246,142 +273,132 @@ fun RightAllAppsScreen(
                             .testTag("all_apps_list"),
                         contentPadding = PaddingValues(top = 4.dp, bottom = 90.dp)
                     ) {
-                        // Top Category Cards
-                        if (filterText.isBlank() && categorizedGroupMap.isNotEmpty()) {
-                            itemsIndexed(
-                                items = categorizedGroupMap.keys.sorted(),
-                                key = { _, cat -> "category_card_$cat" }
-                            ) { _, categoryName ->
-                                val catApps = categorizedGroupMap[categoryName] ?: emptyList()
-                                var isExpanded by remember { mutableStateOf(false) }
+                        itemsIndexed(
+                            items = flatList,
+                            key = { _, item -> item.key }
+                        ) { _, drawerItem ->
+                            when (drawerItem) {
+                                is AppDrawerItem.CategoryCard -> {
+                                    val catApps = drawerItem.apps
+                                    var isExpanded by remember { mutableStateOf(false) }
 
-                                Surface(
-                                    shape = RoundedCornerShape(16.dp),
-                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(bottom = 8.dp)
-                                ) {
-                                    Column(
+                                    Surface(
+                                        shape = RoundedCornerShape(16.dp),
+                                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .padding(12.dp)
+                                            .padding(bottom = 8.dp)
                                     ) {
-                                        Row(
+                                        Column(
                                             modifier = Modifier
                                                 .fillMaxWidth()
-                                                .clickable { isExpanded = !isExpanded },
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.SpaceBetween
+                                                .padding(12.dp)
                                         ) {
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .clickable { isExpanded = !isExpanded },
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.SpaceBetween
+                                            ) {
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    Text(
+                                                        text = drawerItem.name.uppercase(),
+                                                        fontSize = (12 * settings.fontScale).sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        letterSpacing = 0.8.sp,
+                                                        color = MaterialTheme.colorScheme.primary
+                                                    )
+                                                    Spacer(modifier = Modifier.width(8.dp))
+                                                    Surface(
+                                                        shape = RoundedCornerShape(10.dp),
+                                                        color = MaterialTheme.colorScheme.primaryContainer
+                                                    ) {
+                                                        Text(
+                                                            text = "${catApps.size}",
+                                                            fontSize = 11.sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                        )
+                                                    }
+                                                }
                                                 Text(
-                                                    text = categoryName.uppercase(),
-                                                    fontSize = (12 * settings.fontScale).sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    letterSpacing = 0.8.sp,
+                                                    text = if (isExpanded) "Hide" else "Show All",
+                                                    fontSize = 11.sp,
                                                     color = MaterialTheme.colorScheme.primary
                                                 )
-                                                Spacer(modifier = Modifier.width(8.dp))
-                                                Surface(
-                                                    shape = RoundedCornerShape(10.dp),
-                                                    color = MaterialTheme.colorScheme.primaryContainer
-                                                ) {
-                                                    Text(
-                                                        text = "${catApps.size}",
-                                                        fontSize = 11.sp,
-                                                        fontWeight = FontWeight.Bold,
-                                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                            }
+
+                                            Spacer(modifier = Modifier.height(8.dp))
+
+                                            val appsToShow = if (isExpanded) catApps else catApps.take(4)
+                                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                appsToShow.forEach { app ->
+                                                    AppListItem(
+                                                        app = app,
+                                                        iconPackType = settings.iconPackType,
+                                                        customIconSettings = settings.customIconSettings,
+                                                        isLeftHanded = isLeftHanded,
+                                                        fontScale = settings.fontScale,
+                                                        iconScale = settings.appIconScale,
+                                                        showBadges = settings.showAppNotificationBadges,
+                                                        compactSpacing = settings.compactAppRowSpacing,
+                                                        onAppClick = { onAppClick(app) },
+                                                        onAppLongClick = { onAppLongClick(app) },
+                                                        onReplyNotification = { text -> onReplyNotification(app.packageName, text) },
+                                                        onDismissNotification = { onDismissNotification(app.packageName) }
                                                     )
                                                 }
-                                            }
-                                            Text(
-                                                text = if (isExpanded) "Hide" else "Show All",
-                                                fontSize = 11.sp,
-                                                color = MaterialTheme.colorScheme.primary
-                                            )
-                                        }
-
-                                        Spacer(modifier = Modifier.height(8.dp))
-
-                                        val appsToShow = if (isExpanded) catApps else catApps.take(4)
-                                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                            appsToShow.forEach { app ->
-                                                AppListItem(
-                                                    app = app,
-                                                    iconPackType = settings.iconPackType,
-                                                    customIconSettings = settings.customIconSettings,
-                                                    isLeftHanded = isLeftHanded,
-                                                    fontScale = settings.fontScale,
-                                                    iconScale = settings.appIconScale,
-                                                    showBadges = settings.showAppNotificationBadges,
-                                                    compactSpacing = settings.compactAppRowSpacing,
-                                                    onAppClick = { onAppClick(app) },
-                                                    onAppLongClick = { onAppLongClick(app) },
-                                                    onReplyNotification = { text -> onReplyNotification(app.packageName, text) },
-                                                    onDismissNotification = { onDismissNotification(app.packageName) }
-                                                )
                                             }
                                         }
                                     }
                                 }
-                            }
-                        }
 
-                        // Categorized Folders
-                        if (filterText.isBlank() && folders.isNotEmpty()) {
-                            itemsIndexed(folders, key = { _, f -> "folder_${f.id}" }) { _, folder ->
-                                val appsInFolder = allApps.filter { it.packageName in folder.appPackageNames }
-                                FolderInlineItem(
-                                    folder = folder,
-                                    appsInFolder = appsInFolder,
-                                    iconPackType = settings.iconPackType,
-                                    isLeftHanded = isLeftHanded,
-                                    fontScale = settings.fontScale,
-                                    onToggleExpand = { onToggleFolderExpanded(folder.id) },
-                                    onAppClick = onAppClick,
-                                    onAppLongClick = onAppLongClick,
-                                    onSwipeRightForPopup = onSwipeRightForPopup
-                                )
-                                Spacer(modifier = Modifier.height(6.dp))
-                            }
-                        }
+                                is AppDrawerItem.FolderWrapper -> {
+                                    val folder = drawerItem.folder
+                                    val appsInFolder = allApps.filter { it.packageName in folder.appPackageNames }
+                                    FolderInlineItem(
+                                        folder = folder,
+                                        appsInFolder = appsInFolder,
+                                        iconPackType = settings.iconPackType,
+                                        isLeftHanded = isLeftHanded,
+                                        fontScale = settings.fontScale,
+                                        onToggleExpand = { onToggleFolderExpanded(folder.id) },
+                                        onAppClick = onAppClick,
+                                        onAppLongClick = onAppLongClick,
+                                        onSwipeRightForPopup = onSwipeRightForPopup
+                                    )
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                }
 
-                        // Uncategorized App List Items with Alphabet Section Headers
-                        var lastHeader: Char? = null
-                        displayAppsList.forEach { app ->
-                            val currentInitial = app.label.firstOrNull()?.uppercaseChar() ?: '#'
-                            val isFirstOfSection = currentInitial != lastHeader
-
-                            if (isFirstOfSection) {
-                                lastHeader = currentInitial
-                                item(key = "header_$currentInitial") {
+                                is AppDrawerItem.LetterHeader -> {
                                     Text(
-                                        text = currentInitial.toString(),
+                                        text = drawerItem.letter.toString(),
                                         fontSize = (13 * settings.fontScale).sp,
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.primary,
                                         modifier = Modifier.padding(top = 14.dp, bottom = 4.dp, start = 4.dp)
                                     )
                                 }
-                            }
 
-                            item(key = "all_${app.packageName}") {
-                                AppListItem(
-                                    app = app,
-                                    iconPackType = settings.iconPackType,
-                                    customIconSettings = settings.customIconSettings,
-                                    isLeftHanded = isLeftHanded,
-                                    fontScale = settings.fontScale,
-                                    iconScale = settings.appIconScale,
-                                    showBadges = settings.showAppNotificationBadges,
-                                    compactSpacing = settings.compactAppRowSpacing,
-                                    onAppClick = { onAppClick(app) },
-                                    onAppLongClick = { onAppLongClick(app) },
-                                    onReplyNotification = { text -> onReplyNotification(app.packageName, text) },
-                                    onDismissNotification = { onDismissNotification(app.packageName) }
-                                )
+                                is AppDrawerItem.AppRow -> {
+                                    val app = drawerItem.app
+                                    AppListItem(
+                                        app = app,
+                                        iconPackType = settings.iconPackType,
+                                        customIconSettings = settings.customIconSettings,
+                                        isLeftHanded = isLeftHanded,
+                                        fontScale = settings.fontScale,
+                                        iconScale = settings.appIconScale,
+                                        showBadges = settings.showAppNotificationBadges,
+                                        compactSpacing = settings.compactAppRowSpacing,
+                                        onAppClick = { onAppClick(app) },
+                                        onAppLongClick = { onAppLongClick(app) },
+                                        onReplyNotification = { text -> onReplyNotification(app.packageName, text) },
+                                        onDismissNotification = { onDismissNotification(app.packageName) }
+                                    )
+                                }
                             }
                         }
                     }
@@ -406,7 +423,7 @@ fun RightAllAppsScreen(
                                         letterToHeaderIndexMap.entries
                                             .minByOrNull { kotlin.math.abs(it.key.code - char.code) }?.value
                                     }
-                                    if (targetIndex != null) {
+                                    if (targetIndex != null && targetIndex in flatList.indices) {
                                         scope.launch {
                                             listState.scrollToItem(targetIndex)
                                         }

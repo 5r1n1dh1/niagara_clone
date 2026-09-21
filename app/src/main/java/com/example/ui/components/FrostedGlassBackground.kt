@@ -53,6 +53,8 @@ fun FrostedGlassPanel(
                         renderEffect = RenderEffect
                             .createBlurEffect(blurPx, blurPx, Shader.TileMode.CLAMP)
                             .asComposeRenderEffect()
+                    } else {
+                        renderEffect = null
                     }
                     clip = true
                     this.shape = shape
@@ -60,32 +62,32 @@ fun FrostedGlassPanel(
                 .drawWithCache {
                     val strokePx = borderWidth.toPx()
 
-                    val tintBrush = Brush.verticalGradient(
+                    // High-contrast dark base scrim to guarantee text readability on light or dark wallpapers
+                    val baseScrimBrush = Brush.verticalGradient(
                         colors = listOf(
-                            Color.White.copy(alpha = (translucency * 1.2f).coerceAtMost(0.95f)),
-                            Color.White.copy(alpha = (translucency * 0.85f).coerceAtLeast(0.05f)),
-                            Color.White.copy(alpha = (translucency * 1.0f).coerceIn(0.05f, 0.95f))
+                            Color(0xFF0F172A).copy(alpha = (translucency * 0.75f + 0.25f).coerceIn(0.20f, 0.90f)),
+                            Color(0xFF020617).copy(alpha = (translucency * 0.85f + 0.30f).coerceIn(0.25f, 0.95f))
                         )
                     )
 
                     val specularBrush = Brush.linearGradient(
                         colors = listOf(
-                            Color.White.copy(alpha = (glassEffect * 0.45f).coerceAtMost(0.80f)),
+                            Color.White.copy(alpha = (glassEffect * 0.35f + 0.08f).coerceIn(0.05f, 0.75f)),
                             Color.Transparent,
-                            Color.White.copy(alpha = (glassEffect * 0.20f).coerceAtMost(0.40f))
+                            Color.White.copy(alpha = (glassEffect * 0.15f).coerceIn(0.0f, 0.30f))
                         )
                     )
 
                     val borderBrush = Brush.linearGradient(
                         colors = listOf(
-                            Color.White.copy(alpha = 0.35f),
-                            Color.White.copy(alpha = 0.12f)
+                            Color.White.copy(alpha = 0.45f),
+                            Color.White.copy(alpha = 0.18f)
                         )
                     )
 
                     onDrawBehind {
-                        // Draw tint
-                        drawRect(brush = tintBrush)
+                        // Draw dark high-contrast base scrim
+                        drawRect(brush = baseScrimBrush)
 
                         // Draw glass specular highlight
                         if (glassEffect > 0f) {

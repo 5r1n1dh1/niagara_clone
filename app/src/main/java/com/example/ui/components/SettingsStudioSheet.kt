@@ -4,12 +4,15 @@ import android.content.Context
 import android.content.Intent
 import android.provider.Settings
 import androidx.compose.animation.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
@@ -412,6 +415,171 @@ fun SettingsContent(
                                         modifier = Modifier.weight(1f)
                                     )
                                 }
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            var showIconPackImportDialog by remember { mutableStateOf(false) }
+
+                            OutlinedButton(
+                                onClick = { showIconPackImportDialog = true },
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("import_icon_pack_button")
+                            ) {
+                                Icon(Icons.Filled.FileUpload, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = if (settings.customIconSettings.installedPackName != null) {
+                                        "Imported Pack: ${settings.customIconSettings.installedPackName}"
+                                    } else {
+                                        "Import Custom Icon Pack"
+                                    },
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+
+                            if (showIconPackImportDialog) {
+                                val installedPacks = remember {
+                                    try {
+                                        val pm = context.packageManager
+                                        val list = mutableListOf<InstalledIconPackInfo>()
+                                        val actions = listOf(
+                                            "org.adw.launcher.THEMES",
+                                            "com.novalauncher.THEME",
+                                            "com.fede.launcher.THEME_ICONPACK",
+                                            "com.anddoes.launcher.THEME",
+                                            "com.teslacoilsw.launcher.THEME"
+                                        )
+                                        val seen = mutableSetOf<String>()
+                                        for (action in actions) {
+                                            val intent = Intent(action)
+                                            val resolve = pm.queryIntentActivities(intent, 0)
+                                            for (info in resolve) {
+                                                val pkg = info.activityInfo.packageName
+                                                if (seen.add(pkg)) {
+                                                    list.add(
+                                                        InstalledIconPackInfo(
+                                                            packageName = pkg,
+                                                            label = info.loadLabel(pm).toString(),
+                                                            icon = try { info.loadIcon(pm) } catch (_: Exception) { null }
+                                                        )
+                                                    )
+                                                }
+                                            }
+                                        }
+                                        list
+                                    } catch (_: Exception) {
+                                        emptyList()
+                                    }
+                                }
+
+                                AlertDialog(
+                                    onDismissRequest = { showIconPackImportDialog = false },
+                                    title = {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(Icons.Filled.FileUpload, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text("Import Custom Icon Pack", fontWeight = FontWeight.Bold)
+                                        }
+                                    },
+                                    text = {
+                                        Column {
+                                            Text(
+                                                "Select an installed third-party icon pack or browse Google Play Store to download icon packs:",
+                                                fontSize = 12.sp,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                            Spacer(modifier = Modifier.height(12.dp))
+
+                                            if (installedPacks.isEmpty()) {
+                                                Surface(
+                                                    shape = RoundedCornerShape(12.dp),
+                                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
+                                                ) {
+                                                    Column(
+                                                        modifier = Modifier.padding(14.dp),
+                                                        horizontalAlignment = Alignment.CenterHorizontally
+                                                    ) {
+                                                        Text("📦 No third-party icon pack apps found.", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                                                        Spacer(modifier = Modifier.height(4.dp))
+                                                        Text("Install icon packs like Whicons or Delta from the Play Store.", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                    }
+                                                }
+                                            } else {
+                                                Column(
+                                                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                                                    modifier = Modifier.heightIn(max = 220.dp).verticalScroll(rememberScrollState())
+                                                ) {
+                                                    installedPacks.forEach { pack ->
+                                                        val isSelected = settings.customIconSettings.installedPackPackageName == pack.packageName
+                                                        Surface(
+                                                            shape = RoundedCornerShape(10.dp),
+                                                            color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+                                                            border = BorderStroke(1.dp, if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant),
+                                                            modifier = Modifier
+                                                                .fillMaxWidth()
+                                                                .clickable {
+                                                                    onUpdateSettings(
+                                                                        settings.copy(
+                                                                            iconPackType = IconPackType.CUSTOM,
+                                                                            customIconSettings = settings.customIconSettings.copy(
+                                                                                installedPackPackageName = pack.packageName,
+                                                                                installedPackName = pack.label
+                                                                            )
+                                                                        )
+                                                                    )
+                                                                    showIconPackImportDialog = false
+                                                                }
+                                                        ) {
+                                                            Row(
+                                                                modifier = Modifier.padding(10.dp),
+                                                                verticalAlignment = Alignment.CenterVertically
+                                                            ) {
+                                                                Text(pack.label, fontWeight = FontWeight.Bold, fontSize = 13.sp, modifier = Modifier.weight(1f))
+                                                                if (isSelected) {
+                                                                    Icon(Icons.Filled.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+
+                                            Spacer(modifier = Modifier.height(12.dp))
+
+                                            OutlinedButton(
+                                                onClick = {
+                                                    try {
+                                                        val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse("market://search?q=icon%20pack")).apply {
+                                                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                                        }
+                                                        context.startActivity(intent)
+                                                    } catch (_: Exception) {
+                                                        val webIntent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://play.google.com/store/search?q=icon%20pack")).apply {
+                                                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                                        }
+                                                        context.startActivity(webIntent)
+                                                    }
+                                                },
+                                                modifier = Modifier.fillMaxWidth(),
+                                                shape = RoundedCornerShape(10.dp)
+                                            ) {
+                                                Icon(Icons.Filled.Shop, contentDescription = null, modifier = Modifier.size(16.dp))
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text("Browse Play Store for Icon Packs", fontSize = 11.sp)
+                                            }
+                                        }
+                                    },
+                                    confirmButton = {
+                                        TextButton(onClick = { showIconPackImportDialog = false }) {
+                                            Text("Close")
+                                        }
+                                    }
+                                )
                             }
 
                             HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))

@@ -90,7 +90,7 @@ class MainActivity : ComponentActivity() {
             ) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
+                    color = Color.Transparent
                 ) {
                     NiagaraLauncherScreen(viewModel = viewModel)
                 }
@@ -238,8 +238,20 @@ fun NiagaraLauncherScreen(
     } else {
         (blurFraction * 20f).dp
     }
-    val wallpaperBlurModifier = if (wallpaperBlurRadius > 1.dp && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-        Modifier.blur(wallpaperBlurRadius)
+
+    val isAnyPanelOpen = isSearchOpen || isSettingsOpen || isNotificationCenterOpen ||
+        isSystemWidgetPickerOpen || isAddWidgetOpen || (editingNoteWidget != null) ||
+        isCarouselCustomizeOpen || (activeAppForPopup != null) ||
+        (dockPickerSlot != null) || isSecretLabOpen || isDebugOverlayOpen || isDiscoverOpen || (activeUsageBreakerApp != null)
+
+    val panelBackgroundBlurRadius by androidx.compose.animation.core.animateDpAsState(
+        targetValue = if (isAnyPanelOpen) 22.dp else 0.dp,
+        animationSpec = androidx.compose.animation.core.tween(durationMillis = 250),
+        label = "panelBlur"
+    )
+
+    val panelBlurModifier = if (panelBackgroundBlurRadius > 0.5.dp && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        Modifier.blur(panelBackgroundBlurRadius)
     } else {
         Modifier
     }
@@ -262,17 +274,24 @@ fun NiagaraLauncherScreen(
             themePreset = settings.themePreset,
             wallpaperStyle = settings.wallpaperStyle,
             systemWallpaperBitmap = systemWallpaperBitmap,
-            blurRadius = wallpaperBlurRadius,
+            blurRadius = wallpaperBlurRadius + panelBackgroundBlurRadius,
+            backgroundBlurStrength = settings.frostedBlurRadius,
             modifier = Modifier.fillMaxSize()
         )
 
-        // 3-Page Horizontal Pager
-        HorizontalPager(
-            state = pagerState,
+        // Launcher Foreground Screens & Dock Container (Blurred behind open panels)
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .testTag("home_screens_pager")
-        ) { page ->
+                .then(panelBlurModifier)
+        ) {
+            // 3-Page Horizontal Pager
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .testTag("home_screens_pager")
+            ) { page ->
             when (page) {
                 0 -> {
                     // 2. Left most page houses widgets - user can customize (CRUD)
@@ -399,6 +418,7 @@ fun NiagaraLauncherScreen(
                 onAppLongClick = { slotIndex -> viewModel.openDockPicker(slotIndex) },
                 modifier = Modifier.align(Alignment.BottomCenter)
             )
+        }
         }
 
         // ==========================================

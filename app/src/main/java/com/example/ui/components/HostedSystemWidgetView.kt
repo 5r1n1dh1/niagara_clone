@@ -4,6 +4,7 @@ import android.appwidget.AppWidgetHostView
 import android.content.ComponentName
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -26,6 +27,7 @@ fun HostedSystemWidgetView(
     appWidgetId: Int,
     providerPackage: String?,
     providerClass: String?,
+    heightCategory: String = "4x2",
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -39,22 +41,34 @@ fun HostedSystemWidgetView(
         } else null
     }
 
+    val targetHeight = when (heightCategory) {
+        "4x1" -> 90.dp
+        "4x2" -> 190.dp
+        "4x3" -> 290.dp
+        "4x4" -> 390.dp
+        else -> 190.dp
+    }
+
     if (hostView != null) {
         Surface(
-            shape = RoundedCornerShape(18.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+            shape = RoundedCornerShape(16.dp),
+            color = androidx.compose.ui.graphics.Color.Transparent,
             modifier = modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(18.dp))
+                .clip(RoundedCornerShape(16.dp))
         ) {
             AndroidView(
                 factory = { _ ->
-                    hostView
+                    hostView.apply {
+                        setPadding(0, 0, 0, 0)
+                    }
+                },
+                update = { v ->
+                    v.setPadding(0, 0, 0, 0)
                 },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(min = 100.dp, max = 260.dp)
-                    .padding(8.dp)
+                    .height(targetHeight)
             )
         }
     } else {

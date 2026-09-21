@@ -223,23 +223,15 @@ fun CenterHomeScreen(
             .padding(horizontal = 16.dp)
             .testTag("center_home_screen")
     ) {
-        val topOffset = maxHeight * 0.25f
+        val topOffset = maxHeight * 0.18f
 
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(bottom = 110.dp)
         ) {
-            // Top offset spacer
+            // Top minimal breathing space
             item(key = "center_top_spacer") {
-                Spacer(modifier = Modifier.height(topOffset * 0.4f))
-            }
-
-            // Usage Details Widget Above Clock
-            item(key = "usage_details_widget_card") {
-                UsageDetailsWidgetCard(
-                    onOpenSettings = onOpenSettings,
-                    modifier = Modifier.padding(bottom = 12.dp)
-                )
+                Spacer(modifier = Modifier.height(topOffset))
             }
 
             // 4.1 Swipable 4x2 Widgets Carousel (Clock is Fixed #1)

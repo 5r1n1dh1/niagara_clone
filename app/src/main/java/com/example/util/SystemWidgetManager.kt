@@ -10,6 +10,7 @@ import android.content.pm.PackageManager
 import android.graphics.drawable.Drawable
 import android.os.Build
 import android.os.Bundle
+import android.view.MotionEvent
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -24,13 +25,56 @@ data class SystemWidgetProviderItem(
     val minHeight: Int
 )
 
+class ScrollableAppWidgetHostView(context: Context) : AppWidgetHostView(context) {
+    private var initialX = 0f
+    private var initialY = 0f
+
+    init {
+        // Zero out unnecessary system margins so the widget renders clean and edge-to-edge
+        setPadding(0, 0, 0, 0)
+    }
+
+    override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+        when (ev.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                initialX = ev.x
+                initialY = ev.y
+                parent?.requestDisallowInterceptTouchEvent(true)
+            }
+            MotionEvent.ACTION_MOVE -> {
+                val dx = kotlin.math.abs(ev.x - initialX)
+                val dy = kotlin.math.abs(ev.y - initialY)
+                if (dy > 6 || dx > 6) {
+                    parent?.requestDisallowInterceptTouchEvent(true)
+                }
+            }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                parent?.requestDisallowInterceptTouchEvent(false)
+            }
+        }
+        return super.dispatchTouchEvent(ev)
+    }
+
+    override fun onInterceptTouchEvent(ev: MotionEvent): Boolean {
+        when (ev.actionMasked) {
+            MotionEvent.ACTION_DOWN, MotionEvent.ACTION_MOVE -> {
+                parent?.requestDisallowInterceptTouchEvent(true)
+            }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                parent?.requestDisallowInterceptTouchEvent(false)
+            }
+        }
+        return super.onInterceptTouchEvent(ev)
+    }
+}
+
 class FluxAppWidgetHost(context: Context, hostId: Int = 2048) : AppWidgetHost(context, hostId) {
     override fun onCreateView(
         context: Context,
         appWidgetId: Int,
         appWidget: AppWidgetProviderInfo?
     ): AppWidgetHostView {
-        return super.onCreateView(context, appWidgetId, appWidget)
+        return ScrollableAppWidgetHostView(context)
     }
 }
 

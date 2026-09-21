@@ -60,8 +60,10 @@ fun WaveAlphabet(
                         val relativeY = (offset.y - verticalPaddingPx).coerceIn(0f, effectiveHeight - 1f)
                         val index = (relativeY / itemHeight).toInt().coerceIn(0, itemCount - 1)
                         val letter = ALPHABET_ITEMS[index]
-                        onLetterSelected(letter)
-                        onLetterConfirmed(letter)
+                        if (letter != selectedLetter) {
+                            onLetterSelected(letter)
+                            onLetterConfirmed(letter)
+                        }
                     },
                     onDrag = { change, _ ->
                         change.consume()
@@ -69,13 +71,12 @@ fun WaveAlphabet(
                         val relativeY = (change.position.y - verticalPaddingPx).coerceIn(0f, effectiveHeight - 1f)
                         val index = (relativeY / itemHeight).toInt().coerceIn(0, itemCount - 1)
                         val letter = ALPHABET_ITEMS[index]
-                        onLetterSelected(letter)
-                        onLetterConfirmed(letter)
-                    },
-                    onDragEnd = {
-                        selectedLetter?.let { letter ->
+                        if (letter != selectedLetter) {
+                            onLetterSelected(letter)
                             onLetterConfirmed(letter)
                         }
+                    },
+                    onDragEnd = {
                         currentTouchY = null
                     },
                     onDragCancel = {

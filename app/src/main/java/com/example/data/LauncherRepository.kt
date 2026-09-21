@@ -1094,23 +1094,23 @@ class LauncherRepository(private val context: Context) {
     }
 
     private fun getSavedFavoritePackages(): Set<String> {
-        return prefs.getStringSet("favorite_packages", emptySet()) ?: emptySet()
+        return prefs.getStringSet("favorite_packages", null)?.toSet() ?: emptySet()
     }
 
     private fun saveFavoritePackages(set: Set<String>) {
-        prefs.edit().putStringSet("favorite_packages", set).apply()
+        prefs.edit().putStringSet("favorite_packages", HashSet(set)).apply()
     }
 
     private fun getSavedHiddenPackages(): Set<String> {
-        return prefs.getStringSet("hidden_packages", emptySet()) ?: emptySet()
+        return prefs.getStringSet("hidden_packages", null)?.toSet() ?: emptySet()
     }
 
     private fun saveHiddenPackages(set: Set<String>) {
-        prefs.edit().putStringSet("hidden_packages", set).apply()
+        prefs.edit().putStringSet("hidden_packages", HashSet(set)).apply()
     }
 
     private fun getSavedUsageBreakerPackages(): Set<String> {
-        return prefs.getStringSet("usage_breaker_packages", emptySet()) ?: emptySet()
+        return prefs.getStringSet("usage_breaker_packages", null)?.toSet() ?: emptySet()
     }
 
     private fun saveUsageBreakerPackages(set: Set<String>) {
