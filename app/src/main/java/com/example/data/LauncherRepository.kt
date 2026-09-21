@@ -1141,11 +1141,13 @@ class LauncherRepository(private val context: Context) {
 
     private fun getDisguisedMap(): Map<String, String> {
         val str = prefs.getString("disguised_map", null) ?: return emptyMap()
-        val obj = JSONObject(str)
         val map = mutableMapOf<String, String>()
-        for (key in obj.keys()) {
-            map[key] = obj.getString(key)
-        }
+        try {
+            val obj = JSONObject(str)
+            for (key in obj.keys()) {
+                map[key] = obj.optString(key, "")
+            }
+        } catch (_: Exception) {}
         return map
     }
 

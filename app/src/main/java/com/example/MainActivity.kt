@@ -8,6 +8,7 @@ import android.os.Build
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -101,9 +102,17 @@ class MainActivity : ComponentActivity() {
         com.example.util.SystemWidgetManager.stopListening()
     }
 
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        if (level >= TRIM_MEMORY_BACKGROUND) {
+            com.example.ui.components.clearIconBitmapCache()
+        }
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         com.example.util.SystemWidgetManager.stopListening()
+        com.example.ui.components.clearIconBitmapCache()
     }
 }
 
@@ -241,6 +250,32 @@ fun NiagaraLauncherScreen(
         isSystemWidgetPickerOpen || isAddWidgetOpen || (editingNoteWidget != null) ||
         isCarouselCustomizeOpen || (activeAppForPopup != null) ||
         (dockPickerSlot != null) || isSecretLabOpen || isDebugOverlayOpen || isDiscoverOpen || (activeUsageBreakerApp != null)
+
+    // Handle system back gesture / back button defensively
+    BackHandler(enabled = isAnyPanelOpen || isSleepOverlayVisible || isOnboardingOpen || pagerState.currentPage != 1) {
+        when {
+            isSleepOverlayVisible -> viewModel.dismissSleepOverlay()
+            activeAppForPopup != null -> viewModel.closeAppPopup()
+            activeUsageBreakerApp != null -> viewModel.cancelUsageBreaker()
+            isSearchOpen -> viewModel.closeSearch()
+            isNotificationCenterOpen -> viewModel.closeNotificationCenter()
+            isDiscoverOpen -> viewModel.closeDiscover()
+            isSettingsOpen -> viewModel.closeSettings()
+            isOnboardingOpen -> viewModel.closeSetupGuide()
+            isSystemWidgetPickerOpen -> viewModel.closeSystemWidgetPicker()
+            isAddWidgetOpen -> viewModel.closeAddWidgetDialog()
+            editingNoteWidget != null -> viewModel.closeEditNoteWidget()
+            isCarouselCustomizeOpen -> viewModel.closeCarouselCustomize()
+            dockPickerSlot != null -> viewModel.closeDockPicker()
+            isSecretLabOpen -> viewModel.closeSecretLab()
+            isDebugOverlayOpen -> viewModel.closeDebugOverlay()
+            pagerState.currentPage != 1 -> {
+                coroutineScope.launch {
+                    pagerState.animateScrollToPage(1)
+                }
+            }
+        }
+    }
 
     val panelBackgroundBlurRadius by androidx.compose.animation.core.animateDpAsState(
         targetValue = if (isAnyPanelOpen) 22.dp else 0.dp,

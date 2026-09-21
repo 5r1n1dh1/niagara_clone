@@ -59,6 +59,7 @@ fun HostedSystemWidgetView(
         ) {
             AndroidView(
                 factory = { _ ->
+                    (hostView.parent as? android.view.ViewGroup)?.removeView(hostView)
                     hostView.apply {
                         setPadding(0, 0, 0, 0)
                     }

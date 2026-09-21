@@ -41,6 +41,12 @@ import kotlin.math.abs
 
 private val iconBitmapCache = LruCache<String, androidx.compose.ui.graphics.ImageBitmap>(120)
 
+fun clearIconBitmapCache() {
+    try {
+        iconBitmapCache.evictAll()
+    } catch (_: Throwable) {}
+}
+
 @Composable
 fun AppIconRenderer(
     app: AppItem,
