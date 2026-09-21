@@ -987,48 +987,97 @@ private fun AppSpecificOperationsBar(
 ) {
     when (category) {
         AppCategoryType.MUSIC -> {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            Surface(
+                shape = RoundedCornerShape(14.dp),
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)),
+                modifier = Modifier.fillMaxWidth().testTag("media_controls_panel")
             ) {
-                FilledTonalButton(
-                    onClick = {
-                        val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? android.media.AudioManager
-                        try {
-                            val downEvent = android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)
-                            val upEvent = android.view.KeyEvent(android.view.KeyEvent.ACTION_UP, android.view.KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)
-                            audioManager?.dispatchMediaKeyEvent(downEvent)
-                            audioManager?.dispatchMediaKeyEvent(upEvent)
-                        } catch (_: Exception) {}
-                        onDismiss()
-                    },
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(10.dp),
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
-                ) {
-                    Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Play / Pause", fontSize = 12.sp)
-                }
+                Column(modifier = Modifier.padding(10.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(
+                            Icons.Filled.MusicNote,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            "MEDIA PLAYBACK CONTROLS",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.6.sp,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
 
-                FilledTonalButton(
-                    onClick = {
-                        val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? android.media.AudioManager
-                        try {
-                            val downEvent = android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_MEDIA_NEXT)
-                            val upEvent = android.view.KeyEvent(android.view.KeyEvent.ACTION_UP, android.view.KeyEvent.KEYCODE_MEDIA_NEXT)
-                            audioManager?.dispatchMediaKeyEvent(downEvent)
-                            audioManager?.dispatchMediaKeyEvent(upEvent)
-                        } catch (_: Exception) {}
-                        onDismiss()
-                    },
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(10.dp),
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
-                ) {
-                    Icon(Icons.Filled.SkipNext, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Next Track", fontSize = 12.sp)
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        FilledTonalButton(
+                            onClick = {
+                                val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? android.media.AudioManager
+                                try {
+                                    val downEvent = android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_MEDIA_PREVIOUS)
+                                    val upEvent = android.view.KeyEvent(android.view.KeyEvent.ACTION_UP, android.view.KeyEvent.KEYCODE_MEDIA_PREVIOUS)
+                                    audioManager?.dispatchMediaKeyEvent(downEvent)
+                                    audioManager?.dispatchMediaKeyEvent(upEvent)
+                                } catch (_: Exception) {}
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(10.dp),
+                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 6.dp)
+                        ) {
+                            Icon(Icons.Filled.SkipPrevious, contentDescription = "Previous Track", modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Prev", fontSize = 11.sp)
+                        }
+
+                        Button(
+                            onClick = {
+                                val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? android.media.AudioManager
+                                try {
+                                    val downEvent = android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)
+                                    val upEvent = android.view.KeyEvent(android.view.KeyEvent.ACTION_UP, android.view.KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)
+                                    audioManager?.dispatchMediaKeyEvent(downEvent)
+                                    audioManager?.dispatchMediaKeyEvent(upEvent)
+                                } catch (_: Exception) {}
+                            },
+                            modifier = Modifier.weight(1.3f),
+                            shape = RoundedCornerShape(10.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+                        ) {
+                            Icon(Icons.Filled.PlayArrow, contentDescription = "Play/Pause", modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Play / Pause", fontSize = 11.sp, maxLines = 1)
+                        }
+
+                        FilledTonalButton(
+                            onClick = {
+                                val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? android.media.AudioManager
+                                try {
+                                    val downEvent = android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_MEDIA_NEXT)
+                                    val upEvent = android.view.KeyEvent(android.view.KeyEvent.ACTION_UP, android.view.KeyEvent.KEYCODE_MEDIA_NEXT)
+                                    audioManager?.dispatchMediaKeyEvent(downEvent)
+                                    audioManager?.dispatchMediaKeyEvent(upEvent)
+                                } catch (_: Exception) {}
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(10.dp),
+                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 6.dp)
+                        ) {
+                            Icon(Icons.Filled.SkipNext, contentDescription = "Next Track", modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Next", fontSize = 11.sp)
+                        }
+                    }
                 }
             }
         }

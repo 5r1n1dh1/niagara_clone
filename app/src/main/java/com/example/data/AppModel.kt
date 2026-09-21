@@ -90,8 +90,12 @@ data class AppItem(
     val notification: NotificationItem? = null,
     val shortcuts: List<String> = emptyList(),
     val isDualApp: Boolean = false,
+    val userProfileId: Int = 0,
     @Transient val iconDrawable: Drawable? = null
-)
+) {
+    val instanceKey: String get() = if (isDualApp) "$packageName:dual" else packageName
+    val uniqueKey: String get() = "app_${packageName}_${isDualApp}_${userProfileId}_${activityName}"
+}
 
 data class NotificationItem(
     val id: String,
@@ -103,6 +107,8 @@ data class NotificationItem(
     val key: String = id,
     val subText: String? = null,
     val richText: String? = null,
+    val isDualApp: Boolean = false,
+    val instanceKey: String = if (isDualApp) "$packageName:dual" else packageName,
     @Transient val pictureBitmap: Bitmap? = null,
     @Transient val senderIcon: Bitmap? = null
 )

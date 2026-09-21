@@ -131,6 +131,11 @@ class FluxNotificationListenerService : NotificationListenerService() {
                         null
                     }
 
+                    val myUser = try { android.os.Process.myUserHandle() } catch (_: Throwable) { null }
+                    val isSecondary = (myUser != null && sbn.user != null && sbn.user != myUser)
+                    val isDual = isSecondary || pkg.contains("dual", true) || pkg.contains("clone", true) || pkg.contains("parallel", true)
+                    val instanceKey = if (isDual) "$pkg:dual" else pkg
+
                     val item = NotificationItem(
                         id = sbn.key ?: "${pkg}_${sbn.id}",
                         packageName = pkg,
@@ -138,16 +143,24 @@ class FluxNotificationListenerService : NotificationListenerService() {
                         message = text,
                         timeAgo = postTime,
                         canReply = hasReply,
-                        key = sbn.key ?: "",
+                        key = sbn.key ?: "${pkg}_${sbn.id}",
                         subText = subText,
                         richText = richText,
+                        isDualApp = isDual,
+                        instanceKey = instanceKey,
                         pictureBitmap = pictureBitmap,
                         senderIcon = senderIcon
                     )
 
-                    // Store notification mapped by package name for app launcher badge/preview
-                    map[pkg] = item
-                    multiMap.getOrPut(pkg) { mutableListOf() }.add(item)
+                    // Store notification mapped by instance key for proper dual app separation
+                    map[instanceKey] = item
+                    if (!isDual && !map.containsKey(pkg)) {
+                        map[pkg] = item
+                    }
+                    multiMap.getOrPut(instanceKey) { mutableListOf() }.add(item)
+                    if (!isDual) {
+                        multiMap.getOrPut(pkg) { mutableListOf() }.add(item)
+                    }
                 }
                 _liveNotifications.value = map
                 _allLiveNotifications.value = multiMap
@@ -169,10 +182,18 @@ class FluxNotificationListenerService : NotificationListenerService() {
     fun dismissNotificationByKey(key: String) {
         try {
             cancelNotification(key)
-            syncNotifications()
-        } catch (t: Throwable) {
-            // Ignore
+        } catch (_: Throwable) {
+            try {
+                val sbns = activeNotifications
+                val match = sbns?.firstOrNull { it.key == key }
+                if (match != null) {
+                    cancelNotification(match.packageName, match.tag, match.id)
+                }
+            } catch (_: Throwable) {}
         }
+        try {
+            syncNotifications()
+        } catch (_: Throwable) {}
     }
 
     fun replyNotificationByKey(key: String, replyText: String): Boolean {
@@ -211,23 +232,42 @@ class FluxNotificationListenerService : NotificationListenerService() {
 
         fun triggerSync(): Boolean {
             val inst = instance ?: return false
-            inst.syncNotifications()
-            return true
+            try {
+                inst.syncNotifications()
+                return true
+            } catch (_: Throwable) {
+                return false
+            }
         }
 
         fun dismissNotification(key: String): Boolean {
             val inst = instance ?: return false
-            inst.dismissNotificationByKey(key)
-            return true
+            try {
+                inst.dismissNotificationByKey(key)
+                return true
+            } catch (_: Throwable) {
+                return false
+            }
         }
 
-        fun dismissAllForPackage(packageName: String): Boolean {
+        fun dismissAllForPackage(packageName: String, isDualApp: Boolean = false): Boolean {
             val inst = instance ?: return false
             try {
+                val myUser = try { android.os.Process.myUserHandle() } catch (_: Throwable) { null }
                 val sbns = inst.activeNotifications ?: return false
                 for (sbn in sbns) {
                     if (sbn.packageName == packageName) {
-                        inst.cancelNotification(sbn.key)
+                        val sbnIsDual = (myUser != null && sbn.user != null && sbn.user != myUser) ||
+                                packageName.contains("dual", true) || packageName.contains("clone", true) || packageName.contains("parallel", true)
+                        if (sbnIsDual == isDualApp) {
+                            try {
+                                inst.cancelNotification(sbn.key)
+                            } catch (_: Throwable) {
+                                try {
+                                    inst.cancelNotification(sbn.packageName, sbn.tag, sbn.id)
+                                } catch (_: Throwable) {}
+                            }
+                        }
                     }
                 }
                 inst.syncNotifications()

@@ -574,8 +574,9 @@ fun NiagaraLauncherScreen(
 
         // App Popup Drawer (Contextual shortcuts, notifications, & options)
         activeAppForPopup?.let { app ->
-            val notif = activeNotifications[app.packageName] ?: app.notification
-            val appNotifs = allActiveNotifications[app.packageName] ?: emptyList()
+            val instanceKey = app.instanceKey
+            val notif = activeNotifications[instanceKey] ?: if (!app.isDualApp) activeNotifications[app.packageName] else null ?: app.notification
+            val appNotifs = allActiveNotifications[instanceKey] ?: if (!app.isDualApp) allActiveNotifications[app.packageName] ?: emptyList() else emptyList()
             AppPopupDrawer(
                 app = app,
                 iconPackType = settings.iconPackType,
@@ -583,16 +584,16 @@ fun NiagaraLauncherScreen(
                 notification = notif,
                 notifications = appNotifs,
                 onReplyNotification = { replyText ->
-                    viewModel.replyToNotification(app.packageName, replyText)
+                    viewModel.replyToNotification(app.packageName, replyText, isDualApp = app.isDualApp)
                 },
                 onDismissNotification = {
-                    viewModel.dismissNotification(app.packageName)
+                    viewModel.dismissNotification(app.packageName, isDualApp = app.isDualApp)
                 },
                 onReplyNotificationKey = { key, replyText ->
-                    viewModel.replyToNotification(app.packageName, replyText, key)
+                    viewModel.replyToNotification(app.packageName, replyText, key, isDualApp = app.isDualApp)
                 },
                 onDismissNotificationKey = { key ->
-                    viewModel.dismissNotification(app.packageName, key)
+                    viewModel.dismissNotification(app.packageName, key, isDualApp = app.isDualApp)
                 },
                 onDismiss = { viewModel.closeAppPopup() },
                 onToggleFavorite = { viewModel.toggleFavorite(app.packageName) },

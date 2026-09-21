@@ -453,6 +453,9 @@ class LauncherRepository(private val context: Context) {
                         }
                     }
 
+                    val instanceKey = if (isDual) "$pkg:dual" else pkg
+                    val notif = _activeNotifications.value[instanceKey] ?: if (!isDual) _activeNotifications.value[pkg] else null
+
                     installedAppItems.add(
                         AppItem(
                             packageName = pkg,
@@ -460,8 +463,9 @@ class LauncherRepository(private val context: Context) {
                             label = label,
                             shortcuts = listOf("App info", "Share", "Open"),
                             isDualApp = isDual,
+                            userProfileId = profile.hashCode(),
                             iconDrawable = iconDrawable,
-                            notification = _activeNotifications.value[pkg]
+                            notification = notif
                         )
                     )
                 }
@@ -867,38 +871,47 @@ class LauncherRepository(private val context: Context) {
         prefs.edit().putString("app_categories_json", obj.toString()).apply()
     }
 
-    fun replyToNotification(packageName: String, replyText: String, key: String? = null) {
-        if (key != null) {
-            com.example.service.FluxNotificationListenerService.instance?.replyNotificationByKey(key, replyText)
-        } else {
-            com.example.service.FluxNotificationListenerService.replyToPackage(packageName, replyText)
-        }
+    fun replyToNotification(packageName: String, replyText: String, key: String? = null, isDualApp: Boolean = false) {
+        try {
+            if (key != null) {
+                com.example.service.FluxNotificationListenerService.instance?.replyNotificationByKey(key, replyText)
+            } else {
+                com.example.service.FluxNotificationListenerService.replyToPackage(packageName, replyText)
+            }
+        } catch (_: Throwable) {}
+        val instanceKey = if (isDualApp) "$packageName:dual" else packageName
         val current = _activeNotifications.value.toMutableMap()
-        current.remove(packageName)
+        current.remove(instanceKey)
+        if (!isDualApp) current.remove(packageName)
         _activeNotifications.value = current
         val currentApps = _allApps.value
         _allApps.value = currentApps.map {
-            if (it.packageName == packageName) it.copy(notification = null) else it
+            if (it.packageName == packageName && it.isDualApp == isDualApp) it.copy(notification = null) else it
         }
         _favorites.value = _favorites.value.map {
-            if (it.packageName == packageName) it.copy(notification = null) else it
+            if (it.packageName == packageName && it.isDualApp == isDualApp) it.copy(notification = null) else it
         }
     }
 
-    fun dismissNotification(packageName: String, key: String? = null) {
-        if (key != null) {
-            com.example.service.FluxNotificationListenerService.dismissNotification(key)
-        }
-        com.example.service.FluxNotificationListenerService.dismissAllForPackage(packageName)
+    fun dismissNotification(packageName: String, key: String? = null, isDualApp: Boolean = false) {
+        try {
+            if (key != null) {
+                com.example.service.FluxNotificationListenerService.dismissNotification(key)
+            } else {
+                com.example.service.FluxNotificationListenerService.dismissAllForPackage(packageName, isDualApp)
+            }
+        } catch (_: Throwable) {}
+        val instanceKey = if (isDualApp) "$packageName:dual" else packageName
         val current = _activeNotifications.value.toMutableMap()
-        current.remove(packageName)
+        current.remove(instanceKey)
+        if (!isDualApp) current.remove(packageName)
         _activeNotifications.value = current
         val currentApps = _allApps.value
         _allApps.value = currentApps.map {
-            if (it.packageName == packageName) it.copy(notification = null) else it
+            if (it.packageName == packageName && it.isDualApp == isDualApp) it.copy(notification = null) else it
         }
         _favorites.value = _favorites.value.map {
-            if (it.packageName == packageName) it.copy(notification = null) else it
+            if (it.packageName == packageName && it.isDualApp == isDualApp) it.copy(notification = null) else it
         }
     }
 
@@ -1146,20 +1159,22 @@ class LauncherRepository(private val context: Context) {
                     val obj = arr.getJSONObject(i)
                     val typeStr = obj.optString("type", WidgetType.WEATHER_FORECAST.name)
                     val type = WidgetType.entries.find { it.name == typeStr } ?: WidgetType.WEATHER_FORECAST
-                    list.add(
-                        CustomWidgetConfig(
-                            id = obj.optString("id", "w_$i"),
-                            type = type,
-                            title = obj.optString("title", type.displayName),
-                            content = obj.optString("content", ""),
-                            isEnabled = obj.optBoolean("isEnabled", true),
-                            appWidgetId = obj.optInt("appWidgetId", -1),
-                            providerPackage = if (obj.has("providerPackage")) obj.optString("providerPackage") else null,
-                            providerClass = if (obj.has("providerClass")) obj.optString("providerClass") else null,
-                            linkedPackageName = if (obj.has("linkedPackageName")) obj.optString("linkedPackageName") else null,
-                            heightCategory = obj.optString("heightCategory", "4x2")
+                    if (type != WidgetType.MEDIA_PLAYER) {
+                        list.add(
+                            CustomWidgetConfig(
+                                id = obj.optString("id", "w_$i"),
+                                type = type,
+                                title = obj.optString("title", type.displayName),
+                                content = obj.optString("content", ""),
+                                isEnabled = obj.optBoolean("isEnabled", true),
+                                appWidgetId = obj.optInt("appWidgetId", -1),
+                                providerPackage = if (obj.has("providerPackage")) obj.optString("providerPackage") else null,
+                                providerClass = if (obj.has("providerClass")) obj.optString("providerClass") else null,
+                                linkedPackageName = if (obj.has("linkedPackageName")) obj.optString("linkedPackageName") else null,
+                                heightCategory = obj.optString("heightCategory", "4x2")
+                            )
                         )
-                    )
+                    }
                 }
                 if (list.isNotEmpty()) {
                     _leftWidgets.value = list
@@ -1170,11 +1185,10 @@ class LauncherRepository(private val context: Context) {
             }
         }
 
-        // Default Left Page widgets
+        // Default Left Page widgets (clean standard launcher widgets)
         _leftWidgets.value = listOf(
             CustomWidgetConfig("w_weather", WidgetType.WEATHER_FORECAST, "Weather & Forecast", heightCategory = "4x2"),
             CustomWidgetConfig("w_news", WidgetType.NEWS_FEED, "Top News Highlights", heightCategory = "4x2"),
-            CustomWidgetConfig("w_media", WidgetType.MEDIA_PLAYER, "Media Player", heightCategory = "4x2"),
             CustomWidgetConfig("w_agenda", WidgetType.CALENDAR_AGENDA, "Upcoming Agenda", heightCategory = "4x2"),
             CustomWidgetConfig(
                 id = "w_note",
@@ -1277,7 +1291,10 @@ class LauncherRepository(private val context: Context) {
                 val list = mutableListOf<WidgetType>()
                 for (i in 0 until arr.length()) {
                     val name = arr.getString(i)
-                    WidgetType.entries.find { it.name == name }?.let { list.add(it) }
+                    val type = WidgetType.entries.find { it.name == name }
+                    if (type != null && type != WidgetType.MEDIA_PLAYER) {
+                        list.add(type)
+                    }
                 }
                 if (list.isNotEmpty()) {
                     _carouselWidgets.value = list.take(5)
@@ -1288,10 +1305,9 @@ class LauncherRepository(private val context: Context) {
             }
         }
 
-        // Default 3 widgets in carousel (max 5)
+        // Default 2 widgets in carousel (clean weather + calendar)
         _carouselWidgets.value = listOf(
             WidgetType.WEATHER_FORECAST,
-            WidgetType.MEDIA_PLAYER,
             WidgetType.CALENDAR_AGENDA
         )
     }
