@@ -57,18 +57,11 @@ import kotlinx.coroutines.launch
 class MainActivity : ComponentActivity() {
 
     private val viewModel: LauncherViewModel by viewModels()
-    var appWidgetHost: android.appwidget.AppWidgetHost? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         com.example.util.SystemWidgetManager.init(applicationContext)
         com.example.util.SystemWidgetManager.startListening()
-        appWidgetHost = android.appwidget.AppWidgetHost(applicationContext, 1024)
-        try {
-            appWidgetHost?.startListening()
-        } catch (e: Exception) {
-            // Safe fallback
-        }
         enableEdgeToEdge()
 
         setContent {
@@ -98,14 +91,19 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onStart() {
+        super.onStart()
+        com.example.util.SystemWidgetManager.startListening()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        com.example.util.SystemWidgetManager.stopListening()
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         com.example.util.SystemWidgetManager.stopListening()
-        try {
-            appWidgetHost?.stopListening()
-        } catch (e: Exception) {
-            // Safe fallback
-        }
     }
 }
 
@@ -522,22 +520,22 @@ fun NiagaraLauncherScreen(
                 targetScreenTitle = "Left Widgets Screen",
                 onSelectProvider = { providerItem ->
                     viewModel.closeSystemWidgetPicker()
-                    val appWidgetHost = (context as? MainActivity)?.appWidgetHost
-                    val appWidgetManager = android.appwidget.AppWidgetManager.getInstance(context)
-                    val newId = appWidgetHost?.allocateAppWidgetId() ?: -1
-                    val success = try {
-                        appWidgetManager.bindAppWidgetIdIfAllowed(newId, providerItem.providerInfo.provider)
-                    } catch (e: Exception) {
-                        false
-                    }
-                    if (!success && newId != -1) {
-                        val intent = Intent(android.appwidget.AppWidgetManager.ACTION_APPWIDGET_BIND).apply {
-                            putExtra(android.appwidget.AppWidgetManager.EXTRA_APPWIDGET_ID, newId)
-                            putExtra(android.appwidget.AppWidgetManager.EXTRA_APPWIDGET_PROVIDER, providerItem.providerInfo.provider)
+                    val newId = com.example.util.SystemWidgetManager.allocateAppWidgetId(context)
+                    if (newId > 0) {
+                        val success = com.example.util.SystemWidgetManager.bindWidgetIfAllowed(
+                            context,
+                            newId,
+                            providerItem.providerInfo.provider
+                        )
+                        if (!success) {
+                            val intent = Intent(android.appwidget.AppWidgetManager.ACTION_APPWIDGET_BIND).apply {
+                                putExtra(android.appwidget.AppWidgetManager.EXTRA_APPWIDGET_ID, newId)
+                                putExtra(android.appwidget.AppWidgetManager.EXTRA_APPWIDGET_PROVIDER, providerItem.providerInfo.provider)
+                            }
+                            (context as? android.app.Activity)?.startActivityForResult(intent, 501)
                         }
-                        (context as? android.app.Activity)?.startActivityForResult(intent, 501)
+                        viewModel.addLeftSystemWidget(providerItem, newId)
                     }
-                    viewModel.addLeftSystemWidget(providerItem, newId)
                 },
                 onDismiss = { viewModel.closeSystemWidgetPicker() }
             )

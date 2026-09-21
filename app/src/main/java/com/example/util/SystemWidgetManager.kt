@@ -97,6 +97,10 @@ object SystemWidgetManager {
         loadInstalledProviders(context)
     }
 
+    fun getHost(context: Context): FluxAppWidgetHost {
+        return appWidgetHost ?: FluxAppWidgetHost(context.applicationContext, HOST_ID).also { appWidgetHost = it }
+    }
+
     fun startListening() {
         try {
             appWidgetHost?.startListening()
@@ -113,9 +117,10 @@ object SystemWidgetManager {
         }
     }
 
-    fun allocateAppWidgetId(): Int {
+    fun allocateAppWidgetId(context: Context): Int {
         return try {
-            appWidgetHost?.allocateAppWidgetId() ?: -1
+            val host = getHost(context)
+            host.allocateAppWidgetId()
         } catch (e: Exception) {
             -1
         }
@@ -132,7 +137,7 @@ object SystemWidgetManager {
     }
 
     fun bindWidgetIfAllowed(context: Context, appWidgetId: Int, provider: ComponentName): Boolean {
-        val manager = appWidgetManager ?: AppWidgetManager.getInstance(context)
+        val manager = appWidgetManager ?: AppWidgetManager.getInstance(context.applicationContext)
         return try {
             manager.bindAppWidgetIdIfAllowed(appWidgetId, provider)
         } catch (e: Exception) {
@@ -146,7 +151,7 @@ object SystemWidgetManager {
         providerPackage: String? = null,
         providerClass: String? = null
     ): AppWidgetProviderInfo? {
-        val manager = appWidgetManager ?: AppWidgetManager.getInstance(context)
+        val manager = appWidgetManager ?: AppWidgetManager.getInstance(context.applicationContext)
         if (appWidgetId > 0) {
             try {
                 val info = manager.getAppWidgetInfo(appWidgetId)
@@ -156,13 +161,19 @@ object SystemWidgetManager {
             }
         }
         if (!providerPackage.isNullOrBlank() && !providerClass.isNullOrBlank()) {
-            return try {
+            val found = try {
                 manager.installedProviders?.firstOrNull {
                     it.provider.packageName == providerPackage && it.provider.className == providerClass
                 }
             } catch (_: Exception) {
                 null
             }
+            if (found != null && appWidgetId > 0) {
+                try {
+                    manager.bindAppWidgetIdIfAllowed(appWidgetId, found.provider)
+                } catch (_: Exception) {}
+            }
+            return found
         }
         return null
     }
@@ -172,8 +183,12 @@ object SystemWidgetManager {
         appWidgetId: Int,
         providerInfo: AppWidgetProviderInfo
     ): AppWidgetHostView? {
+        if (appWidgetId <= 0) return null
         return try {
-            val host = appWidgetHost ?: FluxAppWidgetHost(context, HOST_ID).also { appWidgetHost = it }
+            val host = getHost(context)
+            try {
+                host.startListening()
+            } catch (_: Throwable) {}
             val view = host.createView(context, appWidgetId, providerInfo)
             view.setAppWidget(appWidgetId, providerInfo)
             view
