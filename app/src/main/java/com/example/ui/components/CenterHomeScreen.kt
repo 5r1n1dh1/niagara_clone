@@ -223,7 +223,7 @@ fun CenterHomeScreen(
             .padding(horizontal = 16.dp)
             .testTag("center_home_screen")
     ) {
-        val topOffset = maxHeight * 0.18f
+        val topOffset = (maxHeight * 0.12f).coerceAtLeast(16.dp)
 
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
@@ -232,6 +232,15 @@ fun CenterHomeScreen(
             // Top minimal breathing space
             item(key = "center_top_spacer") {
                 Spacer(modifier = Modifier.height(topOffset))
+            }
+
+            // 4x1 Digital Wellbeing widget above clock (Daily screen usage, no container around it, no padding/margin)
+            item(key = "center_digital_wellbeing_4x1") {
+                DigitalWellbeing4x1Widget(
+                    onOpenSettings = onOpenSettings,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(14.dp))
             }
 
             // 4.1 Swipable 4x2 Widgets Carousel (Clock is Fixed #1)
