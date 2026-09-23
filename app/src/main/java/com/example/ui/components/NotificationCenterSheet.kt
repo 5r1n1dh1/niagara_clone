@@ -3,6 +3,7 @@ package com.example.ui.components
 import android.app.NotificationManager
 import android.content.Context
 import androidx.compose.animation.*
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -18,7 +19,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -306,17 +309,26 @@ fun NotificationCenterSheet(
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         Box(
                                             modifier = Modifier
-                                                .size(24.dp)
+                                                .size(28.dp)
                                                 .clip(CircleShape)
                                                 .background(MaterialTheme.colorScheme.primaryContainer),
                                             contentAlignment = Alignment.Center
                                         ) {
-                                            Text(
-                                                text = notif.sender.take(1).uppercase(),
-                                                fontSize = 11.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                                            )
+                                            if (notif.senderIcon != null) {
+                                                Image(
+                                                    bitmap = notif.senderIcon.asImageBitmap(),
+                                                    contentDescription = notif.sender,
+                                                    modifier = Modifier.fillMaxSize().clip(CircleShape),
+                                                    contentScale = ContentScale.Crop
+                                                )
+                                            } else {
+                                                Text(
+                                                    text = notif.sender.take(1).uppercase(),
+                                                    fontSize = 12.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                                )
+                                            }
                                         }
                                         Spacer(modifier = Modifier.width(8.dp))
                                         Text(
@@ -344,6 +356,18 @@ fun NotificationCenterSheet(
                                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
+                                }
+
+                                if (notif.pictureBitmap != null) {
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Image(
+                                        bitmap = notif.pictureBitmap.asImageBitmap(),
+                                        contentDescription = "Notification Image",
+                                        contentScale = ContentScale.FillWidth,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(10.dp))
+                                    )
                                 }
 
                                 Spacer(modifier = Modifier.height(4.dp))

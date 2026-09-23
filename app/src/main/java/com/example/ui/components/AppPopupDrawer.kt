@@ -113,6 +113,7 @@ fun AppPopupDrawer(
     onDismissNotification: (() -> Unit)? = null,
     onDismissNotificationKey: ((String) -> Unit)? = null,
     onReplyNotificationKey: ((String, String) -> Unit)? = null,
+    onOpenApp: (() -> Unit)? = null,
     onDismiss: () -> Unit,
     onToggleFavorite: () -> Unit,
     onToggleHide: () -> Unit,
@@ -279,52 +280,25 @@ fun AppPopupDrawer(
                                     .fillMaxWidth()
                                     .horizontalScroll(rememberScrollState())
                                     .testTag("chat_heads_horizontal_list"),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                horizontalArrangement = Arrangement.spacedBy(14.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 effectiveNotifications.forEach { notifItem ->
-                                    val initial = notifItem.sender.firstOrNull()?.uppercaseChar()?.toString() ?: "💬"
-
                                     Column(
                                         horizontalAlignment = Alignment.CenterHorizontally,
                                         modifier = Modifier
-                                            .clip(RoundedCornerShape(8.dp))
+                                            .clip(RoundedCornerShape(10.dp))
                                             .clickable {
                                                 activePreviewNotification = notifItem
                                             }
                                             .padding(horizontal = 2.dp, vertical = 2.dp)
                                             .testTag("chat_head_${notifItem.id}")
                                     ) {
-                                        Box(
-                                            contentAlignment = Alignment.Center,
-                                            modifier = Modifier
-                                                .size(36.dp)
-                                                .clip(CircleShape)
-                                                .background(MaterialTheme.colorScheme.primaryContainer)
-                                                .border(
-                                                    width = 1.5.dp,
-                                                    color = MaterialTheme.colorScheme.primary,
-                                                    shape = CircleShape
-                                                )
-                                        ) {
-                                            if (notifItem.senderIcon != null) {
-                                                Image(
-                                                    bitmap = notifItem.senderIcon.asImageBitmap(),
-                                                    contentDescription = notifItem.sender,
-                                                    modifier = Modifier
-                                                        .fillMaxSize()
-                                                        .clip(CircleShape),
-                                                    contentScale = ContentScale.Crop
-                                                )
-                                            } else {
-                                                Text(
-                                                    text = initial,
-                                                    fontSize = 14.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                                                )
-                                            }
-                                        }
+                                        NotificationAvatarView(
+                                            sender = notifItem.sender,
+                                            senderIcon = notifItem.senderIcon,
+                                            size = 42.dp
+                                        )
 
                                         Spacer(modifier = Modifier.height(4.dp))
 
@@ -602,17 +576,91 @@ fun AppPopupDrawer(
                 } else {
                     onReplyNotification?.invoke(replyText)
                 }
-            }
+            },
+            onOpenApp = onOpenApp
         )
+    }
+}
+
+/**
+ * Avatar View for Notifications and Chat Heads:
+ * - Renders actual avatar photo if senderIcon bitmap is available
+ * - Otherwise generates a vibrant, stable gradient avatar with sender initials
+ */
+@Composable
+fun NotificationAvatarView(
+    sender: String,
+    senderIcon: Bitmap?,
+    size: androidx.compose.ui.unit.Dp = 42.dp,
+    modifier: Modifier = Modifier
+) {
+    val initial = remember(sender) {
+        val parts = sender.trim().split(" ").filter { it.isNotBlank() }
+        if (parts.size >= 2) {
+            "${parts[0].first().uppercaseChar()}${parts[1].first().uppercaseChar()}"
+        } else {
+            sender.firstOrNull()?.uppercaseChar()?.toString() ?: "💬"
+        }
+    }
+
+    val hash = remember(sender) { kotlin.math.abs(sender.hashCode()) }
+    val avatarGradients = remember {
+        listOf(
+            listOf(Color(0xFF6366F1), Color(0xFF8B5CF6)),
+            listOf(Color(0xFF3B82F6), Color(0xFF06B6D4)),
+            listOf(Color(0xFF10B981), Color(0xFF059669)),
+            listOf(Color(0xFFF59E0B), Color(0xFFD97706)),
+            listOf(Color(0xFFEC4899), Color(0xFFF43F5E)),
+            listOf(Color(0xFF8B5CF6), Color(0xFFD946EF)),
+            listOf(Color(0xFF14B8A6), Color(0xFF0EA5E9))
+        )
+    }
+    val gradientColors = avatarGradients[hash % avatarGradients.size]
+    val bgModifier = if (senderIcon != null) {
+        Modifier.background(MaterialTheme.colorScheme.surfaceVariant)
+    } else {
+        Modifier.background(androidx.compose.ui.graphics.Brush.linearGradient(gradientColors))
+    }
+
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier
+            .size(size)
+            .clip(CircleShape)
+            .then(bgModifier)
+            .border(
+                width = 1.5.dp,
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+                shape = CircleShape
+            )
+    ) {
+        if (senderIcon != null) {
+            Image(
+                bitmap = senderIcon.asImageBitmap(),
+                contentDescription = sender,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(CircleShape),
+                contentScale = ContentScale.Crop
+            )
+        } else {
+            Text(
+                text = initial,
+                fontSize = (size.value * 0.38f).sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White
+            )
+        }
     }
 }
 
 /**
  * Detailed Message Preview Popup Dialog:
  * - Opens on touch of a chat head or notification item
- * - Supports images (pictureBitmap) and rich text formats (HTML / Markdown styling)
+ * - Shows actual sender avatar or colored initials
+ * - Supports rendering image attachments (pictureBitmap)
  * - Has Reply text input + quick reply chips and Dismiss options
- * - Hides smoothly on click / touch outside or on dismiss request
+ * - Replaced Done button with Open App button to directly jump to the app
  */
 @Composable
 fun DetailedMessagePreviewPopupDialog(
@@ -620,8 +668,10 @@ fun DetailedMessagePreviewPopupDialog(
     appLabel: String,
     onDismissRequest: () -> Unit,
     onDismissNotification: (String) -> Unit,
-    onReplyNotification: (String, String) -> Unit
+    onReplyNotification: (String, String) -> Unit,
+    onOpenApp: (() -> Unit)? = null
 ) {
+    val context = LocalContext.current
     var replyText by remember { mutableStateOf("") }
     var replySentConfirmation by remember { mutableStateOf(false) }
 
@@ -671,30 +721,11 @@ fun DetailedMessagePreviewPopupDialog(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Box(
-                            contentAlignment = Alignment.Center,
-                            modifier = Modifier
-                                .size(44.dp)
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.primaryContainer)
-                                .border(1.5.dp, MaterialTheme.colorScheme.primary, CircleShape)
-                        ) {
-                            if (notification.senderIcon != null) {
-                                Image(
-                                    bitmap = notification.senderIcon.asImageBitmap(),
-                                    contentDescription = notification.sender,
-                                    modifier = Modifier.fillMaxSize().clip(CircleShape),
-                                    contentScale = ContentScale.Crop
-                                )
-                            } else {
-                                Text(
-                                    text = notification.sender.firstOrNull()?.uppercaseChar()?.toString() ?: "💬",
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 18.sp,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                                )
-                            }
-                        }
+                        NotificationAvatarView(
+                            sender = notification.sender,
+                            senderIcon = notification.senderIcon,
+                            size = 46.dp
+                        )
 
                         Spacer(modifier = Modifier.width(12.dp))
 
@@ -748,18 +779,24 @@ fun DetailedMessagePreviewPopupDialog(
                             .weight(weight = 1f, fill = false)
                             .verticalScroll(rememberScrollState())
                     ) {
-                        // Attached Image if available
+                        // Attached Image if available (Videos not necessary as per user request)
                         if (notification.pictureBitmap != null) {
-                            Image(
-                                bitmap = notification.pictureBitmap.asImageBitmap(),
-                                contentDescription = "Message image attachment",
-                                contentScale = ContentScale.FillWidth,
+                            Surface(
+                                shape = RoundedCornerShape(16.dp),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clip(RoundedCornerShape(14.dp))
-                                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f), RoundedCornerShape(14.dp))
-                            )
-                            Spacer(modifier = Modifier.height(12.dp))
+                                    .padding(bottom = 12.dp)
+                            ) {
+                                Image(
+                                    bitmap = notification.pictureBitmap.asImageBitmap(),
+                                    contentDescription = "Notification Image",
+                                    contentScale = ContentScale.FillWidth,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(16.dp))
+                                )
+                            }
                         }
 
                         // Rich Text Formatted Message
@@ -803,7 +840,7 @@ fun DetailedMessagePreviewPopupDialog(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Footer: Reply Input & Dismiss / Close Actions
+                    // Footer: Reply Input & Action Buttons
                     if (replySentConfirmation) {
                         Surface(
                             shape = RoundedCornerShape(12.dp),
@@ -884,7 +921,7 @@ fun DetailedMessagePreviewPopupDialog(
 
                     Spacer(modifier = Modifier.height(14.dp))
 
-                    // Bottom Action Row: Dismiss Option & Close
+                    // Bottom Action Row: Dismiss Option & Open App Button (replacing Done button)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -908,12 +945,39 @@ fun DetailedMessagePreviewPopupDialog(
                         }
 
                         Button(
-                            onClick = onDismissRequest,
+                            onClick = {
+                                onDismissRequest()
+                                if (onOpenApp != null) {
+                                    onOpenApp()
+                                } else {
+                                    try {
+                                        val launchIntent = context.packageManager.getLaunchIntentForPackage(notification.packageName)
+                                        if (launchIntent != null) {
+                                            launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
+                                            context.startActivity(launchIntent)
+                                        }
+                                    } catch (_: Throwable) {}
+                                }
+                            },
                             shape = RoundedCornerShape(12.dp),
-                            contentPadding = PaddingValues(horizontal = 18.dp, vertical = 6.dp),
-                            modifier = Modifier.testTag("preview_popup_close_button")
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = MaterialTheme.colorScheme.onPrimary
+                            ),
+                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                            modifier = Modifier.testTag("preview_popup_open_app_button")
                         ) {
-                            Text("Done", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                            Icon(
+                                imageVector = Icons.Filled.Launch,
+                                contentDescription = "Open App",
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = if (appLabel.isNotBlank()) "Open $appLabel" else "Open App",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
                         }
                     }
                 }

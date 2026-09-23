@@ -6,6 +6,10 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.drawable.BitmapDrawable
+import android.graphics.drawable.Drawable
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
@@ -166,23 +170,8 @@ class FluxNotificationListenerService : NotificationListenerService() {
                     val richText = extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString()
                         ?: extras.getCharSequence(Notification.EXTRA_TEXT)?.toString()
 
-                    val pictureBitmap: Bitmap? = try {
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                            extras.getParcelable(Notification.EXTRA_PICTURE, Bitmap::class.java)
-                        } else {
-                            @Suppress("DEPRECATION")
-                            extras.getParcelable(Notification.EXTRA_PICTURE) as? Bitmap
-                        } ?: (extras.get(Notification.EXTRA_PICTURE) as? Bitmap)
-                          ?: (extras.get(Notification.EXTRA_LARGE_ICON_BIG) as? Bitmap)
-                    } catch (_: Throwable) {
-                        null
-                    }
-
-                    val senderIcon: Bitmap? = try {
-                        extras.get(Notification.EXTRA_LARGE_ICON) as? Bitmap
-                    } catch (_: Throwable) {
-                        null
-                    }
+                    val pictureBitmap: Bitmap? = extractPictureBitmap(notif, extras)
+                    val senderIcon: Bitmap? = extractAvatarBitmap(notif, extras)
 
                     val myUser = try { android.os.Process.myUserHandle() } catch (_: Throwable) { null }
                     val isSecondary = (myUser != null && sbn.user != null && sbn.user != myUser)
@@ -226,6 +215,183 @@ class FluxNotificationListenerService : NotificationListenerService() {
                 // Safeguard against OS security exceptions
             }
         }
+    }
+
+    private fun extractAvatarBitmap(notif: Notification, extras: Bundle): Bitmap? {
+        // 1. Direct getLargeIcon on Notification (Android M+)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            try {
+                notif.largeIcon?.let { icon ->
+                    extractBitmapFromObject(icon)?.let { return it }
+                }
+            } catch (_: Throwable) {}
+        }
+
+        // 2. EXTRA_LARGE_ICON & EXTRA_LARGE_ICON_BIG
+        try {
+            extras.get(Notification.EXTRA_LARGE_ICON)?.let { obj ->
+                extractBitmapFromObject(obj)?.let { return it }
+            }
+        } catch (_: Throwable) {}
+
+        try {
+            extras.get(Notification.EXTRA_LARGE_ICON_BIG)?.let { obj ->
+                extractBitmapFromObject(obj)?.let { return it }
+            }
+        } catch (_: Throwable) {}
+
+        // 3. Conversation Icon (Android 11+)
+        try {
+            extras.get("android.conversationIcon")?.let { obj ->
+                extractBitmapFromObject(obj)?.let { return it }
+            }
+        } catch (_: Throwable) {}
+
+        // 4. Messaging Person (Android P+)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            try {
+                val person = extras.getParcelable(Notification.EXTRA_MESSAGING_PERSON, android.app.Person::class.java)
+                    ?: extras.get(Notification.EXTRA_MESSAGING_PERSON) as? android.app.Person
+                person?.icon?.let { icon ->
+                    extractBitmapFromObject(icon)?.let { return it }
+                }
+            } catch (_: Throwable) {}
+        }
+
+        // 5. Messages Array in MessagingStyle (check latest message sender avatar)
+        try {
+            val messages = extras.getParcelableArray(Notification.EXTRA_MESSAGES)
+            if (messages != null && messages.isNotEmpty()) {
+                for (i in messages.indices.reversed()) {
+                    val msg = messages[i]
+                    if (msg is Bundle) {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                            val person = msg.getParcelable("sender_person", android.app.Person::class.java)
+                                ?: msg.getParcelable("person", android.app.Person::class.java)
+                            person?.icon?.let { icon ->
+                                extractBitmapFromObject(icon)?.let { return it }
+                            }
+                        }
+                        msg.get("sender_icon")?.let { iconObj ->
+                            extractBitmapFromObject(iconObj)?.let { return it }
+                        }
+                    }
+                }
+            }
+        } catch (_: Throwable) {}
+
+        return null
+    }
+
+    private fun extractPictureBitmap(notif: Notification, extras: Bundle): Bitmap? {
+        // 1. EXTRA_PICTURE
+        try {
+            extras.get(Notification.EXTRA_PICTURE)?.let { obj ->
+                extractBitmapFromObject(obj, maxDimension = 1024)?.let { return it }
+            }
+        } catch (_: Throwable) {}
+
+        // 2. EXTRA_PICTURE_ICON (Android 12+)
+        try {
+            extras.get("android.pictureIcon")?.let { obj ->
+                extractBitmapFromObject(obj, maxDimension = 1024)?.let { return it }
+            }
+        } catch (_: Throwable) {}
+
+        // 3. Background Image URI
+        try {
+            extras.get("android.backgroundImageUri")?.let { obj ->
+                extractBitmapFromObject(obj, maxDimension = 1024)?.let { return it }
+            }
+        } catch (_: Throwable) {}
+
+        // 4. Check MessagingStyle message attachments for images (ignore videos/audio as requested)
+        try {
+            val messages = extras.getParcelableArray(Notification.EXTRA_MESSAGES)
+            if (messages != null && messages.isNotEmpty()) {
+                for (i in messages.indices.reversed()) {
+                    val msg = messages[i]
+                    if (msg is Bundle) {
+                        val mimeType = msg.getString("data_mime_type") ?: msg.getString("type") ?: ""
+                        if (mimeType.startsWith("image/", ignoreCase = true)) {
+                            val uriObj = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                msg.getParcelable("data_uri", Uri::class.java)
+                            } else {
+                                @Suppress("DEPRECATION")
+                                msg.getParcelable("data_uri")
+                            } ?: msg.get("data_uri") ?: msg.get("uri")
+                            if (uriObj != null) {
+                                extractBitmapFromObject(uriObj, maxDimension = 1024)?.let { return it }
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (_: Throwable) {}
+
+        return null
+    }
+
+    private fun extractBitmapFromObject(obj: Any?, maxDimension: Int = 256): Bitmap? {
+        if (obj == null) return null
+        if (obj is Bitmap) {
+            return scaleBitmapIfNeeded(obj, maxDimension)
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && obj is android.graphics.drawable.Icon) {
+            try {
+                val drawable = obj.loadDrawable(this) ?: return null
+                return drawableToBitmap(drawable, maxDimension)
+            } catch (_: Throwable) {}
+        }
+        if (obj is Drawable) {
+            return drawableToBitmap(obj, maxDimension)
+        }
+        if (obj is Uri) {
+            try {
+                contentResolver.openInputStream(obj)?.use { input ->
+                    val bmp = BitmapFactory.decodeStream(input)
+                    return if (bmp != null) scaleBitmapIfNeeded(bmp, maxDimension) else null
+                }
+            } catch (_: Throwable) {}
+        }
+        if (obj is String && (obj.startsWith("content://") || obj.startsWith("file://"))) {
+            try {
+                val uri = Uri.parse(obj)
+                contentResolver.openInputStream(uri)?.use { input ->
+                    val bmp = BitmapFactory.decodeStream(input)
+                    return if (bmp != null) scaleBitmapIfNeeded(bmp, maxDimension) else null
+                }
+            } catch (_: Throwable) {}
+        }
+        return null
+    }
+
+    private fun drawableToBitmap(drawable: Drawable, maxDimension: Int): Bitmap {
+        if (drawable is BitmapDrawable && drawable.bitmap != null) {
+            return scaleBitmapIfNeeded(drawable.bitmap, maxDimension)
+        }
+        val w = if (drawable.intrinsicWidth > 0) drawable.intrinsicWidth.coerceIn(32, maxDimension) else 128
+        val h = if (drawable.intrinsicHeight > 0) drawable.intrinsicHeight.coerceIn(32, maxDimension) else 128
+        val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        val canvas = android.graphics.Canvas(bitmap)
+        drawable.setBounds(0, 0, canvas.width, canvas.height)
+        drawable.draw(canvas)
+        return bitmap
+    }
+
+    private fun scaleBitmapIfNeeded(bitmap: Bitmap, maxDimension: Int): Bitmap {
+        if (bitmap.width <= maxDimension && bitmap.height <= maxDimension) return bitmap
+        val ratio = bitmap.width.toFloat() / bitmap.height.toFloat()
+        val newW: Int
+        val newH: Int
+        if (bitmap.width > bitmap.height) {
+            newW = maxDimension
+            newH = (maxDimension / ratio).toInt().coerceAtLeast(1)
+        } else {
+            newH = maxDimension
+            newW = (maxDimension * ratio).toInt().coerceAtLeast(1)
+        }
+        return Bitmap.createScaledBitmap(bitmap, newW, newH, true)
     }
 
     private fun shouldFilter(sbn: StatusBarNotification): Boolean {

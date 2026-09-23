@@ -685,6 +685,10 @@ fun NiagaraLauncherScreen(
                 onDismissNotificationKey = { key ->
                     viewModel.dismissNotification(app.packageName, key, isDualApp = app.isDualApp)
                 },
+                onOpenApp = {
+                    viewModel.closeAppPopup()
+                    viewModel.launchApp(app)
+                },
                 onDismiss = { viewModel.closeAppPopup() },
                 onToggleFavorite = { viewModel.toggleFavorite(app.packageName) },
                 onToggleHide = { viewModel.toggleHideApp(app.packageName) },

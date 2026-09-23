@@ -386,6 +386,23 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         repository.reloadApps()
     }
 
+    fun launchAppByPackage(packageName: String, isDualApp: Boolean = false) {
+        val targetApp = allApps.value.firstOrNull { it.packageName == packageName && it.isDualApp == isDualApp }
+            ?: allApps.value.firstOrNull { it.packageName == packageName }
+        if (targetApp != null) {
+            launchApp(targetApp)
+        } else {
+            val context = getApplication<Application>()
+            try {
+                val intent = context.packageManager.getLaunchIntentForPackage(packageName)
+                if (intent != null) {
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
+                    context.startActivity(intent)
+                }
+            } catch (_: Throwable) {}
+        }
+    }
+
     private fun executeAppLaunch(app: AppItem) {
         val context = getApplication<Application>()
         try {
