@@ -22,6 +22,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -45,9 +47,23 @@ fun UnifiedSearchSheet(
 ) {
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val focusManager = LocalFocusManager.current
+
+    val handleDismiss = {
+        keyboardController?.hide()
+        focusManager.clearFocus(force = true)
+        onDismiss()
+    }
+
+    val handleAppClick: (AppItem) -> Unit = { app ->
+        keyboardController?.hide()
+        focusManager.clearFocus(force = true)
+        onAppClick(app)
+    }
 
     ModalBottomSheet(
-        onDismissRequest = onDismiss,
+        onDismissRequest = handleDismiss,
         containerColor = Color.Transparent,
         scrimColor = Color.Black.copy(alpha = 0.45f),
         modifier = modifier.testTag("unified_search_sheet")
@@ -87,7 +103,7 @@ fun UnifiedSearchSheet(
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                 keyboardActions = KeyboardActions(onSearch = {
                     if (query.isNotBlank() && filteredApps.isNotEmpty()) {
-                        onAppClick(filteredApps.first())
+                        handleAppClick(filteredApps.first())
                     }
                 }),
                 modifier = Modifier
@@ -202,7 +218,7 @@ fun UnifiedSearchSheet(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(10.dp))
-                            .clickable { onAppClick(app) }
+                            .clickable { handleAppClick(app) }
                             .padding(horizontal = 8.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {

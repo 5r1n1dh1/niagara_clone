@@ -192,8 +192,8 @@ fun CenterHomeScreen(
     onAppClick: (AppItem) -> Unit,
     onAppLongClick: (AppItem) -> Unit,
     onSwipeRightForPopup: ((AppItem) -> Unit)? = null,
-    onReplyNotification: (packageName: String, text: String) -> Unit,
-    onDismissNotification: (packageName: String) -> Unit,
+    onReplyNotification: (packageName: String, text: String, isDualApp: Boolean) -> Unit = { _, _, _ -> },
+    onDismissNotification: (packageName: String, isDualApp: Boolean) -> Unit = { _, _ -> },
     onToggleMediaPlay: () -> Unit,
     onMediaNext: () -> Unit,
     onMediaPrev: () -> Unit,
@@ -370,8 +370,8 @@ fun CenterHomeScreen(
                     compactSpacing = settings.compactAppRowSpacing,
                     onAppClick = { onAppClick(app) },
                     onAppLongClick = { onAppLongClick(app) },
-                    onReplyNotification = { text -> onReplyNotification(app.packageName, text) },
-                    onDismissNotification = { onDismissNotification(app.packageName) }
+                    onReplyNotification = { text -> onReplyNotification(app.packageName, text, app.isDualApp) },
+                    onDismissNotification = { onDismissNotification(app.packageName, app.isDualApp) }
                 )
             }
         }

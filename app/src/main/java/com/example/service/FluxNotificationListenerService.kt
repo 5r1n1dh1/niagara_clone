@@ -186,7 +186,10 @@ class FluxNotificationListenerService : NotificationListenerService() {
 
                     val myUser = try { android.os.Process.myUserHandle() } catch (_: Throwable) { null }
                     val isSecondary = (myUser != null && sbn.user != null && sbn.user != myUser)
-                    val isDual = isSecondary || pkg.contains("dual", true) || pkg.contains("clone", true) || pkg.contains("parallel", true)
+                    val userStr = sbn.user?.toString() ?: ""
+                    val isDual = isSecondary || pkg.contains("dual", true) || pkg.contains("clone", true) ||
+                            pkg.contains("parallel", true) || userStr.contains("95") || userStr.contains("96") ||
+                            userStr.contains("10") || userStr.contains("11")
                     val instanceKey = if (isDual) "$pkg:dual" else pkg
 
                     val item = NotificationItem(
@@ -205,14 +208,13 @@ class FluxNotificationListenerService : NotificationListenerService() {
                         senderIcon = senderIcon
                     )
 
-                    // Store notification mapped by instance key for proper dual app separation
+                    // Store latest notification mapped by unique instance key
                     map[instanceKey] = item
-                    if (!isDual && !map.containsKey(pkg)) {
-                        map[pkg] = item
-                    }
-                    multiMap.getOrPut(instanceKey) { mutableListOf() }.add(item)
-                    if (!isDual) {
-                        multiMap.getOrPut(pkg) { mutableListOf() }.add(item)
+
+                    // Add to multi-notification list for this app instance without duplicates
+                    val notifList = multiMap.getOrPut(instanceKey) { mutableListOf() }
+                    if (notifList.none { it.key == item.key }) {
+                        notifList.add(item)
                     }
                 }
                 _liveNotifications.value = map
@@ -336,11 +338,20 @@ class FluxNotificationListenerService : NotificationListenerService() {
             }
         }
 
-        fun replyToPackage(packageName: String, replyText: String): Boolean {
+        fun replyToPackage(packageName: String, replyText: String, isDualApp: Boolean = false): Boolean {
             val inst = instance ?: return false
             try {
+                val myUser = try { android.os.Process.myUserHandle() } catch (_: Throwable) { null }
                 val sbns = inst.activeNotifications ?: return false
-                val sbn = sbns.firstOrNull { it.packageName == packageName } ?: return false
+                val sbn = sbns.firstOrNull { sbn ->
+                    if (sbn.packageName != packageName) return@firstOrNull false
+                    val userStr = sbn.user?.toString() ?: ""
+                    val sbnIsDual = (myUser != null && sbn.user != null && sbn.user != myUser) ||
+                            packageName.contains("dual", true) || packageName.contains("clone", true) ||
+                            packageName.contains("parallel", true) || userStr.contains("95") || userStr.contains("96") ||
+                            userStr.contains("10") || userStr.contains("11")
+                    sbnIsDual == isDualApp
+                } ?: sbns.firstOrNull { it.packageName == packageName } ?: return false
                 return inst.replyNotificationByKey(sbn.key, replyText)
             } catch (_: Throwable) {
                 return false

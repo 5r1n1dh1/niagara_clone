@@ -40,6 +40,8 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Velocity
@@ -49,6 +51,9 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.data.*
 import com.example.ui.LauncherViewModel
 import com.example.ui.components.*
@@ -192,6 +197,31 @@ fun NiagaraLauncherScreen(
     // Page 2: Right most screen (All Apps with margins & Wave Alphabet)
     val pagerState = rememberPagerState(initialPage = 1, pageCount = { 3 })
     val coroutineScope = rememberCoroutineScope()
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val focusManager = LocalFocusManager.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    // Ensure keyboard is dismissed and focus cleared whenever switching away from All Apps screen
+    LaunchedEffect(pagerState.currentPage) {
+        if (pagerState.currentPage != 2) {
+            keyboardController?.hide()
+            focusManager.clearFocus(force = true)
+        }
+    }
+
+    // Dismiss keyboard when launcher resumes from opened external app or when paused
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME || event == Lifecycle.Event.ON_PAUSE) {
+                keyboardController?.hide()
+                focusManager.clearFocus(force = true)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
 
     val notificationSwipeDownConnection = remember(settings.swipeDownForNotificationCenter) {
         object : NestedScrollConnection {
@@ -363,10 +393,18 @@ fun NiagaraLauncherScreen(
                         weather = weather,
                         mediaPlayer = mediaPlayer,
                         calendarEvents = calendarEvents,
-                        onAppClick = { viewModel.launchApp(it) },
-                        onAppLongClick = { viewModel.openAppPopup(it) },
-                        onReplyNotification = { pkg, text -> viewModel.replyToNotification(pkg, text) },
-                        onDismissNotification = { pkg -> viewModel.dismissNotification(pkg) },
+                        onAppClick = {
+                            keyboardController?.hide()
+                            focusManager.clearFocus(force = true)
+                            viewModel.launchApp(it)
+                        },
+                        onAppLongClick = {
+                            keyboardController?.hide()
+                            focusManager.clearFocus(force = true)
+                            viewModel.openAppPopup(it)
+                        },
+                        onReplyNotification = { pkg, text, isDualApp -> viewModel.replyToNotification(pkg, text, isDualApp = isDualApp) },
+                        onDismissNotification = { pkg, isDualApp -> viewModel.dismissNotification(pkg, isDualApp = isDualApp) },
                         onToggleMediaPlay = { viewModel.toggleMediaPlayPause() },
                         onMediaNext = { viewModel.skipMediaNext() },
                         onMediaPrev = { viewModel.skipMediaPrev() },
@@ -375,8 +413,14 @@ fun NiagaraLauncherScreen(
                         onOpenWeather = { viewModel.launchIntegration(com.example.util.IntegrationCategory.WEATHER) },
                         onOpenCalendar = { viewModel.launchIntegration(com.example.util.IntegrationCategory.CALENDAR) },
                         onOpenCarouselCustomize = { viewModel.openCarouselCustomize() },
-                        onOpenSettings = { viewModel.openSettings() },
+                        onOpenSettings = {
+                            keyboardController?.hide()
+                            focusManager.clearFocus(force = true)
+                            viewModel.openSettings()
+                        },
                         onNavigateToAllApps = {
+                            keyboardController?.hide()
+                            focusManager.clearFocus(force = true)
                             coroutineScope.launch { pagerState.animateScrollToPage(2) }
                         }
                     )
@@ -390,12 +434,24 @@ fun NiagaraLauncherScreen(
                         settings = settings,
                         selectedWaveLetter = waveSelectedLetter,
                         onWaveLetterSelected = { viewModel.setWaveSelectedLetter(it) },
-                        onAppClick = { viewModel.launchApp(it) },
-                        onAppLongClick = { viewModel.openAppPopup(it) },
-                        onReplyNotification = { pkg, text -> viewModel.replyToNotification(pkg, text) },
-                        onDismissNotification = { pkg -> viewModel.dismissNotification(pkg) },
+                        onAppClick = {
+                            keyboardController?.hide()
+                            focusManager.clearFocus(force = true)
+                            viewModel.launchApp(it)
+                        },
+                        onAppLongClick = {
+                            keyboardController?.hide()
+                            focusManager.clearFocus(force = true)
+                            viewModel.openAppPopup(it)
+                        },
+                        onReplyNotification = { pkg, text, isDualApp -> viewModel.replyToNotification(pkg, text, isDualApp = isDualApp) },
+                        onDismissNotification = { pkg, isDualApp -> viewModel.dismissNotification(pkg, isDualApp = isDualApp) },
                         onToggleFolderExpanded = { folderId -> viewModel.repository.toggleFolderExpanded(folderId) },
-                        onOpenSettings = { viewModel.openSettings() }
+                        onOpenSettings = {
+                            keyboardController?.hide()
+                            focusManager.clearFocus(force = true)
+                            viewModel.openSettings()
+                        }
                     )
                 }
             }

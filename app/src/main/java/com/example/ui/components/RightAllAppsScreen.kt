@@ -7,6 +7,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
@@ -21,9 +23,11 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.*
@@ -64,8 +68,8 @@ fun RightAllAppsScreen(
     onAppClick: (AppItem) -> Unit,
     onAppLongClick: (AppItem) -> Unit,
     onSwipeRightForPopup: ((AppItem) -> Unit)? = null,
-    onReplyNotification: (packageName: String, text: String) -> Unit,
-    onDismissNotification: (packageName: String) -> Unit,
+    onReplyNotification: (packageName: String, text: String, isDualApp: Boolean) -> Unit = { _, _, _ -> },
+    onDismissNotification: (packageName: String, isDualApp: Boolean) -> Unit = { _, _ -> },
     onToggleFolderExpanded: (String) -> Unit,
     onOpenSettings: () -> Unit = {},
     modifier: Modifier = Modifier
@@ -73,10 +77,18 @@ fun RightAllAppsScreen(
     val listState = rememberLazyListState()
     val isLeftHanded = settings.leftHandedMode
     val focusRequester = remember { FocusRequester() }
+    val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
 
     var filterText by remember { mutableStateOf("") }
     var isSearchFocused by remember { mutableStateOf(false) }
+
+    val handleAppClick: (AppItem) -> Unit = { app ->
+        keyboardController?.hide()
+        focusManager.clearFocus(force = true)
+        filterText = ""
+        onAppClick(app)
+    }
 
     val imeInsets = WindowInsets.ime
     val density = LocalDensity.current
@@ -215,6 +227,17 @@ fun RightAllAppsScreen(
                             onValueChange = { filterText = it },
                             placeholder = { Text("Search apps or categories...", fontSize = 13.sp) },
                             singleLine = true,
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                            keyboardActions = KeyboardActions(
+                                onSearch = {
+                                    keyboardController?.hide()
+                                    focusManager.clearFocus(force = true)
+                                    val firstMatch = displayAppsList.firstOrNull()
+                                    if (firstMatch != null) {
+                                        handleAppClick(firstMatch)
+                                    }
+                                }
+                            ),
                             colors = TextFieldDefaults.colors(
                                 focusedContainerColor = Color.Transparent,
                                 unfocusedContainerColor = Color.Transparent,
@@ -231,6 +254,7 @@ fun RightAllAppsScreen(
                                 onClick = {
                                     filterText = ""
                                     keyboardController?.hide()
+                                    focusManager.clearFocus(force = true)
                                 },
                                 modifier = Modifier.size(24.dp)
                             ) {
@@ -241,7 +265,11 @@ fun RightAllAppsScreen(
                         Spacer(modifier = Modifier.width(4.dp))
 
                         IconButton(
-                            onClick = onOpenSettings,
+                            onClick = {
+                                keyboardController?.hide()
+                                focusManager.clearFocus(force = true)
+                                onOpenSettings()
+                            },
                             modifier = Modifier
                                 .size(28.dp)
                                 .testTag("all_apps_settings_button")
@@ -344,10 +372,14 @@ fun RightAllAppsScreen(
                                                         iconScale = settings.appIconScale,
                                                         showBadges = settings.showAppNotificationBadges,
                                                         compactSpacing = settings.compactAppRowSpacing,
-                                                        onAppClick = { onAppClick(app) },
-                                                        onAppLongClick = { onAppLongClick(app) },
-                                                        onReplyNotification = { text -> onReplyNotification(app.packageName, text) },
-                                                        onDismissNotification = { onDismissNotification(app.packageName) }
+                                                        onAppClick = { handleAppClick(app) },
+                                                        onAppLongClick = {
+                                                            keyboardController?.hide()
+                                                            focusManager.clearFocus(force = true)
+                                                            onAppLongClick(app)
+                                                        },
+                                                        onReplyNotification = { text -> onReplyNotification(app.packageName, text, app.isDualApp) },
+                                                        onDismissNotification = { onDismissNotification(app.packageName, app.isDualApp) }
                                                     )
                                                 }
                                             }
@@ -365,8 +397,12 @@ fun RightAllAppsScreen(
                                         isLeftHanded = isLeftHanded,
                                         fontScale = settings.fontScale,
                                         onToggleExpand = { onToggleFolderExpanded(folder.id) },
-                                        onAppClick = onAppClick,
-                                        onAppLongClick = onAppLongClick,
+                                        onAppClick = handleAppClick,
+                                        onAppLongClick = {
+                                            keyboardController?.hide()
+                                            focusManager.clearFocus(force = true)
+                                            onAppLongClick(it)
+                                        },
                                         onSwipeRightForPopup = onSwipeRightForPopup
                                     )
                                     Spacer(modifier = Modifier.height(6.dp))
@@ -393,10 +429,14 @@ fun RightAllAppsScreen(
                                         iconScale = settings.appIconScale,
                                         showBadges = settings.showAppNotificationBadges,
                                         compactSpacing = settings.compactAppRowSpacing,
-                                        onAppClick = { onAppClick(app) },
-                                        onAppLongClick = { onAppLongClick(app) },
-                                        onReplyNotification = { text -> onReplyNotification(app.packageName, text) },
-                                        onDismissNotification = { onDismissNotification(app.packageName) }
+                                        onAppClick = { handleAppClick(app) },
+                                        onAppLongClick = {
+                                            keyboardController?.hide()
+                                            focusManager.clearFocus(force = true)
+                                            onAppLongClick(app)
+                                        },
+                                        onReplyNotification = { text -> onReplyNotification(app.packageName, text, app.isDualApp) },
+                                        onDismissNotification = { onDismissNotification(app.packageName, app.isDualApp) }
                                     )
                                 }
                             }
@@ -411,8 +451,14 @@ fun RightAllAppsScreen(
                         WaveAlphabet(
                             isLeftHanded = isLeftHanded,
                             selectedLetter = selectedWaveLetter,
-                            onLetterSelected = onWaveLetterSelected,
+                            onLetterSelected = { letter ->
+                                keyboardController?.hide()
+                                focusManager.clearFocus(force = true)
+                                onWaveLetterSelected(letter)
+                            },
                             onLetterConfirmed = { letter ->
+                                keyboardController?.hide()
+                                focusManager.clearFocus(force = true)
                                 val targetChar = if (letter == '★') {
                                     displayAppsList.firstOrNull()?.label?.firstOrNull()?.uppercaseChar()
                                 } else {

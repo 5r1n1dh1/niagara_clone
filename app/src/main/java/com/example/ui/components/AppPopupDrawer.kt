@@ -134,74 +134,16 @@ fun AppPopupDrawer(
         detectAppCategory(app.packageName, app.label)
     }
 
-    // Consolidated list of notifications for this app
-    val effectiveNotifications = remember(notifications, notification, category, app.packageName) {
+    // Consolidated list of notifications for this app, deduplicated
+    val effectiveNotifications = remember(notifications, notification, app.packageName, app.isDualApp) {
+        val list = mutableListOf<NotificationItem>()
         if (notifications.isNotEmpty()) {
-            notifications
-        } else if (notification != null) {
-            listOf(notification)
-        } else if (category == AppCategoryType.MESSAGING) {
-            // Provide rich demo messaging threads if no active live notifications are detected
-            listOf(
-                NotificationItem(
-                    id = "${app.packageName}_demo_1",
-                    packageName = app.packageName,
-                    sender = "Alice Walker",
-                    message = "Hey! Are we still meeting for coffee at **Blue Bottle** at <b>2:30 PM</b>? ☕ Let me know if you need directions!",
-                    timeAgo = "5m ago",
-                    canReply = true,
-                    key = "${app.packageName}_demo_1",
-                    subText = "Project Team",
-                    richText = "Hey! Are we still meeting for coffee at **Blue Bottle** at <b>2:30 PM</b>? ☕\n\n• Please check the attached notes\n• *Don't forget the presentation deck!*"
-                ),
-                NotificationItem(
-                    id = "${app.packageName}_demo_2",
-                    packageName = app.packageName,
-                    sender = "David Miller",
-                    message = "Here is the updated design link: [Figma Design](https://figma.com). Code reviews look <code>ready for merge</code>! 👍",
-                    timeAgo = "18m ago",
-                    canReply = true,
-                    key = "${app.packageName}_demo_2",
-                    subText = "Design Guild",
-                    richText = "Here is the updated design link: [Figma Design](https://figma.com).\nCode reviews look <code>ready for merge</code>! Let me know when you test it. 🚀"
-                ),
-                NotificationItem(
-                    id = "${app.packageName}_demo_3",
-                    packageName = app.packageName,
-                    sender = "Sarah Connor",
-                    message = "<b>Important:</b> Server maintenance scheduled tonight at <u>11:00 PM EST</u>.",
-                    timeAgo = "1h ago",
-                    canReply = true,
-                    key = "${app.packageName}_demo_3",
-                    subText = "DevOps Alerts",
-                    richText = "<b>Important Announcement:</b>\nServer maintenance scheduled tonight at <u>11:00 PM EST</u>.\nExpected downtime: <i>15 minutes</i>."
-                ),
-                NotificationItem(
-                    id = "${app.packageName}_demo_4",
-                    packageName = app.packageName,
-                    sender = "Elena Rostova",
-                    message = "Thanks for the quick fix! 🌟 See you tomorrow at the <b>9:00 AM</b> standup.",
-                    timeAgo = "2h ago",
-                    canReply = true,
-                    key = "${app.packageName}_demo_4",
-                    subText = "Frontend Squad",
-                    richText = "Thanks for the quick fix! 🌟\nSee you tomorrow at the <b>9:00 AM</b> standup."
-                ),
-                NotificationItem(
-                    id = "${app.packageName}_demo_5",
-                    packageName = app.packageName,
-                    sender = "Marcus Vance",
-                    message = "New deployment to production: `v2.4.0-stable` 🚀 All tests passed successfully!",
-                    timeAgo = "3h ago",
-                    canReply = true,
-                    key = "${app.packageName}_demo_5",
-                    subText = "Release Bot",
-                    richText = "New deployment to production: `v2.4.0-stable` 🚀\nAll tests passed successfully!"
-                )
-            )
-        } else {
-            emptyList()
+            list.addAll(notifications)
         }
+        if (notification != null && list.none { it.key == notification.key || (it.sender == notification.sender && it.message == notification.message) }) {
+            list.add(notification)
+        }
+        list.distinctBy { it.key }
     }
 
     // Active selected chat head for detailed message preview popup window

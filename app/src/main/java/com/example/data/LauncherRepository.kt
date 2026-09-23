@@ -101,10 +101,18 @@ class LauncherRepository(private val context: Context) {
                 val currentApps = _allApps.value
                 if (currentApps.isNotEmpty()) {
                     val updated = currentApps.map { app ->
-                        val notif = liveMap[app.packageName]
+                        val notif = liveMap[app.instanceKey] ?: if (!app.isDualApp) liveMap[app.packageName] else null
                         if (app.notification != notif) app.copy(notification = notif) else app
                     }
                     _allApps.value = updated
+                }
+                val currentFavs = _favorites.value
+                if (currentFavs.isNotEmpty()) {
+                    val updatedFavs = currentFavs.map { app ->
+                        val notif = liveMap[app.instanceKey] ?: if (!app.isDualApp) liveMap[app.packageName] else null
+                        if (app.notification != notif) app.copy(notification = notif) else app
+                    }
+                    _favorites.value = updatedFavs
                 }
             }
         }
@@ -885,7 +893,7 @@ class LauncherRepository(private val context: Context) {
             if (key != null) {
                 com.example.service.FluxNotificationListenerService.instance?.replyNotificationByKey(key, replyText)
             } else {
-                com.example.service.FluxNotificationListenerService.replyToPackage(packageName, replyText)
+                com.example.service.FluxNotificationListenerService.replyToPackage(packageName, replyText, isDualApp)
             }
         } catch (_: Throwable) {}
         val instanceKey = if (isDualApp) "$packageName:dual" else packageName
