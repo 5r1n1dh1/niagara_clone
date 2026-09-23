@@ -39,6 +39,8 @@ fun Carousel4x2WidgetCard(
     calendarEvents: List<CalendarEvent>,
     isHeadphonesConnected: Boolean,
     showSeconds: Boolean = false,
+    clockColorTintHex: String = "#FFFFFF",
+    clockScale: Float = 1.0f,
     onToggleMediaPlay: () -> Unit,
     onMediaNext: () -> Unit,
     onMediaPrev: () -> Unit,
@@ -70,6 +72,8 @@ fun Carousel4x2WidgetCard(
                         weather = weather,
                         event = calendarEvents.firstOrNull(),
                         showSeconds = showSeconds,
+                        clockColorTintHex = clockColorTintHex,
+                        clockScale = clockScale,
                         onOpenWeather = onOpenWeather,
                         onOpenCalendar = onOpenCalendar,
                         onOpenSettings = onOpenSettings
@@ -691,6 +695,8 @@ private fun Clock4x2Widget(
     weather: WeatherInfo,
     event: CalendarEvent?,
     showSeconds: Boolean = false,
+    clockColorTintHex: String = "#FFFFFF",
+    clockScale: Float = 1.0f,
     onOpenWeather: () -> Unit,
     onOpenCalendar: () -> Unit,
     onOpenSettings: () -> Unit
@@ -712,6 +718,14 @@ private fun Clock4x2Widget(
     val secondsFormat = remember { SimpleDateFormat("ss", Locale.getDefault()) }
     val dateFormat = remember { SimpleDateFormat("EEEE, MMMM d", Locale.getDefault()) }
 
+    val accentTint = remember(clockColorTintHex) {
+        try {
+            Color(android.graphics.Color.parseColor(clockColorTintHex))
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     Column(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.SpaceBetween
@@ -726,19 +740,19 @@ private fun Clock4x2Widget(
             ) {
                 Text(
                     text = timeFormat.format(currentTime.time),
-                    fontSize = 44.sp,
+                    fontSize = (44 * clockScale).sp,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = (-1.5).sp,
-                    lineHeight = 44.sp,
-                    color = MaterialTheme.colorScheme.onSurface
+                    lineHeight = (44 * clockScale).sp,
+                    color = accentTint ?: MaterialTheme.colorScheme.onSurface
                 )
                 if (showSeconds) {
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = secondsFormat.format(currentTime.time),
-                        fontSize = 17.sp,
+                        fontSize = (17 * clockScale).sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.primary,
+                        color = accentTint ?: MaterialTheme.colorScheme.primary,
                         modifier = Modifier.padding(bottom = 6.dp)
                     )
                 }
@@ -760,7 +774,7 @@ private fun Clock4x2Widget(
                         text = "${weather.temperatureCelsius}°C",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
+                        color = accentTint ?: MaterialTheme.colorScheme.primary
                     )
                 }
             }
@@ -774,9 +788,9 @@ private fun Clock4x2Widget(
         ) {
             Text(
                 text = dateFormat.format(currentTime.time),
-                fontSize = 14.sp,
+                fontSize = (14 * clockScale).sp,
                 fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.primary
+                color = accentTint ?: MaterialTheme.colorScheme.primary
             )
             Spacer(modifier = Modifier.height(2.dp))
             if (event != null) {
@@ -784,7 +798,7 @@ private fun Clock4x2Widget(
                     Icon(
                         imageVector = Icons.Filled.Event,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.secondary,
+                        tint = accentTint ?: MaterialTheme.colorScheme.secondary,
                         modifier = Modifier.size(12.dp)
                     )
                     Spacer(modifier = Modifier.width(4.dp))

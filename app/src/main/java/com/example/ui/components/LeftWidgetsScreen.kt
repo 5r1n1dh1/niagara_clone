@@ -181,77 +181,26 @@ fun LeftWidgetsScreen(
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 itemsIndexed(widgets, key = { _, w -> w.id }) { index, item ->
-                    val dismissState = rememberSwipeToDismissBoxState(
-                        confirmValueChange = { dismissValue ->
-                            when (dismissValue) {
-                                SwipeToDismissBoxValue.EndToStart -> {
-                                    onDeleteWidget(item.id)
-                                    true
-                                }
-                                SwipeToDismissBoxValue.StartToEnd -> {
-                                    val nextSize = when (item.heightCategory) {
-                                        "4x1" -> "4x2"
-                                        "4x2" -> "4x3"
-                                        "4x3" -> "4x4"
-                                        else -> "4x1"
-                                    }
-                                    onUpdateWidgetSize(item.id, nextSize)
-                                    false
-                                }
-                                SwipeToDismissBoxValue.Settled -> false
-                            }
-                        }
+                    LeftWidgetCardWrapper(
+                        widget = item,
+                        index = index,
+                        totalCount = widgets.size,
+                        isEditMode = isEditMode,
+                        weather = weather,
+                        mediaPlayer = mediaPlayer,
+                        calendarEvents = calendarEvents,
+                        isHeadphonesConnected = isHeadphonesConnected,
+                        onDelete = { onDeleteWidget(item.id) },
+                        onMoveUp = { onReorderWidget(index, index - 1) },
+                        onMoveDown = { onReorderWidget(index, index + 1) },
+                        onEditNote = { onEditNoteClick(item) },
+                        onToggleMediaPlay = onToggleMediaPlay,
+                        onMediaNext = onMediaNext,
+                        onMediaPrev = onMediaPrev,
+                        onToggleHeadphones = onToggleHeadphones,
+                        onRefreshWeather = onRefreshWeather,
+                        onUpdateSize = { newSize -> onUpdateWidgetSize(item.id, newSize) }
                     )
-
-                    SwipeToDismissBox(
-                        state = dismissState,
-                        backgroundContent = {
-                            val color = when (dismissState.dismissDirection) {
-                                SwipeToDismissBoxValue.EndToStart -> MaterialTheme.colorScheme.errorContainer
-                                SwipeToDismissBoxValue.StartToEnd -> MaterialTheme.colorScheme.primaryContainer
-                                else -> androidx.compose.ui.graphics.Color.Transparent
-                            }
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .clip(RoundedCornerShape(20.dp))
-                                    .background(color)
-                                    .padding(horizontal = 20.dp),
-                                contentAlignment = if (dismissState.dismissDirection == SwipeToDismissBoxValue.StartToEnd) Alignment.CenterStart else Alignment.CenterEnd
-                            ) {
-                                if (dismissState.dismissDirection == SwipeToDismissBoxValue.EndToStart) {
-                                    Icon(Icons.Filled.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.onErrorContainer)
-                                } else if (dismissState.dismissDirection == SwipeToDismissBoxValue.StartToEnd) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(Icons.Filled.AspectRatio, contentDescription = "Resize", tint = MaterialTheme.colorScheme.onPrimaryContainer)
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text("Cycle Size", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                                    }
-                                }
-                            }
-                        }
-                    ) {
-                        LeftWidgetCardWrapper(
-                            widget = item,
-                            index = index,
-                            totalCount = widgets.size,
-                            isEditMode = isEditMode,
-                            weather = weather,
-                            mediaPlayer = mediaPlayer,
-                            calendarEvents = calendarEvents,
-                            isHeadphonesConnected = isHeadphonesConnected,
-                            onDelete = { onDeleteWidget(item.id) },
-                            onMoveUp = { onReorderWidget(index, index - 1) },
-                            onMoveDown = { onReorderWidget(index, index + 1) },
-                            onEditNote = { onEditNoteClick(item) },
-                            onToggleMediaPlay = onToggleMediaPlay,
-                            onMediaNext = onMediaNext,
-                            onMediaPrev = onMediaPrev,
-                            onToggleHeadphones = onToggleHeadphones,
-                            onRefreshWeather = onRefreshWeather,
-                            onUpdateSize = { newSize -> onUpdateWidgetSize(item.id, newSize) }
-                        )
-                    }
                 }
             }
         }
@@ -746,18 +695,52 @@ private fun QuickNoteWidgetBody(content: String, onEdit: () -> Unit) {
 
 @Composable
 private fun SystemTogglesWidgetBody(isHeadphones: Boolean, onToggleHeadphones: () -> Unit) {
-    var isWifiOn by remember { mutableStateOf(true) }
-    var isBluetoothOn by remember { mutableStateOf(true) }
-    var isFlashlightOn by remember { mutableStateOf(false) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val controlsState by com.example.util.DeviceControlsManager.controlsState.collectAsState()
 
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        ToggleItemPill(icon = Icons.Filled.Wifi, label = "Wi-Fi", isActive = isWifiOn) { isWifiOn = !isWifiOn }
-        ToggleItemPill(icon = Icons.Filled.Bluetooth, label = "Bluetooth", isActive = isBluetoothOn) { isBluetoothOn = !isBluetoothOn }
-        ToggleItemPill(icon = Icons.Filled.Headphones, label = "Headset", isActive = isHeadphones, onClick = onToggleHeadphones)
-        ToggleItemPill(icon = Icons.Filled.FlashlightOn, label = "Torch", isActive = isFlashlightOn) { isFlashlightOn = !isFlashlightOn }
+        ToggleItemPill(
+            icon = Icons.Filled.Wifi,
+            label = if (controlsState.isWifiOn) "Wi-Fi On" else "Wi-Fi",
+            isActive = controlsState.isWifiOn
+        ) {
+            com.example.util.DeviceControlsManager.openWifiSettings(context)
+        }
+
+        ToggleItemPill(
+            icon = Icons.Filled.Bluetooth,
+            label = if (controlsState.isBluetoothOn) "BT On" else "Bluetooth",
+            isActive = controlsState.isBluetoothOn
+        ) {
+            com.example.util.DeviceControlsManager.openBluetoothSettings(context)
+        }
+
+        ToggleItemPill(
+            icon = if (controlsState.isTorchOn) Icons.Filled.FlashlightOn else Icons.Filled.FlashlightOff,
+            label = if (controlsState.isTorchOn) "Torch On" else "Torch",
+            isActive = controlsState.isTorchOn
+        ) {
+            com.example.util.DeviceControlsManager.toggleTorch(context)
+        }
+
+        ToggleItemPill(
+            icon = when (controlsState.ringerMode) {
+                android.media.AudioManager.RINGER_MODE_SILENT -> Icons.Filled.VolumeOff
+                android.media.AudioManager.RINGER_MODE_VIBRATE -> Icons.Filled.Vibration
+                else -> Icons.Filled.VolumeUp
+            },
+            label = when (controlsState.ringerMode) {
+                android.media.AudioManager.RINGER_MODE_SILENT -> "Silent"
+                android.media.AudioManager.RINGER_MODE_VIBRATE -> "Vibrate"
+                else -> "Sound"
+            },
+            isActive = controlsState.ringerMode != android.media.AudioManager.RINGER_MODE_SILENT
+        ) {
+            com.example.util.DeviceControlsManager.toggleRingerMode(context)
+        }
     }
 }
 

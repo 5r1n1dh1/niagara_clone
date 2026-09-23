@@ -40,12 +40,24 @@ fun ClockHeader(
     upcomingEvent: CalendarEvent?,
     fontScale: Float,
     isLeftHanded: Boolean,
+    clockColorTintHex: String = "#FFFFFF",
+    clockScale: Float = 1.0f,
     onClockClick: () -> Unit,
     onDateClick: () -> Unit,
     onWeatherClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var currentTime by remember { mutableStateOf(Calendar.getInstance()) }
+
+    val accentColor = remember(clockColorTintHex) {
+        try {
+            Color(android.graphics.Color.parseColor(clockColorTintHex))
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    val totalScale = fontScale * clockScale
 
     LaunchedEffect(showSeconds) {
         while (true) {
@@ -95,17 +107,17 @@ fun ClockHeader(
                     ) {
                         Text(
                             text = timeString,
-                            fontSize = (46 * fontScale).sp,
+                            fontSize = (46 * totalScale).sp,
                             fontWeight = FontWeight.Light,
-                            color = MaterialTheme.colorScheme.onBackground,
+                            color = accentColor ?: MaterialTheme.colorScheme.onBackground,
                             letterSpacing = (-1).sp
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = amPmString,
-                            fontSize = (16 * fontScale).sp,
+                            fontSize = (16 * totalScale).sp,
                             fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.primary,
+                            color = accentColor ?: MaterialTheme.colorScheme.primary,
                             modifier = Modifier.padding(bottom = 6.dp)
                         )
                     }
@@ -114,9 +126,9 @@ fun ClockHeader(
                 ClockStyle.BOLD_MODERN -> {
                     Text(
                         text = timeString,
-                        fontSize = (54 * fontScale).sp,
+                        fontSize = (54 * totalScale).sp,
                         fontWeight = FontWeight.Black,
-                        color = MaterialTheme.colorScheme.onBackground,
+                        color = accentColor ?: MaterialTheme.colorScheme.onBackground,
                         letterSpacing = (-2).sp
                     )
                 }
@@ -127,18 +139,18 @@ fun ClockHeader(
                     }
                     Text(
                         text = wordTime,
-                        fontSize = (26 * fontScale).sp,
+                        fontSize = (26 * totalScale).sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onBackground,
-                        lineHeight = 32.sp
+                        color = accentColor ?: MaterialTheme.colorScheme.onBackground,
+                        lineHeight = (32 * totalScale).sp
                     )
                 }
 
                 ClockStyle.ANALOG -> {
                     AnalogClockCanvas(
                         calendar = currentTime,
-                        primaryColor = MaterialTheme.colorScheme.primary,
-                        textColor = MaterialTheme.colorScheme.onBackground,
+                        primaryColor = accentColor ?: MaterialTheme.colorScheme.primary,
+                        textColor = accentColor ?: MaterialTheme.colorScheme.onBackground,
                         showSeconds = showSeconds
                     )
                 }
@@ -153,17 +165,17 @@ fun ClockHeader(
                     ) {
                         Text(
                             text = timeString,
-                            fontSize = (24 * fontScale).sp,
+                            fontSize = (24 * totalScale).sp,
                             fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.95f),
+                            color = accentColor ?: MaterialTheme.colorScheme.onBackground.copy(alpha = 0.95f),
                             letterSpacing = 0.5.sp
                         )
                         Spacer(modifier = Modifier.width(12.dp))
                         Text(
                             text = "${weather.temperatureCelsius}°C",
-                            fontSize = (20 * fontScale).sp,
+                            fontSize = (20 * totalScale).sp,
                             fontWeight = FontWeight.Normal,
-                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.85f),
+                            color = accentColor ?: MaterialTheme.colorScheme.onBackground.copy(alpha = 0.85f),
                             modifier = Modifier
                                 .clip(RoundedCornerShape(6.dp))
                                 .clickable(onClick = onWeatherClick)
@@ -171,7 +183,7 @@ fun ClockHeader(
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = "🌧️",
-                            fontSize = (18 * fontScale).sp,
+                            fontSize = (18 * totalScale).sp,
                             modifier = Modifier
                                 .clip(RoundedCornerShape(6.dp))
                                 .clickable(onClick = onWeatherClick)
@@ -183,15 +195,15 @@ fun ClockHeader(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
                             text = timeString,
-                            fontSize = (28 * fontScale).sp,
+                            fontSize = (28 * totalScale).sp,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onBackground
+                            color = accentColor ?: MaterialTheme.colorScheme.onBackground
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = "• $dateString",
-                            fontSize = (14 * fontScale).sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            fontSize = (14 * totalScale).sp,
+                            color = accentColor ?: MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }

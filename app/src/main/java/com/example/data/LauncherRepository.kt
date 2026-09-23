@@ -85,6 +85,7 @@ class LauncherRepository(private val context: Context) {
     init {
         com.example.util.SystemWidgetManager.init(context)
         observeLiveNotifications()
+        registerPackageListeners()
         loadAvailableSystemWidgets()
         loadLeftWidgets()
         loadCarouselWidgets()
@@ -92,6 +93,53 @@ class LauncherRepository(private val context: Context) {
         loadFolders()
         refreshCalendarEvents()
         reloadApps()
+    }
+
+    private fun registerPackageListeners() {
+        try {
+            val launcherApps = context.getSystemService(Context.LAUNCHER_APPS_SERVICE) as? LauncherApps
+            launcherApps?.registerCallback(object : LauncherApps.Callback() {
+                override fun onPackageAdded(packageName: String, user: android.os.UserHandle) {
+                    reloadApps()
+                }
+
+                override fun onPackageChanged(packageName: String, user: android.os.UserHandle) {
+                    reloadApps()
+                }
+
+                override fun onPackageRemoved(packageName: String, user: android.os.UserHandle) {
+                    reloadApps()
+                }
+
+                override fun onPackagesAvailable(packageNames: Array<out String>, user: android.os.UserHandle, replacing: Boolean) {
+                    reloadApps()
+                }
+
+                override fun onPackagesUnavailable(packageNames: Array<out String>, user: android.os.UserHandle, replacing: Boolean) {
+                    reloadApps()
+                }
+            })
+        } catch (_: Throwable) {}
+
+        try {
+            val packageFilter = android.content.IntentFilter().apply {
+                addAction(Intent.ACTION_PACKAGE_ADDED)
+                addAction(Intent.ACTION_PACKAGE_REMOVED)
+                addAction(Intent.ACTION_PACKAGE_REPLACED)
+                addAction(Intent.ACTION_PACKAGE_CHANGED)
+                addDataScheme("package")
+            }
+            val receiver = object : android.content.BroadcastReceiver() {
+                override fun onReceive(context: Context?, intent: Intent?) {
+                    reloadApps()
+                }
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                context.registerReceiver(receiver, packageFilter, Context.RECEIVER_EXPORTED)
+            } else {
+                context.registerReceiver(receiver, packageFilter)
+            }
+        } catch (_: Throwable) {}
     }
 
     private fun observeLiveNotifications() {

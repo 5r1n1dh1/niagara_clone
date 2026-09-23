@@ -162,32 +162,7 @@ fun DigitalWellbeing4x1Widget(
     }
 
     val onWidgetClick = {
-        if (!hasUsagePermission) {
-            try {
-                val intent = Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS).apply {
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-                context.startActivity(intent)
-            } catch (_: Exception) {
-                onOpenSettings()
-            }
-        } else {
-            try {
-                val intent = Intent("com.google.android.apps.wellbeing.action.SHOW_DASHBOARD").apply {
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-                context.startActivity(intent)
-            } catch (_: Exception) {
-                try {
-                    val intent = Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS).apply {
-                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    }
-                    context.startActivity(intent)
-                } catch (_: Exception) {
-                    onOpenSettings()
-                }
-            }
-        }
+        com.example.util.DeviceControlsManager.openDigitalWellbeing(context)
     }
 
     // 4x1 Digital Wellbeing Widget without container, no padding/margin

@@ -241,4 +241,71 @@ object DeviceControlsManager {
             } catch (_: Throwable) {}
         }
     }
+
+    fun openDigitalWellbeing(context: Context) {
+        val intents = listOf(
+            // 1. Google Pixel / AOSP Digital Wellbeing TopLevelSettingsActivity
+            Intent(Intent.ACTION_MAIN).apply {
+                component = android.content.ComponentName("com.google.android.apps.wellbeing", "com.google.android.apps.wellbeing.home.TopLevelSettingsActivity")
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            },
+            // 2. Google Digital Wellbeing action WELLBEING
+            Intent("com.google.android.apps.wellbeing.action.WELLBEING").apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            },
+            // 3. Google Digital Wellbeing action SHOW_DASHBOARD
+            Intent("com.google.android.apps.wellbeing.action.SHOW_DASHBOARD").apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            },
+            // 4. Samsung Digital Wellbeing
+            Intent().apply {
+                component = android.content.ComponentName("com.samsung.android.forest", "com.samsung.android.forest.home.ui.MainActivity")
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            },
+            // 5. Xiaomi / HyperOS Screen Time
+            Intent().apply {
+                component = android.content.ComponentName("com.miui.securitycenter", "com.miui.powercenter.digitalwellbeing.DigitalWellbeingActivity")
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            },
+            // 6. Generic Settings Digital Wellbeing
+            Intent("android.settings.DIGITAL_WELLBEING").apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+        )
+
+        for (intent in intents) {
+            try {
+                if (intent.resolveActivity(context.packageManager) != null) {
+                    context.startActivity(intent)
+                    return
+                }
+            } catch (_: Throwable) {}
+        }
+
+        // Try direct launch by package name
+        try {
+            val launchIntent = context.packageManager.getLaunchIntentForPackage("com.google.android.apps.wellbeing")
+                ?: context.packageManager.getLaunchIntentForPackage("com.samsung.android.forest")
+            if (launchIntent != null) {
+                launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                context.startActivity(launchIntent)
+                return
+            }
+        } catch (_: Throwable) {}
+
+        // Fallback: Usage Access or Settings
+        try {
+            val intent = Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+        } catch (_: Throwable) {
+            try {
+                val intent = Intent(Settings.ACTION_SETTINGS).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(intent)
+            } catch (_: Throwable) {}
+        }
+    }
 }

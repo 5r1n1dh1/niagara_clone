@@ -4,17 +4,11 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.*
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
 import com.example.data.LauncherRepository
-import com.example.ui.components.SettingsContent
+import com.example.ui.components.SettingsStudioSheet
 import com.example.ui.theme.NiagaraTheme
 import com.example.util.WidgetIntegrationsManager
 
@@ -33,49 +27,39 @@ class SettingsActivity : ComponentActivity() {
         setContent {
             val settings by repository.settings.collectAsState()
             val allApps by repository.allApps.collectAsState()
+            val dockPackageNames by repository.dockPackageNames.collectAsState()
+            val userCategories by repository.userCategories.collectAsState()
+
+            val dockApps = remember(dockPackageNames, allApps) {
+                dockPackageNames.mapNotNull { pkg -> allApps.find { it.packageName == pkg } }
+            }
 
             NiagaraTheme(
                 preset = settings.themePreset,
                 fontFamily = settings.customFont
             ) {
-                Scaffold(
-                    topBar = {
-                        @OptIn(ExperimentalMaterial3Api::class)
-                        TopAppBar(
-                            title = { Text("Flux Launcher Settings") },
-                            navigationIcon = {
-                                IconButton(onClick = { finish() }) {
-                                    Icon(
-                                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                        contentDescription = "Back"
-                                    )
-                                }
-                            },
-                            colors = TopAppBarDefaults.topAppBarColors(
-                                containerColor = MaterialTheme.colorScheme.background
-                            )
-                        )
-                    }
-                ) { innerPadding ->
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(MaterialTheme.colorScheme.background)
-                            .padding(innerPadding)
-                    ) {
-                        SettingsContent(
-                            settings = settings,
-                            allApps = allApps,
-                            widgetIntegrations = widgetIntegrations,
-                            onUpdateSettings = { repository.updateSettings(it) },
-                            onExportBackup = { repository.exportBackupJson() },
-                            onImportBackup = { repository.importBackupJson(it) },
-                            onResetDefaults = { repository.resetToDefaults() },
-                            onClose = { finish() },
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    }
-                }
+                SettingsStudioSheet(
+                    settings = settings,
+                    allApps = allApps,
+                    dockApps = dockApps,
+                    widgetIntegrations = widgetIntegrations,
+                    onUpdateSettings = { repository.updateSettings(it) },
+                    onSelectDockSlot = null,
+                    onClearDockSlot = { slot -> repository.clearDockSlot(slot) },
+                    onResetDockDefaults = { repository.resetDockToDefaults() },
+                    onExportBackup = { repository.exportBackupJson() },
+                    onImportBackup = { repository.importBackupJson(it) },
+                    onResetDefaults = { repository.resetToDefaults() },
+                    onOpenSetupGuide = {},
+                    onOpenSystemWidgetPicker = {},
+                    userCategories = userCategories,
+                    onAddCategory = { repository.addUserCategory(it) },
+                    onRenameCategory = { old, new -> repository.updateUserCategoryName(old, new) },
+                    onRemoveCategory = { repository.removeUserCategory(it) },
+                    onAssignCategory = { pkg, cat -> repository.setAppCategory(pkg, cat) },
+                    onDismiss = { finish() },
+                    modifier = Modifier.fillMaxSize()
+                )
             }
         }
     }

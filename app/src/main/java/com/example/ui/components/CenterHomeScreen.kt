@@ -89,25 +89,7 @@ fun UsageDetailsWidgetCard(
             .fillMaxWidth()
             .height(68.dp)
             .clickable {
-                if (!hasUsagePermission) {
-                    try {
-                        val intent = android.content.Intent(android.provider.Settings.ACTION_USAGE_ACCESS_SETTINGS).apply {
-                            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                        }
-                        context.startActivity(intent)
-                    } catch (_: Exception) {
-                        onOpenSettings()
-                    }
-                } else {
-                    try {
-                        val intent = android.content.Intent("com.google.android.apps.wellbeing.action.SHOW_DASHBOARD").apply {
-                            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                        }
-                        context.startActivity(intent)
-                    } catch (_: Exception) {
-                        onOpenSettings()
-                    }
-                }
+                com.example.util.DeviceControlsManager.openDigitalWellbeing(context)
             }
             .testTag("usage_details_widget_card")
     ) {
@@ -260,6 +242,8 @@ fun CenterHomeScreen(
                             calendarEvents = calendarEvents,
                             isHeadphonesConnected = settings.isHeadphonesConnected,
                             showSeconds = settings.showSeconds,
+                            clockColorTintHex = settings.clockColorTintHex,
+                            clockScale = settings.clockScale,
                             onToggleMediaPlay = onToggleMediaPlay,
                             onMediaNext = onMediaNext,
                             onMediaPrev = onMediaPrev,
