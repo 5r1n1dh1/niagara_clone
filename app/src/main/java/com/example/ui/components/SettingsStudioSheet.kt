@@ -34,6 +34,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.*
@@ -89,11 +90,17 @@ fun SettingsStudioSheet(
     settings: LauncherSettings,
     allApps: List<AppItem> = emptyList(),
     dockApps: List<AppItem> = emptyList(),
+    carouselWidgets: List<WidgetType> = emptyList(),
+    availableWidgets: List<WidgetType> = emptyList(),
     widgetIntegrations: WidgetIntegrationsManager? = null,
     onUpdateSettings: (LauncherSettings) -> Unit,
     onSelectDockSlot: ((Int) -> Unit)? = null,
     onClearDockSlot: ((Int) -> Unit)? = null,
     onResetDockDefaults: (() -> Unit)? = null,
+    onAddCarouselWidget: ((WidgetType) -> Unit)? = null,
+    onRemoveCarouselWidget: ((WidgetType) -> Unit)? = null,
+    onReorderCarouselWidget: ((Int, Int) -> Unit)? = null,
+    onOpenAddSystemWidget: (() -> Unit)? = null,
     onExportBackup: () -> String,
     onImportBackup: (String) -> Boolean,
     onResetDefaults: () -> Unit,
@@ -368,7 +375,13 @@ fun SettingsStudioSheet(
                     SettingsPage.CLOCK_WIDGETS -> {
                         ClockWidgetsSettingsPage(
                             settings = settings,
-                            onUpdateSettings = onUpdateSettings
+                            carouselWidgets = carouselWidgets,
+                            availableWidgets = availableWidgets,
+                            onUpdateSettings = onUpdateSettings,
+                            onAddCarouselWidget = onAddCarouselWidget,
+                            onRemoveCarouselWidget = onRemoveCarouselWidget,
+                            onReorderCarouselWidget = onReorderCarouselWidget,
+                            onOpenAddSystemWidget = onOpenAddSystemWidget
                         )
                     }
 
@@ -1488,7 +1501,13 @@ private fun GesturesSettingsPage(
 @Composable
 private fun ClockWidgetsSettingsPage(
     settings: LauncherSettings,
-    onUpdateSettings: (LauncherSettings) -> Unit
+    carouselWidgets: List<WidgetType> = emptyList(),
+    availableWidgets: List<WidgetType> = emptyList(),
+    onUpdateSettings: (LauncherSettings) -> Unit,
+    onAddCarouselWidget: ((WidgetType) -> Unit)? = null,
+    onRemoveCarouselWidget: ((WidgetType) -> Unit)? = null,
+    onReorderCarouselWidget: ((Int, Int) -> Unit)? = null,
+    onOpenAddSystemWidget: (() -> Unit)? = null
 ) {
     var customHexInput by remember(settings.clockColorTintHex) { mutableStateOf(settings.clockColorTintHex) }
 
@@ -1509,6 +1528,7 @@ private fun ClockWidgetsSettingsPage(
         contentPadding = PaddingValues(top = 12.dp, bottom = 32.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        // 1. Clock Widget Customization Card
         item {
             SettingsCard(title = "Clock Widget Customization") {
                 Text(
@@ -1668,6 +1688,163 @@ private fun ClockWidgetsSettingsPage(
                     subtitle = "Display day of week and month below clock time",
                     checked = settings.showDate,
                     onCheckedChange = { onUpdateSettings(settings.copy(showDate = it)) }
+                )
+            }
+        }
+
+        // 2. Favourites Screen Widget Carousel Customization Card
+        item {
+            SettingsCard(title = "Favourites Screen Widget Carousel") {
+                Text(
+                    text = "Active Carousel Cards (${carouselWidgets.size + 1}/6)",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    text = "The clock is fixed as first card. Swipe left/right on home screen to view your active cards.",
+                    fontSize = 11.5.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Fixed Card #1: Clock
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.5f),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("🕒", fontSize = 20.sp)
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("1. Clock & Date", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            Text("Fixed home card #1", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            modifier = Modifier.padding(horizontal = 4.dp)
+                        ) {
+                            Text(
+                                "Fixed",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                // Dynamic Carousel Widgets
+                carouselWidgets.forEachIndexed { index, widgetType ->
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surface,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 3.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(widgetType.iconEmoji, fontSize = 20.sp)
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "${index + 2}. ${widgetType.displayName}",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Text(
+                                    text = widgetType.description,
+                                    fontSize = 10.5.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+
+                            // Reorder Up
+                            IconButton(
+                                onClick = { onReorderCarouselWidget?.invoke(index, index - 1) },
+                                enabled = index > 0,
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "Move Up", modifier = Modifier.size(18.dp))
+                            }
+
+                            // Reorder Down
+                            IconButton(
+                                onClick = { onReorderCarouselWidget?.invoke(index, index + 1) },
+                                enabled = index < carouselWidgets.size - 1,
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "Move Down", modifier = Modifier.size(18.dp))
+                            }
+
+                            // Remove
+                            IconButton(
+                                onClick = { onRemoveCarouselWidget?.invoke(widgetType) },
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(Icons.Filled.Close, contentDescription = "Remove", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
+                            }
+                        }
+                    }
+                }
+
+                // Add More Carousel Widgets
+                val availableToAdd = remember(carouselWidgets, availableWidgets) {
+                    val fullList = if (availableWidgets.isNotEmpty()) availableWidgets else WidgetType.entries.filter { it != WidgetType.CLOCK }
+                    fullList.filter { it !in carouselWidgets }
+                }
+
+                if (availableToAdd.isNotEmpty() && carouselWidgets.size < 5) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = "Add to Carousel",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    LazyRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        items(availableToAdd) { toAdd ->
+                            FilledTonalButton(
+                                onClick = { onAddCarouselWidget?.invoke(toAdd) },
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                                modifier = Modifier.height(36.dp)
+                            ) {
+                                Text("${toAdd.iconEmoji} ${toAdd.displayName}", fontSize = 11.5.sp)
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(14.dp))
+                            }
+                        }
+                    }
+                }
+
+                HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp))
+
+                // Auto-surfacing option
+                SettingsToggleRow(
+                    title = "Auto-Surfacing Music Widget",
+                    subtitle = "Automatically prioritize YouTube Music / media player card when active playback starts",
+                    checked = settings.audioAppAutoSurfacing,
+                    onCheckedChange = { onUpdateSettings(settings.copy(audioAppAutoSurfacing = it)) }
                 )
             }
         }

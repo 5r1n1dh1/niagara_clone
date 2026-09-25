@@ -241,6 +241,7 @@ fun YouTubeMusicFluxWidget(
     modifier: Modifier = Modifier,
     size: String = "4x2", // "4x2", "4x3", "4x4"
     isHeadphonesOverride: Boolean = false,
+    isEmbeddedInCard: Boolean = false,
     onTogglePlay: () -> Unit,
     onNext: () -> Unit,
     onPrev: () -> Unit,
@@ -269,25 +270,7 @@ fun YouTubeMusicFluxWidget(
         openAudioOutputSettings(context)
     }
 
-    // Frosted Minimalist Glass Card Container
-    Surface(
-        shape = RoundedCornerShape(24.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.40f),
-        border = BorderStroke(
-            1.dp,
-            Brush.verticalGradient(
-                colors = listOf(
-                    MaterialTheme.colorScheme.primary.copy(alpha = 0.28f),
-                    MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.12f)
-                )
-            )
-        ),
-        tonalElevation = 2.dp,
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(24.dp))
-            .testTag("youtube_music_flux_widget_$size")
-    ) {
+    val widgetContent = @Composable {
         if (!isInstalled) {
             YouTubeMusicNotInstalledCard(
                 onInstallClick = {
@@ -305,16 +288,9 @@ fun YouTubeMusicFluxWidget(
                         context.startActivity(webIntent)
                     }
                 },
-                modifier = Modifier.padding(16.dp)
+                modifier = Modifier.padding(10.dp)
             )
-            return@Surface
-        }
-
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(14.dp)
-        ) {
+        } else {
             when (size) {
                 "4x3" -> {
                     YouTubeMusicLayout4x3(
@@ -361,6 +337,44 @@ fun YouTubeMusicFluxWidget(
             }
         }
     }
+
+    if (isEmbeddedInCard) {
+        Box(
+            modifier = modifier
+                .fillMaxWidth()
+                .testTag("youtube_music_flux_widget_$size")
+        ) {
+            widgetContent()
+        }
+    } else {
+        // Standalone Frosted Minimalist Glass Card Container
+        Surface(
+            shape = RoundedCornerShape(24.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.40f),
+            border = BorderStroke(
+                1.dp,
+                Brush.verticalGradient(
+                    colors = listOf(
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.28f),
+                        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.12f)
+                    )
+                )
+            ),
+            tonalElevation = 2.dp,
+            modifier = modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(24.dp))
+                .testTag("youtube_music_flux_widget_$size")
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(10.dp)
+            ) {
+                widgetContent()
+            }
+        }
+    }
 }
 
 /**
@@ -381,7 +395,7 @@ private fun YouTubeMusicLayout4x2(
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
         // Top Row: Album Art + Track Info + Optional Output Selector
         Row(
@@ -391,16 +405,16 @@ private fun YouTubeMusicLayout4x2(
             YouTubeMusicAlbumArt(
                 bitmap = media.albumArtBitmap,
                 isPlaying = media.isPlaying,
-                size = 54.dp,
+                size = 40.dp,
                 onClick = onOpenApp
             )
 
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(8.dp))
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = media.trackTitle.ifBlank { "YouTube Music" },
-                    fontSize = 14.sp,
+                    fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
@@ -408,7 +422,7 @@ private fun YouTubeMusicLayout4x2(
                 )
                 Text(
                     text = media.artistName.ifBlank { "Tap to play music" },
-                    fontSize = 12.sp,
+                    fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -432,9 +446,11 @@ private fun YouTubeMusicLayout4x2(
             onSeek = onSeek
         )
 
-        // Bottom Row: Icon-Only Media Controls
+        // Bottom Row: Icon-Only Media Controls (with fully accessible touch area)
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 1.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -443,6 +459,8 @@ private fun YouTubeMusicLayout4x2(
                 icon = Icons.Filled.Shuffle,
                 contentDescription = "Shuffle",
                 isActive = media.isShuffleEnabled,
+                size = 36.dp,
+                iconSize = 18.dp,
                 onClick = onToggleShuffle
             )
 
@@ -450,12 +468,16 @@ private fun YouTubeMusicLayout4x2(
             IconControlButton(
                 icon = Icons.Filled.SkipPrevious,
                 contentDescription = "Previous Track",
+                size = 38.dp,
+                iconSize = 22.dp,
                 onClick = onPrev
             )
 
             // Play / Pause Button (Icon only with smooth animated morph)
             PlayPausePillButton(
                 isPlaying = media.isPlaying,
+                size = 42.dp,
+                iconSize = 22.dp,
                 onClick = onTogglePlay
             )
 
@@ -463,6 +485,8 @@ private fun YouTubeMusicLayout4x2(
             IconControlButton(
                 icon = Icons.Filled.SkipNext,
                 contentDescription = "Next Track",
+                size = 38.dp,
+                iconSize = 22.dp,
                 onClick = onNext
             )
 
@@ -470,6 +494,8 @@ private fun YouTubeMusicLayout4x2(
             IconControlButton(
                 icon = Icons.AutoMirrored.Filled.QueueMusic,
                 contentDescription = "YouTube Music Library",
+                size = 36.dp,
+                iconSize = 18.dp,
                 onClick = onOpenLibrary
             )
         }
@@ -813,7 +839,18 @@ private fun MaterialYouSeekbar(
     var isDragging by remember { mutableStateOf(false) }
     var dragFraction by remember { mutableFloatStateOf(progress) }
 
+    LaunchedEffect(progress) {
+        if (!isDragging) {
+            dragFraction = progress
+        }
+    }
+
     val currentFraction = if (isDragging) dragFraction else progress
+    val animatedProgress by animateFloatAsState(
+        targetValue = currentFraction,
+        animationSpec = if (isDragging) snap() else tween(durationMillis = 300, easing = LinearEasing),
+        label = "seekbar_smooth_progress"
+    )
 
     Column(modifier = Modifier.fillMaxWidth()) {
         Box(
@@ -846,7 +883,7 @@ private fun MaterialYouSeekbar(
             // Active Progress Track
             Box(
                 modifier = Modifier
-                    .fillMaxWidth(currentFraction.coerceIn(0.01f, 1f))
+                    .fillMaxWidth(animatedProgress.coerceIn(0.01f, 1f))
                     .height(5.dp)
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.primary)
@@ -855,7 +892,7 @@ private fun MaterialYouSeekbar(
             // Scrubber Thumb
             Box(
                 modifier = Modifier
-                    .fillMaxWidth(currentFraction.coerceIn(0.02f, 0.98f))
+                    .fillMaxWidth(animatedProgress.coerceIn(0.02f, 0.98f))
                     .wrapContentWidth(Alignment.End)
                     .size(if (isDragging) 14.dp else 10.dp)
                     .clip(CircleShape)

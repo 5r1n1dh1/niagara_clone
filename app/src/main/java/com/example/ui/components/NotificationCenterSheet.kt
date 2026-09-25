@@ -39,6 +39,9 @@ import java.util.*
 @Composable
 fun NotificationCenterSheet(
     notifications: Map<String, NotificationItem>,
+    blurRadius: Float = 15f,
+    translucency: Float = 0.30f,
+    glassEffect: Float = 0.30f,
     onDismissNotification: (String) -> Unit,
     onReplyNotification: (packageName: String, text: String) -> Unit,
     onClearAll: () -> Unit,
@@ -73,9 +76,9 @@ fun NotificationCenterSheet(
     ) {
         FrostedGlassPanel(
             cornerRadius = 28.dp,
-            blurRadius = 22.dp,
-            translucency = 0.35f,
-            glassEffect = 0.35f,
+            blurRadius = blurRadius.dp,
+            translucency = translucency,
+            glassEffect = glassEffect,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 12.dp)
@@ -135,9 +138,11 @@ fun NotificationCenterSheet(
             }
 
             // Quick Settings Tiles Grid
-            Surface(
-                shape = RoundedCornerShape(18.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+            FrostedGlassPanel(
+                cornerRadius = 18.dp,
+                blurRadius = blurRadius.dp,
+                translucency = translucency,
+                glassEffect = glassEffect,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(12.dp)) {
@@ -297,7 +302,8 @@ fun NotificationCenterSheet(
                     items(notifications.values.toList(), key = { "${it.instanceKey}_${it.id}_${it.key}" }) { notif ->
                         Surface(
                             shape = RoundedCornerShape(14.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = (translucency * 0.9f).coerceIn(0.20f, 0.50f)),
+                            border = androidx.compose.foundation.BorderStroke(0.5.dp, Color.White.copy(alpha = 0.15f)),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Column(modifier = Modifier.padding(12.dp)) {
@@ -453,7 +459,8 @@ private fun QuickTileItem(
 ) {
     Surface(
         shape = RoundedCornerShape(12.dp),
-        color = if (isActive) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+        color = if (isActive) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface.copy(alpha = 0.55f),
+        border = if (isActive) null else androidx.compose.foundation.BorderStroke(0.5.dp, Color.White.copy(alpha = 0.20f)),
         modifier = Modifier
             .width(100.dp)
             .clip(RoundedCornerShape(12.dp))

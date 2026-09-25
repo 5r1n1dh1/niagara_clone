@@ -2,6 +2,7 @@ package com.example.ui.components
 
 import android.content.Intent
 import android.provider.Settings
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -25,6 +26,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
@@ -38,13 +40,14 @@ import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Intelligent empty space gesture handler that seamlessly and reliably handles:
- * - Downward swipe/fling to open Notification Center
+ * - Downward swipe/fling to open Notification Center (only when enabled and on empty space)
  * - Long press on actual empty space to open Home Screen Quick Customization menu
  */
 fun Modifier.emptySpaceGestureHandler(
+    isSwipeDownEnabled: Boolean = true,
     onSwipeDown: () -> Unit,
     onLongPress: () -> Unit
-): Modifier = pointerInput(Unit) {
+): Modifier = pointerInput(isSwipeDownEnabled) {
     awaitEachGesture {
         val down = awaitFirstDown(requireUnconsumed = true)
         var totalDy = 0f
@@ -79,7 +82,7 @@ fun Modifier.emptySpaceGestureHandler(
             totalDy += drag.y
 
             if (!isDownSwipeTriggered && !isLongPressTriggered) {
-                if (totalDy > 30f && totalDy > kotlin.math.abs(totalDx) * 1.15f) {
+                if (isSwipeDownEnabled && totalDy > 30f && totalDy > kotlin.math.abs(totalDx) * 1.15f) {
                     isDownSwipeTriggered = true
                     change.consume()
                     onSwipeDown()
@@ -238,6 +241,8 @@ fun CenterHomeScreen(
     weather: WeatherInfo,
     mediaPlayer: MediaPlaybackState,
     calendarEvents: List<CalendarEvent>,
+    appWidgetHost: android.appwidget.AppWidgetHost? = null,
+    appWidgetManager: android.appwidget.AppWidgetManager? = null,
     onAppClick: (AppItem) -> Unit,
     onAppLongClick: (AppItem) -> Unit,
     onSwipeRightForPopup: ((AppItem) -> Unit)? = null,
@@ -252,6 +257,7 @@ fun CenterHomeScreen(
     onOpenWeather: () -> Unit,
     onOpenCalendar: () -> Unit,
     onOpenCarouselCustomize: () -> Unit,
+    onAddSystemWidget: () -> Unit = {},
     onOpenSettings: () -> Unit,
     onNavigateToAllApps: () -> Unit,
     modifier: Modifier = Modifier
@@ -290,6 +296,17 @@ fun CenterHomeScreen(
     ) {
         val topOffset = settings.favoritesTopSpacing.heightDp.dp
 
+        // Background handler for empty margins / untouched space in Favourites screen
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .emptySpaceGestureHandler(
+                    isSwipeDownEnabled = settings.swipeDownForNotificationCenter,
+                    onSwipeDown = onSwipeDownForNotification,
+                    onLongPress = { showHomeEmptySpaceOptions = true }
+                )
+        )
+
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(bottom = 120.dp)
@@ -301,6 +318,7 @@ fun CenterHomeScreen(
                         .fillMaxWidth()
                         .height(topOffset)
                         .emptySpaceGestureHandler(
+                            isSwipeDownEnabled = settings.swipeDownForNotificationCenter,
                             onSwipeDown = onSwipeDownForNotification,
                             onLongPress = { showHomeEmptySpaceOptions = true }
                         )
@@ -350,6 +368,11 @@ fun CenterHomeScreen(
                                 showSeconds = settings.showSeconds,
                                 clockColorTintHex = settings.clockColorTintHex,
                                 clockScale = settings.clockScale,
+                                blurRadius = settings.frostedBlurRadius,
+                                translucency = settings.frostedTranslucency,
+                                glassEffect = settings.frostedGlassEffect,
+                                appWidgetHost = appWidgetHost,
+                                appWidgetManager = appWidgetManager,
                                 onToggleMediaPlay = onToggleMediaPlay,
                                 onMediaNext = onMediaNext,
                                 onMediaPrev = onMediaPrev,
@@ -478,8 +501,9 @@ fun CenterHomeScreen(
                 Spacer(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(140.dp)
+                        .height(240.dp)
                         .emptySpaceGestureHandler(
+                            isSwipeDownEnabled = settings.swipeDownForNotificationCenter,
                             onSwipeDown = onSwipeDownForNotification,
                             onLongPress = { showHomeEmptySpaceOptions = true }
                         )
@@ -487,149 +511,277 @@ fun CenterHomeScreen(
             }
         }
 
-        // Long Press Empty Space Bottom Sheet
+        // Long Press Empty Space Frosted Glass Bottom Sheet
         if (showHomeEmptySpaceOptions) {
             ModalBottomSheet(
                 onDismissRequest = { showHomeEmptySpaceOptions = false },
-                containerColor = MaterialTheme.colorScheme.surface,
-                tonalElevation = 8.dp,
-                shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-                dragHandle = {
-                    Box(
-                        modifier = Modifier
-                            .padding(vertical = 12.dp)
-                            .size(width = 36.dp, height = 4.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
-                    )
-                }
+                containerColor = Color.Transparent,
+                scrimColor = Color.Black.copy(alpha = 0.55f),
+                tonalElevation = 0.dp,
+                shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+                dragHandle = null
             ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 24.dp)
-                        .padding(bottom = 36.dp)
+                FrostedGlassPanel(
+                    cornerRadius = 28.dp,
+                    blurRadius = settings.frostedBlurRadius.dp,
+                    translucency = settings.frostedTranslucency,
+                    glassEffect = settings.frostedGlassEffect,
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text(
-                        text = "Home Screen",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = "Quick options & customizations",
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(bottom = 16.dp)
-                    )
-
-                    Surface(
-                        shape = RoundedCornerShape(16.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(16.dp))
-                            .clickable {
-                                showHomeEmptySpaceOptions = false
-                                onOpenSettings()
-                            }
+                            .padding(horizontal = 20.dp)
+                            .padding(top = 16.dp, bottom = 36.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Row(
+                        // Drag indicator
+                        Box(
                             modifier = Modifier
-                                .padding(16.dp)
-                                .fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.primaryContainer),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.Settings,
-                                    contentDescription = "Flux Launcher Settings",
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(16.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Flux Launcher Settings",
-                                    fontSize = 15.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Text(
-                                    text = "Customize icons, themes, widgets & gestures",
-                                    fontSize = 12.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                                modifier = Modifier.size(16.dp)
+                                .align(Alignment.CenterHorizontally)
+                                .size(width = 40.dp, height = 4.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
+                        )
+
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        Column(modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)) {
+                            Text(
+                                text = "Home Screen Customization",
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "Quick widgets, launcher settings & wallpaper",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                    }
 
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    Surface(
-                        shape = RoundedCornerShape(16.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(16.dp))
-                            .clickable {
-                                showHomeEmptySpaceOptions = false
-                                openSystemWallpaperPicker()
-                            }
-                    ) {
-                        Row(
+                        // 1. Customize Carousel
+                        Surface(
+                            shape = RoundedCornerShape(16.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = settings.frostedTranslucency),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f)),
                             modifier = Modifier
-                                .padding(16.dp)
-                                .fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(16.dp))
+                                .clickable {
+                                    showHomeEmptySpaceOptions = false
+                                    onOpenCarouselCustomize()
+                                }
                         ) {
-                            Box(
+                            Row(
                                 modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.secondaryContainer),
-                                contentAlignment = Alignment.Center
+                                    .padding(14.dp)
+                                    .fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.primaryContainer),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.ViewCarousel,
+                                        contentDescription = "Customize Carousel",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(14.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "Customize Widget Carousel",
+                                        fontSize = 14.5.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = "Manage & reorder home screen widgets (${displayWidgets.size}/5 active)",
+                                        fontSize = 11.5.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                                 Icon(
-                                    imageVector = Icons.Outlined.Wallpaper,
-                                    contentDescription = "Change System Wallpaper",
-                                    tint = MaterialTheme.colorScheme.secondary,
-                                    modifier = Modifier.size(20.dp)
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                    modifier = Modifier.size(15.dp)
                                 )
                             }
-                            Spacer(modifier = Modifier.width(16.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Change System Wallpaper",
-                                    fontSize = 15.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Text(
-                                    text = "Open device wallpaper settings & picker",
-                                    fontSize = 12.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                        }
+
+                        // 2. Add System Widget
+                        Surface(
+                            shape = RoundedCornerShape(16.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = settings.frostedTranslucency),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(16.dp))
+                                .clickable {
+                                    showHomeEmptySpaceOptions = false
+                                    onAddSystemWidget()
+                                }
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .padding(14.dp)
+                                    .fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.tertiaryContainer),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Extension,
+                                        contentDescription = "Add System Widget",
+                                        tint = MaterialTheme.colorScheme.tertiary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(14.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "Add System App Widget",
+                                        fontSize = 14.5.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = "Place widgets from any installed Android app",
+                                        fontSize = 11.5.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                    modifier = Modifier.size(15.dp)
                                 )
                             }
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                                modifier = Modifier.size(16.dp)
-                            )
+                        }
+
+                        // 3. Flux Launcher Settings
+                        Surface(
+                            shape = RoundedCornerShape(16.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = settings.frostedTranslucency),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(16.dp))
+                                .clickable {
+                                    showHomeEmptySpaceOptions = false
+                                    onOpenSettings()
+                                }
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .padding(14.dp)
+                                    .fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.secondaryContainer),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.Settings,
+                                        contentDescription = "Flux Launcher Settings",
+                                        tint = MaterialTheme.colorScheme.secondary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(14.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "Flux Launcher Settings",
+                                        fontSize = 14.5.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = "Customize icons, themes, fonts, gestures & dock",
+                                        fontSize = 11.5.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                    modifier = Modifier.size(15.dp)
+                                )
+                            }
+                        }
+
+                        // 4. Change Wallpaper
+                        Surface(
+                            shape = RoundedCornerShape(16.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = settings.frostedTranslucency),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(16.dp))
+                                .clickable {
+                                    showHomeEmptySpaceOptions = false
+                                    openSystemWallpaperPicker()
+                                }
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .padding(14.dp)
+                                    .fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.Wallpaper,
+                                        contentDescription = "Change System Wallpaper",
+                                        tint = MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(14.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "Change System Wallpaper",
+                                        fontSize = 14.5.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = "Open device wallpaper settings & picker",
+                                        fontSize = 11.5.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                    modifier = Modifier.size(15.dp)
+                                )
+                            }
                         }
                     }
                 }

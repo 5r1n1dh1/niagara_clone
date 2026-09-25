@@ -344,6 +344,7 @@ class LauncherRepository(private val context: Context) {
         return when (type) {
             WidgetType.MEDIA_PLAYER -> com.example.ui.components.isYouTubeMusicInstalled(context)
             WidgetType.WEATHER_FORECAST -> true
+            WidgetType.SYSTEM_WIDGET -> true
             WidgetType.NEWS_FEED -> true
             WidgetType.QUICK_NOTE -> true
             WidgetType.CLOCK -> true
@@ -960,59 +961,33 @@ class LauncherRepository(private val context: Context) {
 
     fun togglePlayPauseMedia() {
         val currentlyPlaying = _mediaPlayer.value.isPlaying
-        val keycode = if (currentlyPlaying) android.view.KeyEvent.KEYCODE_MEDIA_PAUSE else android.view.KeyEvent.KEYCODE_MEDIA_PLAY
-        val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? android.media.AudioManager
-        try {
-            val downEvent = android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, keycode)
-            val upEvent = android.view.KeyEvent(android.view.KeyEvent.ACTION_UP, keycode)
-            audioManager?.dispatchMediaKeyEvent(downEvent)
-            audioManager?.dispatchMediaKeyEvent(upEvent)
-        } catch (_: Exception) {}
-
-        val newPlayingState = !currentlyPlaying
-        val musicPkg = widgetIntegrations.getPackage(IntegrationCategory.MUSIC)
-        val appLabel = if (musicPkg != null) {
+        val handled = com.example.service.FluxNotificationListenerService.sendMediaControl("toggle_play")
+        if (!handled) {
+            val keycode = if (currentlyPlaying) android.view.KeyEvent.KEYCODE_MEDIA_PAUSE else android.view.KeyEvent.KEYCODE_MEDIA_PLAY
+            val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? android.media.AudioManager
             try {
-                val pm = context.packageManager
-                val appInfo = pm.getApplicationInfo(musicPkg, PackageManager.GET_META_DATA)
-                pm.getApplicationLabel(appInfo).toString()
-            } catch (_: Exception) {
-                _mediaPlayer.value.appName
-            }
-        } else {
-            _mediaPlayer.value.appName
+                val downEvent = android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, keycode)
+                val upEvent = android.view.KeyEvent(android.view.KeyEvent.ACTION_UP, keycode)
+                audioManager?.dispatchMediaKeyEvent(downEvent)
+                audioManager?.dispatchMediaKeyEvent(upEvent)
+            } catch (_: Exception) {}
         }
-
         _mediaPlayer.value = _mediaPlayer.value.copy(
-            isPlaying = newPlayingState,
-            appName = appLabel
+            isPlaying = !currentlyPlaying
         )
     }
 
     fun skipNextMedia() {
-        val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? android.media.AudioManager
-        try {
-            val downEvent = android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_MEDIA_NEXT)
-            val upEvent = android.view.KeyEvent(android.view.KeyEvent.ACTION_UP, android.view.KeyEvent.KEYCODE_MEDIA_NEXT)
-            audioManager?.dispatchMediaKeyEvent(downEvent)
-            audioManager?.dispatchMediaKeyEvent(upEvent)
-        } catch (_: Exception) {}
-
-        val musicPkg = widgetIntegrations.getPackage(IntegrationCategory.MUSIC)
-        val currentApp = if (musicPkg != null) {
-            widgetIntegrations.getAppLabel(IntegrationCategory.MUSIC, context.packageManager)
-        } else {
-            com.example.ui.components.getYouTubeMusicAppLabel(context)
+        val handled = com.example.service.FluxNotificationListenerService.sendMediaControl("next")
+        if (!handled) {
+            val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? android.media.AudioManager
+            try {
+                val downEvent = android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_MEDIA_NEXT)
+                val upEvent = android.view.KeyEvent(android.view.KeyEvent.ACTION_UP, android.view.KeyEvent.KEYCODE_MEDIA_NEXT)
+                audioManager?.dispatchMediaKeyEvent(downEvent)
+                audioManager?.dispatchMediaKeyEvent(upEvent)
+            } catch (_: Exception) {}
         }
-
-        val tracks = listOf(
-            MediaPlaybackState(true, "Midnight City", "M83", currentApp, 0.35f, "4:03", "1:25"),
-            MediaPlaybackState(true, "Starboy", "The Weeknd, Daft Punk", currentApp, 0.12f, "3:50", "0:27"),
-            MediaPlaybackState(true, "Solar Power", "Lorde", currentApp, 0.65f, "3:12", "2:04"),
-            MediaPlaybackState(true, "Resonance", "HOME", currentApp, 0.80f, "3:32", "2:49")
-        )
-        val next = tracks.random()
-        _mediaPlayer.value = next
     }
 
     fun syncMusicIntegration() {
@@ -1037,40 +1012,40 @@ class LauncherRepository(private val context: Context) {
     }
 
     fun skipPreviousMedia() {
-        val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? android.media.AudioManager
-        try {
-            val downEvent = android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_MEDIA_PREVIOUS)
-            val upEvent = android.view.KeyEvent(android.view.KeyEvent.ACTION_UP, android.view.KeyEvent.KEYCODE_MEDIA_PREVIOUS)
-            audioManager?.dispatchMediaKeyEvent(downEvent)
-            audioManager?.dispatchMediaKeyEvent(upEvent)
-        } catch (_: Exception) {}
-
-        val musicPkg = widgetIntegrations.getPackage(IntegrationCategory.MUSIC)
-        val currentApp = if (musicPkg != null) {
-            widgetIntegrations.getAppLabel(IntegrationCategory.MUSIC, context.packageManager)
-        } else {
-            com.example.ui.components.getYouTubeMusicAppLabel(context)
+        val handled = com.example.service.FluxNotificationListenerService.sendMediaControl("prev")
+        if (!handled) {
+            val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? android.media.AudioManager
+            try {
+                val downEvent = android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_MEDIA_PREVIOUS)
+                val upEvent = android.view.KeyEvent(android.view.KeyEvent.ACTION_UP, android.view.KeyEvent.KEYCODE_MEDIA_PREVIOUS)
+                audioManager?.dispatchMediaKeyEvent(downEvent)
+                audioManager?.dispatchMediaKeyEvent(upEvent)
+            } catch (_: Exception) {}
         }
-        val tracks = listOf(
-            MediaPlaybackState(true, "Resonance", "HOME", currentApp, 0.10f, "3:32", "0:21", isShuffleEnabled = _mediaPlayer.value.isShuffleEnabled),
-            MediaPlaybackState(true, "Solar Power", "Lorde", currentApp, 0.05f, "3:12", "0:10", isShuffleEnabled = _mediaPlayer.value.isShuffleEnabled),
-            MediaPlaybackState(true, "Starboy", "The Weeknd, Daft Punk", currentApp, 0.08f, "3:50", "0:18", isShuffleEnabled = _mediaPlayer.value.isShuffleEnabled),
-            MediaPlaybackState(true, "Midnight City", "M83", currentApp, 0.15f, "4:03", "0:36", isShuffleEnabled = _mediaPlayer.value.isShuffleEnabled)
-        )
-        _mediaPlayer.value = tracks.random()
     }
 
     fun seekMedia(progress: Float) {
         val p = progress.coerceIn(0f, 1f)
-        val totalSec = 240
-        val currentSec = (p * totalSec).toInt()
-        val min = currentSec / 60
-        val sec = currentSec % 60
-        val timeStr = String.format(Locale.getDefault(), "%d:%02d", min, sec)
-        _mediaPlayer.value = _mediaPlayer.value.copy(
-            progressPercent = p,
-            currentTimeText = timeStr
-        )
+        val handled = com.example.service.FluxNotificationListenerService.sendMediaControl("seek", p)
+        val currentDuration = _mediaPlayer.value.durationMs
+        if (currentDuration > 0) {
+            val currentPos = (p * currentDuration).toLong()
+            _mediaPlayer.value = _mediaPlayer.value.copy(
+                progressPercent = p,
+                positionMs = currentPos,
+                currentTimeText = com.example.service.FluxNotificationListenerService.formatMs(currentPos)
+            )
+        } else {
+            val totalSec = 240
+            val currentSec = (p * totalSec).toInt()
+            val min = currentSec / 60
+            val sec = currentSec % 60
+            val timeStr = String.format(Locale.getDefault(), "%d:%02d", min, sec)
+            _mediaPlayer.value = _mediaPlayer.value.copy(
+                progressPercent = p,
+                currentTimeText = timeStr
+            )
+        }
     }
 
     fun setHeadphonesConnected(connected: Boolean) {
@@ -1212,7 +1187,8 @@ class LauncherRepository(private val context: Context) {
                                 title = obj.optString("title", type.displayName),
                                 content = obj.optString("content", ""),
                                 isEnabled = obj.optBoolean("isEnabled", true),
-                                heightCategory = obj.optString("heightCategory", "4x2")
+                                heightCategory = obj.optString("heightCategory", "4x2"),
+                                appWidgetId = obj.optInt("appWidgetId", -1)
                             )
                         )
                     }
@@ -1251,9 +1227,23 @@ class LauncherRepository(private val context: Context) {
             obj.put("content", w.content)
             obj.put("isEnabled", w.isEnabled)
             obj.put("heightCategory", w.heightCategory)
+            obj.put("appWidgetId", w.appWidgetId)
             arr.put(obj)
         }
         prefs.edit().putString("left_widgets_json", arr.toString()).apply()
+    }
+
+    fun addLeftSystemWidget(appWidgetId: Int, label: String = "System Widget") {
+        val newWidget = CustomWidgetConfig(
+            id = "sys_${appWidgetId}_${System.currentTimeMillis()}",
+            type = WidgetType.SYSTEM_WIDGET,
+            title = label.ifBlank { "System Widget" },
+            appWidgetId = appWidgetId,
+            heightCategory = "4x2"
+        )
+        val updated = _leftWidgets.value + newWidget
+        _leftWidgets.value = updated
+        saveLeftWidgets(updated)
     }
 
     fun addLeftWidget(type: WidgetType, title: String = type.displayName, content: String = "") {

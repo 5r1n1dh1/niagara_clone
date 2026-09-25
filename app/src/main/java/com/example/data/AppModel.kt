@@ -160,15 +160,17 @@ data class CalendarEvent(
 data class MediaPlaybackState(
     val isPlaying: Boolean = false,
     val trackTitle: String = "YouTube Music",
-    val artistName: String = "Tap to Play",
+    val artistName: String = "Tap to play music",
     val appName: String = "YouTube Music",
-    val progressPercent: Float = 0.35f,
-    val durationText: String = "3:45",
-    val currentTimeText: String = "1:20",
+    val progressPercent: Float = 0f,
+    val durationText: String = "--:--",
+    val currentTimeText: String = "0:00",
+    val durationMs: Long = 0L,
+    val positionMs: Long = 0L,
     val isShuffleEnabled: Boolean = false,
     val isRepeatEnabled: Boolean = false,
     val albumArtBitmap: Bitmap? = null,
-    val packageName: String = "com.google.android.apps.youtube.music",
+    val packageName: String = "app.revanced.android.apps.youtube.music",
     val isExternalOutputConnected: Boolean = false,
     val outputDeviceName: String? = null
 )
@@ -221,6 +223,7 @@ enum class WidgetType(val displayName: String, val description: String, val icon
     CLOCK("Clock Widget", "Customizable digital, analog, or word clock with date", "🕒"),
     WEATHER_FORECAST("Weather & Forecast", "Current condition and hourly forecast", "⛅"),
     MEDIA_PLAYER("YouTube Music", "Live playback, controls and album art", "🎵"),
+    SYSTEM_WIDGET("System Widget", "Android AppWidget from installed applications", "🧩"),
     NEWS_FEED("News Highlights", "Top breaking stories & articles with photo cards", "📰"),
     QUICK_NOTE("Sticky Note", "Editable scratchpad for quick thoughts", "📝"),
     MINDFULNESS_QUOTE("Daily Reflection", "Mindfulness quotes and wellbeing stats", "🧘"),
@@ -233,6 +236,7 @@ data class CustomWidgetConfig(
     val title: String,
     val content: String = "",
     val isEnabled: Boolean = true,
-    val heightCategory: String = "4x2" // "4x1", "4x2", "4x3", "4x4"
+    val heightCategory: String = "4x2", // "4x1", "4x2", "4x3", "4x4"
+    val appWidgetId: Int = -1
 )
 

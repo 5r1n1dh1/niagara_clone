@@ -1,6 +1,9 @@
 package com.example
 
 import android.Manifest
+import android.app.Activity
+import android.appwidget.AppWidgetHost
+import android.appwidget.AppWidgetManager
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -165,6 +168,80 @@ fun NiagaraLauncherScreen(
         WidgetType.entries.filter { viewModel.repository.isWidgetAvailable(it) }
     }
 
+    val appWidgetManager = remember { AppWidgetManager.getInstance(context) }
+    val appWidgetHost = remember { AppWidgetHost(context, 1024) }
+    var pendingAppWidgetId by remember { mutableStateOf<Int?>(null) }
+
+    DisposableEffect(appWidgetHost) {
+        try {
+            appWidgetHost.startListening()
+        } catch (_: Throwable) {}
+        onDispose {
+            try {
+                appWidgetHost.stopListening()
+            } catch (_: Throwable) {}
+        }
+    }
+
+    val configureWidgetLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val appWidgetId = pendingAppWidgetId
+        if (result.resultCode == Activity.RESULT_OK && appWidgetId != null && appWidgetId > 0) {
+            val info = appWidgetManager.getAppWidgetInfo(appWidgetId)
+            val label = info?.loadLabel(context.packageManager)?.toString() ?: "System Widget"
+            viewModel.addLeftSystemWidget(appWidgetId, label)
+        } else if (appWidgetId != null && appWidgetId > 0) {
+            try {
+                appWidgetHost.deleteAppWidgetId(appWidgetId)
+            } catch (_: Throwable) {}
+        }
+        pendingAppWidgetId = null
+    }
+
+    val pickWidgetLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val appWidgetId = result.data?.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, -1) ?: -1
+            if (appWidgetId != -1) {
+                val info = appWidgetManager.getAppWidgetInfo(appWidgetId)
+                if (info?.configure != null) {
+                    pendingAppWidgetId = appWidgetId
+                    val configureIntent = Intent(AppWidgetManager.ACTION_APPWIDGET_CONFIGURE).apply {
+                        component = info.configure
+                        putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
+                    }
+                    configureWidgetLauncher.launch(configureIntent)
+                } else {
+                    val label = info?.loadLabel(context.packageManager)?.toString() ?: "System Widget"
+                    viewModel.addLeftSystemWidget(appWidgetId, label)
+                }
+            }
+        } else {
+            val appWidgetId = pendingAppWidgetId
+            if (appWidgetId != null && appWidgetId > 0) {
+                try {
+                    appWidgetHost.deleteAppWidgetId(appWidgetId)
+                } catch (_: Throwable) {}
+            }
+            pendingAppWidgetId = null
+        }
+    }
+
+    val launchAddSystemWidget: () -> Unit = {
+        try {
+            val newId = appWidgetHost.allocateAppWidgetId()
+            pendingAppWidgetId = newId
+            val pickIntent = Intent(AppWidgetManager.ACTION_APPWIDGET_PICK).apply {
+                putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, newId)
+            }
+            pickWidgetLauncher.launch(pickIntent)
+        } catch (_: Throwable) {
+            viewModel.showToast("Could not open system widget picker")
+        }
+    }
+
     val isSearchOpen by viewModel.isSearchOpen.collectAsState()
     val isNotificationCenterOpen by viewModel.isNotificationCenterOpen.collectAsState()
     val isDiscoverOpen by viewModel.isDiscoverOpen.collectAsState()
@@ -232,47 +309,6 @@ fun NiagaraLauncherScreen(
         }
     }
 
-    val notificationSwipeDownConnection = remember(settings.swipeDownForNotificationCenter) {
-        object : NestedScrollConnection {
-            var accumulatedDragY = 0f
-
-            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                if (available.y < 0f) {
-                    accumulatedDragY = 0f
-                }
-                return Offset.Zero
-            }
-
-            override fun onPostScroll(
-                consumed: Offset,
-                available: Offset,
-                source: NestedScrollSource
-            ): Offset {
-                if (!settings.swipeDownForNotificationCenter) return Offset.Zero
-                if (source == NestedScrollSource.UserInput && available.y > 0f) {
-                    accumulatedDragY += available.y
-                    if (accumulatedDragY > 45f) {
-                        accumulatedDragY = 0f
-                        viewModel.openNotificationCenter()
-                        return Offset(0f, available.y)
-                    }
-                }
-                return Offset.Zero
-            }
-
-            override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
-                if (!settings.swipeDownForNotificationCenter) return Velocity.Zero
-                if (available.y > 150f || accumulatedDragY > 15f) {
-                    accumulatedDragY = 0f
-                    viewModel.openNotificationCenter()
-                    return available
-                }
-                accumulatedDragY = 0f
-                return Velocity.Zero
-            }
-        }
-    }
-
     // Dynamic Gaussian blur on wallpaper when swiping to Widgets (page 0) or Apps (page 2)
     val pageOffset = (pagerState.currentPage - 1) + pagerState.currentPageOffsetFraction
     val blurFraction = kotlin.math.abs(pageOffset).coerceIn(0f, 1f)
@@ -327,7 +363,6 @@ fun NiagaraLauncherScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .nestedScroll(notificationSwipeDownConnection)
             .pointerInput(settings.doubleTapToSleep) {
                 detectTapGestures(
                     onDoubleTap = {
@@ -386,7 +421,10 @@ fun NiagaraLauncherScreen(
                                 blurRadius = settings.frostedBlurRadius,
                                 translucency = settings.frostedTranslucency,
                                 glassEffect = settings.frostedGlassEffect,
+                                appWidgetHost = appWidgetHost,
+                                appWidgetManager = appWidgetManager,
                                 onAddWidgetClick = { viewModel.openAddWidgetDialog() },
+                                onAddSystemWidgetClick = launchAddSystemWidget,
                                 onDeleteWidget = { id -> viewModel.deleteLeftWidget(id) },
                                 onReorderWidget = { from, to -> viewModel.reorderLeftWidget(from, to) },
                                 onEditNoteClick = { widget -> viewModel.openEditNoteWidget(widget) },
@@ -410,6 +448,8 @@ fun NiagaraLauncherScreen(
                                 weather = weather,
                                 mediaPlayer = mediaPlayer,
                                 calendarEvents = calendarEvents,
+                                appWidgetHost = appWidgetHost,
+                                appWidgetManager = appWidgetManager,
                                 onAppClick = {
                                     keyboardController?.hide()
                                     focusManager.clearFocus(force = true)
@@ -431,6 +471,7 @@ fun NiagaraLauncherScreen(
                                 onOpenWeather = { viewModel.launchIntegration(com.example.util.IntegrationCategory.WEATHER) },
                                 onOpenCalendar = { viewModel.launchIntegration(com.example.util.IntegrationCategory.CALENDAR) },
                                 onOpenCarouselCustomize = { viewModel.openCarouselCustomize() },
+                                onAddSystemWidget = launchAddSystemWidget,
                                 onOpenSettings = {
                                     keyboardController?.hide()
                                     focusManager.clearFocus(force = true)
@@ -489,16 +530,7 @@ fun NiagaraLauncherScreen(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .statusBarsPadding()
-                    .padding(top = 4.dp)
-                    .pointerInput(settings.swipeDownForNotificationCenter) {
-                        if (settings.swipeDownForNotificationCenter) {
-                            detectVerticalDragGestures { _, dragAmount ->
-                                if (dragAmount > 12f) {
-                                    viewModel.openNotificationCenter()
-                                }
-                            }
-                        }
-                    },
+                    .padding(top = 4.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -623,17 +655,41 @@ fun NiagaraLauncherScreen(
             )
         }
 
+        // Notification Center & Quick Settings Shade
+        if (isNotificationCenterOpen) {
+            NotificationCenterSheet(
+                notifications = activeNotifications,
+                blurRadius = settings.frostedBlurRadius,
+                translucency = settings.frostedTranslucency,
+                glassEffect = settings.frostedGlassEffect,
+                onDismissNotification = { pkg -> viewModel.dismissNotification(pkg) },
+                onReplyNotification = { pkg, text -> viewModel.replyToNotification(pkg, text) },
+                onClearAll = { viewModel.clearAllNotifications() },
+                onClose = { viewModel.closeNotificationCenter() },
+                onOpenSettings = {
+                    viewModel.closeNotificationCenter()
+                    viewModel.openSettings()
+                }
+            )
+        }
+
         // Settings Studio Sheet
         if (isSettingsOpen) {
             SettingsStudioSheet(
                 settings = settings,
                 allApps = allApps,
                 dockApps = dockApps,
+                carouselWidgets = carouselWidgets,
+                availableWidgets = availableWidgetTypes,
                 widgetIntegrations = viewModel.widgetIntegrations,
                 onUpdateSettings = { viewModel.repository.updateSettings(it) },
                 onSelectDockSlot = { slotIndex -> viewModel.openDockPicker(slotIndex) },
                 onClearDockSlot = { slotIndex -> viewModel.clearDockSlot(slotIndex) },
                 onResetDockDefaults = { viewModel.resetDockToDefaults() },
+                onAddCarouselWidget = { viewModel.addCarouselWidget(it) },
+                onRemoveCarouselWidget = { viewModel.removeCarouselWidget(it) },
+                onReorderCarouselWidget = { from, to -> viewModel.reorderCarouselWidget(from, to) },
+                onOpenAddSystemWidget = launchAddSystemWidget,
                 onExportBackup = { viewModel.repository.exportBackupJson() },
                 onImportBackup = { viewModel.repository.importBackupJson(it) },
                 onResetDefaults = { viewModel.repository.resetToDefaults() },

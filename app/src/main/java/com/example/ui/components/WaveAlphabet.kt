@@ -38,7 +38,9 @@ fun WaveAlphabet(
     modifier: Modifier = Modifier
 ) {
     var componentHeight by remember { mutableFloatStateOf(1f) }
+    var componentWidth by remember { mutableFloatStateOf(1f) }
     var currentTouchY by remember { mutableStateOf<Float?>(null) }
+    var currentTouchX by remember { mutableStateOf<Float?>(null) }
 
     val verticalPaddingPx = with(androidx.compose.ui.platform.LocalDensity.current) { 32.dp.toPx() }
     val itemCount = ALPHABET_ITEMS.size
@@ -52,10 +54,12 @@ fun WaveAlphabet(
             .testTag("wave_alphabet")
             .onGloballyPositioned { coordinates ->
                 componentHeight = coordinates.size.height.toFloat()
+                componentWidth = coordinates.size.width.toFloat()
             }
             .pointerInput(componentHeight, isLeftHanded, verticalPaddingPx) {
                 detectDragGestures(
                     onDragStart = { offset ->
+                        currentTouchX = offset.x
                         currentTouchY = offset.y
                         val relativeY = (offset.y - verticalPaddingPx).coerceIn(0f, effectiveHeight - 1f)
                         val index = (relativeY / itemHeight).toInt().coerceIn(0, itemCount - 1)
@@ -67,6 +71,7 @@ fun WaveAlphabet(
                     },
                     onDrag = { change, _ ->
                         change.consume()
+                        currentTouchX = change.position.x
                         currentTouchY = change.position.y
                         val relativeY = (change.position.y - verticalPaddingPx).coerceIn(0f, effectiveHeight - 1f)
                         val index = (relativeY / itemHeight).toInt().coerceIn(0, itemCount - 1)
@@ -77,10 +82,12 @@ fun WaveAlphabet(
                         }
                     },
                     onDragEnd = {
+                        currentTouchX = null
                         currentTouchY = null
                         onLetterSelected(null)
                     },
                     onDragCancel = {
+                        currentTouchX = null
                         currentTouchY = null
                         onLetterSelected(null)
                     }
@@ -89,6 +96,7 @@ fun WaveAlphabet(
             .pointerInput(componentHeight, verticalPaddingPx) {
                 detectTapGestures(
                     onPress = { offset ->
+                        currentTouchX = offset.x
                         currentTouchY = offset.y
                         val relativeY = (offset.y - verticalPaddingPx).coerceIn(0f, effectiveHeight - 1f)
                         val index = (relativeY / itemHeight).toInt().coerceIn(0, itemCount - 1)
@@ -96,6 +104,7 @@ fun WaveAlphabet(
                         onLetterSelected(letter)
                         onLetterConfirmed(letter)
                         tryAwaitRelease()
+                        currentTouchX = null
                         currentTouchY = null
                         onLetterSelected(null)
                     }
@@ -147,22 +156,28 @@ fun WaveAlphabet(
             }
         }
 
-        // Floating thumb magnifier bubble: displayed to the immediate left with a small gap
+        // Floating thumb magnifier bubble: displayed with 120px gap to the left of the touched area rather than below the finger
         if (selectedLetter != null && currentTouchY != null) {
             val touchY = currentTouchY ?: 0f
             val density = androidx.compose.ui.platform.LocalDensity.current
-            val bubbleOffsetY = touchY.coerceIn(24f, (componentHeight - 24f).coerceAtLeast(24f))
-            val xOffsetPx = with(density) { if (isLeftHanded) 30.dp.toPx() else (-26).dp.toPx() }
-            val yOffsetPx = with(density) { 19.dp.toPx() }
+            val bubbleSizePx = with(density) { 38.dp.toPx() }
+            val bubbleOffsetY = (touchY - (bubbleSizePx / 2f)).coerceIn(8f, (componentHeight - bubbleSizePx - 8f).coerceAtLeast(8f))
+            val touchX = currentTouchX ?: (if (isLeftHanded) 0f else componentWidth)
+            val bubbleOffsetX = if (isLeftHanded) {
+                touchX + 120f
+            } else {
+                touchX - 120f - bubbleSizePx
+            }
 
             Surface(
                 shape = RoundedCornerShape(12.dp),
                 color = MaterialTheme.colorScheme.primary,
                 shadowElevation = 6.dp,
                 modifier = Modifier
+                    .align(Alignment.TopStart)
                     .graphicsLayer {
-                        translationY = bubbleOffsetY - yOffsetPx
-                        translationX = xOffsetPx
+                        translationY = bubbleOffsetY
+                        translationX = bubbleOffsetX
                     }
                     .size(width = 38.dp, height = 38.dp)
                     .clip(RoundedCornerShape(12.dp))

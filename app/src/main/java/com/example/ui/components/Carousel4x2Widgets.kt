@@ -41,6 +41,11 @@ fun Carousel4x2WidgetCard(
     showSeconds: Boolean = false,
     clockColorTintHex: String = "#FFFFFF",
     clockScale: Float = 1.0f,
+    blurRadius: Float = 15f,
+    translucency: Float = 0.30f,
+    glassEffect: Float = 0.30f,
+    appWidgetHost: android.appwidget.AppWidgetHost? = null,
+    appWidgetManager: android.appwidget.AppWidgetManager? = null,
     onToggleMediaPlay: () -> Unit,
     onMediaNext: () -> Unit,
     onMediaPrev: () -> Unit,
@@ -52,10 +57,11 @@ fun Carousel4x2WidgetCard(
     onOpenSettings: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    Surface(
-        shape = RoundedCornerShape(22.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
-        tonalElevation = 2.dp,
+    FrostedGlassPanel(
+        cornerRadius = 22.dp,
+        blurRadius = blurRadius.dp,
+        translucency = translucency,
+        glassEffect = glassEffect,
         modifier = modifier
             .fillMaxWidth()
             .height(168.dp) // Standard 4x2 grid equivalent height
@@ -65,7 +71,14 @@ fun Carousel4x2WidgetCard(
             )
             .testTag("carousel_4x2_card_${type.name}")
     ) {
-        Box(modifier = Modifier.fillMaxSize().padding(14.dp)) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(
+                    if (type == WidgetType.MEDIA_PLAYER) PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                    else PaddingValues(10.dp)
+                )
+        ) {
             when (type) {
                 WidgetType.CLOCK -> {
                     Clock4x2Widget(
@@ -97,10 +110,18 @@ fun Carousel4x2WidgetCard(
                         media = mediaPlayer,
                         size = "4x2",
                         isHeadphonesOverride = isHeadphonesConnected,
+                        isEmbeddedInCard = true,
                         onTogglePlay = onToggleMediaPlay,
                         onNext = onMediaNext,
                         onPrev = onMediaPrev,
                         onSeek = onSeekMedia
+                    )
+                }
+                WidgetType.SYSTEM_WIDGET -> {
+                    SystemAppWidgetView(
+                        appWidgetId = -1,
+                        appWidgetHost = appWidgetHost,
+                        appWidgetManager = appWidgetManager
                     )
                 }
                 WidgetType.QUICK_NOTE -> {

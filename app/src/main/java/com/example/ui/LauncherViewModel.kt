@@ -606,6 +606,17 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         vibrateClick()
     }
 
+    fun addLeftSystemWidget(appWidgetId: Int, label: String = "System Widget") {
+        if (settings.value.isLayoutLocked) {
+            showToast("🔒 Layout is locked. Unlock to modify widgets.")
+            return
+        }
+        repository.addLeftSystemWidget(appWidgetId, label)
+        _isAddWidgetOpen.value = false
+        showToast("Added $label")
+        vibrateClick()
+    }
+
     fun deleteLeftWidget(id: String) {
         if (settings.value.isLayoutLocked) {
             showToast("🔒 Layout is locked. Unlock to remove widgets.")

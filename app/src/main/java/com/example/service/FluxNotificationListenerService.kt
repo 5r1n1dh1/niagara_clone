@@ -9,9 +9,14 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
+import android.media.MediaMetadata
+import android.media.session.MediaController
+import android.media.session.MediaSessionManager
+import android.media.session.PlaybackState
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.SystemClock
 import android.provider.Settings
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
@@ -19,9 +24,12 @@ import androidx.core.app.NotificationManagerCompat
 import com.example.data.NotificationItem
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -30,14 +38,38 @@ import java.util.Locale
 class FluxNotificationListenerService : NotificationListenerService() {
 
     private val serviceScope = CoroutineScope(Dispatchers.Default)
+    private var mediaProgressPollJob: Job? = null
+    private var activeMediaController: MediaController? = null
+
+    private val mediaControllerCallback = object : MediaController.Callback() {
+        override fun onPlaybackStateChanged(state: PlaybackState?) {
+            updateMediaPlaybackFromController(activeMediaController)
+        }
+
+        override fun onMetadataChanged(metadata: MediaMetadata?) {
+            updateMediaPlaybackFromController(activeMediaController)
+        }
+
+        override fun onSessionDestroyed() {
+            activeMediaController = null
+            findAndAttachActiveMediaController()
+        }
+    }
+
+    private val sessionListener = MediaSessionManager.OnActiveSessionsChangedListener { controllers ->
+        findAndAttachActiveMediaController(controllers)
+    }
 
     override fun onCreate() {
         super.onCreate()
         instance = this
+        startMediaProgressPoller()
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        mediaProgressPollJob?.cancel()
+        unregisterSessionListener()
         if (instance == this) {
             instance = null
         }
@@ -46,14 +78,172 @@ class FluxNotificationListenerService : NotificationListenerService() {
     override fun onListenerConnected() {
         super.onListenerConnected()
         instance = this
+        registerSessionListener()
+        findAndAttachActiveMediaController()
         syncNotifications()
     }
 
     override fun onListenerDisconnected() {
         super.onListenerDisconnected()
+        unregisterSessionListener()
         if (instance == this) {
             instance = null
         }
+    }
+
+    private fun registerSessionListener() {
+        try {
+            val mediaSessionManager = getSystemService(Context.MEDIA_SESSION_SERVICE) as? MediaSessionManager
+            val component = ComponentName(this, FluxNotificationListenerService::class.java)
+            mediaSessionManager?.addOnActiveSessionsChangedListener(sessionListener, component)
+        } catch (_: Throwable) {}
+    }
+
+    private fun unregisterSessionListener() {
+        try {
+            val mediaSessionManager = getSystemService(Context.MEDIA_SESSION_SERVICE) as? MediaSessionManager
+            mediaSessionManager?.removeOnActiveSessionsChangedListener(sessionListener)
+            activeMediaController?.unregisterCallback(mediaControllerCallback)
+            activeMediaController = null
+        } catch (_: Throwable) {}
+    }
+
+    private fun findAndAttachActiveMediaController(controllers: List<MediaController>? = null) {
+        try {
+            val list = controllers ?: run {
+                val mediaSessionManager = getSystemService(Context.MEDIA_SESSION_SERVICE) as? MediaSessionManager
+                val component = ComponentName(this, FluxNotificationListenerService::class.java)
+                mediaSessionManager?.getActiveSessions(component) ?: emptyList()
+            }
+
+            // Prioritize YouTube Music / ReVanced packages
+            val ytController = list.firstOrNull { c ->
+                val pkg = c.packageName ?: ""
+                pkg.equals("app.revanced.android.apps.youtube.music", ignoreCase = true) ||
+                        pkg.equals("com.google.android.apps.youtube.music", ignoreCase = true) ||
+                        pkg.equals("app.rvx.android.apps.youtube.music", ignoreCase = true) ||
+                        pkg.equals("com.vanced.android.apps.youtube.music", ignoreCase = true) ||
+                        pkg.contains("youtube.music", true)
+            }
+
+            // Or any currently playing controller
+            val playingController = ytController ?: list.firstOrNull {
+                it.playbackState?.state == PlaybackState.STATE_PLAYING
+            } ?: list.firstOrNull()
+
+            if (playingController != activeMediaController) {
+                activeMediaController?.unregisterCallback(mediaControllerCallback)
+                activeMediaController = playingController
+                activeMediaController?.registerCallback(mediaControllerCallback)
+            }
+
+            updateMediaPlaybackFromController(activeMediaController)
+        } catch (_: Throwable) {}
+    }
+
+    private fun startMediaProgressPoller() {
+        mediaProgressPollJob?.cancel()
+        mediaProgressPollJob = serviceScope.launch {
+            while (isActive) {
+                delay(500)
+                val current = _liveMediaPlayback.value
+                if (current != null && current.isPlaying && current.durationMs > 0) {
+                    val controller = activeMediaController
+                    if (controller != null) {
+                        updateMediaPlaybackFromController(controller)
+                    } else {
+                        // Smoothly advance time
+                        val newPos = (current.positionMs + 500).coerceAtMost(current.durationMs)
+                        val newProgress = (newPos.toFloat() / current.durationMs.toFloat()).coerceIn(0f, 1f)
+                        _liveMediaPlayback.value = current.copy(
+                            positionMs = newPos,
+                            progressPercent = newProgress,
+                            currentTimeText = formatMs(newPos)
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private fun updateMediaPlaybackFromController(controller: MediaController?) {
+        if (controller == null) return
+        try {
+            val metadata = controller.metadata
+            val playbackState = controller.playbackState
+            val pkg = controller.packageName ?: ""
+            val appLabel = try {
+                packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString()
+            } catch (_: Throwable) {
+                if (pkg.contains("revanced", true)) "YouTube Music ReVanced" else "YouTube Music"
+            }
+
+            val trackTitle = metadata?.getString(MediaMetadata.METADATA_KEY_TITLE) ?: ""
+            val artistName = metadata?.getString(MediaMetadata.METADATA_KEY_ARTIST)
+                ?: metadata?.getString(MediaMetadata.METADATA_KEY_ALBUM_ARTIST)
+                ?: appLabel
+
+            val durationMs = metadata?.getLong(MediaMetadata.METADATA_KEY_DURATION) ?: 0L
+            val rawPosition = playbackState?.position ?: 0L
+            val isPlaying = playbackState?.state == PlaybackState.STATE_PLAYING
+            val speed = playbackState?.playbackSpeed ?: 1.0f
+            val lastUpdate = playbackState?.lastPositionUpdateTime ?: 0L
+
+            val currentPositionMs = if (isPlaying && lastUpdate > 0) {
+                rawPosition + ((SystemClock.elapsedRealtime() - lastUpdate) * (if (speed > 0f) speed else 1.0f)).toLong()
+            } else {
+                rawPosition
+            }.coerceIn(0L, if (durationMs > 0) durationMs else Long.MAX_VALUE)
+
+            val progressPercent = if (durationMs > 0) {
+                (currentPositionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
+            } else {
+                0f
+            }
+
+            val durationText = if (durationMs > 0) formatMs(durationMs) else "--:--"
+            val currentTimeText = formatMs(currentPositionMs)
+
+            var albumArt: Bitmap? = metadata?.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART)
+                ?: metadata?.getBitmap(MediaMetadata.METADATA_KEY_ART)
+                ?: metadata?.getBitmap(MediaMetadata.METADATA_KEY_DISPLAY_ICON)
+
+            if (albumArt == null) {
+                val artUriStr = metadata?.getString(MediaMetadata.METADATA_KEY_ALBUM_ART_URI)
+                    ?: metadata?.getString(MediaMetadata.METADATA_KEY_ART_URI)
+                    ?: metadata?.getString(MediaMetadata.METADATA_KEY_DISPLAY_ICON_URI)
+                if (!artUriStr.isNullOrBlank()) {
+                    albumArt = extractBitmapFromObject(artUriStr, maxDimension = 512)
+                }
+            }
+
+            if (albumArt == null) {
+                val notifs = activeNotifications
+                val matchingSbn = notifs?.firstOrNull { it.packageName == pkg }
+                if (matchingSbn != null) {
+                    val extras = matchingSbn.notification?.extras ?: Bundle()
+                    albumArt = extractPictureBitmap(matchingSbn.notification, extras)
+                        ?: extractAvatarBitmap(matchingSbn.notification, extras)
+                }
+            }
+
+            if (trackTitle.isNotBlank()) {
+                _liveMediaPlayback.value = com.example.data.MediaPlaybackState(
+                    isPlaying = isPlaying,
+                    trackTitle = trackTitle,
+                    artistName = artistName,
+                    appName = appLabel,
+                    packageName = pkg,
+                    albumArtBitmap = albumArt,
+                    progressPercent = progressPercent,
+                    durationText = durationText,
+                    currentTimeText = currentTimeText,
+                    durationMs = durationMs,
+                    positionMs = currentPositionMs,
+                    isShuffleEnabled = false
+                )
+            }
+        } catch (_: Throwable) {}
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
@@ -134,6 +324,12 @@ class FluxNotificationListenerService : NotificationListenerService() {
                                 actionTitle.contains("pause")
                             } ?: true
 
+                            val durationMs = extras.getLong("android.duration", 0L).let {
+                                if (it > 0) it else extras.getLong("duration", 0L)
+                            }
+                            val durationText = if (durationMs > 0) formatMs(durationMs) else "--:--"
+                            val currentTimeText = "0:00"
+
                             detectedMedia = com.example.data.MediaPlaybackState(
                                 isPlaying = isPlaying,
                                 trackTitle = trackTitle,
@@ -141,10 +337,14 @@ class FluxNotificationListenerService : NotificationListenerService() {
                                 appName = appLabel,
                                 packageName = pkg,
                                 albumArtBitmap = albumArt,
-                                progressPercent = 0.45f,
-                                durationText = "3:50",
-                                currentTimeText = "1:45"
+                                progressPercent = 0f,
+                                durationText = durationText,
+                                currentTimeText = currentTimeText,
+                                durationMs = durationMs,
+                                positionMs = 0L
                             )
+                            // Immediately query MediaController for real-time state
+                            findAndAttachActiveMediaController()
                         }
                     }
 
@@ -531,6 +731,45 @@ class FluxNotificationListenerService : NotificationListenerService() {
             } catch (_: Throwable) {
                 return false
             }
+        }
+
+        fun sendMediaControl(action: String, value: Float = 0f): Boolean {
+            val inst = instance ?: return false
+            val controller = inst.activeMediaController ?: run {
+                inst.findAndAttachActiveMediaController()
+                inst.activeMediaController
+            }
+            if (controller != null) {
+                try {
+                    val transport = controller.transportControls
+                    when (action) {
+                        "toggle_play" -> {
+                            val isPlaying = controller.playbackState?.state == PlaybackState.STATE_PLAYING
+                            if (isPlaying) transport.pause() else transport.play()
+                        }
+                        "play" -> transport.play()
+                        "pause" -> transport.pause()
+                        "next" -> transport.skipToNext()
+                        "prev" -> transport.skipToPrevious()
+                        "seek" -> {
+                            val duration = controller.metadata?.getLong(MediaMetadata.METADATA_KEY_DURATION) ?: 0L
+                            if (duration > 0) {
+                                transport.seekTo((value * duration).toLong())
+                            }
+                        }
+                    }
+                    inst.updateMediaPlaybackFromController(controller)
+                    return true
+                } catch (_: Throwable) {}
+            }
+            return false
+        }
+
+        fun formatMs(ms: Long): String {
+            val totalSeconds = (ms / 1000).coerceAtLeast(0)
+            val minutes = totalSeconds / 60
+            val seconds = totalSeconds % 60
+            return String.format(Locale.getDefault(), "%d:%02d", minutes, seconds)
         }
 
         fun isNotificationAccessGranted(context: Context): Boolean {

@@ -43,7 +43,10 @@ fun LeftWidgetsScreen(
     blurRadius: Float = 15f,
     translucency: Float = 0.30f,
     glassEffect: Float = 0.30f,
+    appWidgetHost: android.appwidget.AppWidgetHost? = null,
+    appWidgetManager: android.appwidget.AppWidgetManager? = null,
     onAddWidgetClick: () -> Unit,
+    onAddSystemWidgetClick: () -> Unit = {},
     onDeleteWidget: (String) -> Unit,
     onReorderWidget: (from: Int, to: Int) -> Unit,
     onEditNoteClick: (CustomWidgetConfig) -> Unit,
@@ -112,11 +115,19 @@ fun LeftWidgetsScreen(
                     modifier = Modifier.background(MaterialTheme.colorScheme.surfaceContainerHigh)
                 ) {
                     DropdownMenuItem(
-                        text = { Text("Add Widget") },
+                        text = { Text("Add Launcher Widget") },
                         leadingIcon = { Icon(Icons.Filled.Add, contentDescription = null) },
                         onClick = {
                             menuExpanded = false
                             onAddWidgetClick()
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Add System App Widget") },
+                        leadingIcon = { Icon(Icons.Filled.Extension, contentDescription = null) },
+                        onClick = {
+                            menuExpanded = false
+                            onAddSystemWidgetClick()
                         }
                     )
                     HorizontalDivider()
@@ -182,6 +193,11 @@ fun LeftWidgetsScreen(
                             mediaPlayer = mediaPlayer,
                             calendarEvents = calendarEvents,
                             isHeadphonesConnected = isHeadphonesConnected,
+                            blurRadius = blurRadius,
+                            translucency = translucency,
+                            glassEffect = glassEffect,
+                            appWidgetHost = appWidgetHost,
+                            appWidgetManager = appWidgetManager,
                             onDelete = { onDeleteWidget(item.id) },
                             onMoveUp = { onReorderWidget(index, index - 1) },
                             onMoveDown = { onReorderWidget(index, index + 1) },
@@ -211,6 +227,11 @@ private fun LeftWidgetCardWrapper(
     mediaPlayer: MediaPlaybackState,
     calendarEvents: List<CalendarEvent>,
     isHeadphonesConnected: Boolean,
+    blurRadius: Float = 15f,
+    translucency: Float = 0.30f,
+    glassEffect: Float = 0.30f,
+    appWidgetHost: android.appwidget.AppWidgetHost? = null,
+    appWidgetManager: android.appwidget.AppWidgetManager? = null,
     onDelete: () -> Unit,
     onMoveUp: () -> Unit,
     onMoveDown: () -> Unit,
@@ -222,12 +243,11 @@ private fun LeftWidgetCardWrapper(
     onRefreshWeather: () -> Unit,
     onUpdateSize: (String) -> Unit = {}
 ) {
-    val zIndexAlpha = (0.35f + (index.toFloat() / totalCount.coerceAtLeast(1) * 0.45f)).coerceIn(0.35f, 0.95f)
-
-    Surface(
-        shape = RoundedCornerShape(20.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = zIndexAlpha),
-        tonalElevation = (2 + index).dp,
+    FrostedGlassPanel(
+        cornerRadius = 20.dp,
+        blurRadius = blurRadius.dp,
+        translucency = translucency,
+        glassEffect = glassEffect,
         modifier = Modifier
             .fillMaxWidth()
             .testTag("left_widget_${widget.id}")
@@ -326,6 +346,13 @@ private fun LeftWidgetCardWrapper(
                             onTogglePlay = onToggleMediaPlay,
                             onNext = onMediaNext,
                             onPrev = onMediaPrev
+                        )
+                    }
+                    WidgetType.SYSTEM_WIDGET -> {
+                        SystemAppWidgetView(
+                            appWidgetId = widget.appWidgetId,
+                            appWidgetHost = appWidgetHost,
+                            appWidgetManager = appWidgetManager
                         )
                     }
                     WidgetType.QUICK_NOTE -> {
@@ -1039,4 +1066,73 @@ private fun NewsWidgetBody() {
             }
         }
     }
+}
+
+@Composable
+fun SystemAppWidgetView(
+    appWidgetId: Int,
+    appWidgetHost: android.appwidget.AppWidgetHost?,
+    appWidgetManager: android.appwidget.AppWidgetManager?,
+    modifier: Modifier = Modifier
+) {
+    if (appWidgetId <= 0 || appWidgetHost == null || appWidgetManager == null) {
+        Box(
+            modifier = modifier
+                .fillMaxWidth()
+                .height(110.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "System widget not configured",
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        return
+    }
+
+    val info = remember(appWidgetId) {
+        try {
+            appWidgetManager.getAppWidgetInfo(appWidgetId)
+        } catch (_: Throwable) {
+            null
+        }
+    }
+
+    if (info == null) {
+        Box(
+            modifier = modifier
+                .fillMaxWidth()
+                .height(90.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "Widget not available",
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.error
+            )
+        }
+        return
+    }
+
+    androidx.compose.ui.viewinterop.AndroidView(
+        factory = { ctx ->
+            try {
+                appWidgetHost.createView(ctx, appWidgetId, info).apply {
+                    setAppWidget(appWidgetId, info)
+                }
+            } catch (e: Throwable) {
+                android.widget.TextView(ctx).apply {
+                    text = "Widget load error: ${e.message}"
+                    textSize = 12f
+                }
+            }
+        },
+        update = { view ->
+            try {
+                (view as? android.appwidget.AppWidgetHostView)?.updateAppWidget(null)
+            } catch (_: Throwable) {}
+        },
+        modifier = modifier.fillMaxWidth()
+    )
 }
