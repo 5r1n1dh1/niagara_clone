@@ -70,27 +70,39 @@ class WidgetIntegrationsManager(private val context: Context) {
         val customPkg = _integrations.value.weatherPackage
         if (customPkg.isNotBlank() && launchPackage(customPkg)) return
 
-        // Fallbacks: Common weather packages or Google Weather intent or web
+        // Known manufacturer weather packages
         val commonPkgs = listOf(
-            "com.google.android.GoogleCamera", // skip
-            "com.weather.Weather",
-            "com.accuweather.android",
             "com.google.android.apps.weather",
-            "com.sec.android.daemonapp"
+            "com.sec.android.daemonapp",
+            "com.miui.weather2",
+            "com.coloros.weather2",
+            "com.oneplus.weather",
+            "com.realme.weather",
+            "com.motorola.timeweatherwidget",
+            "com.accuweather.android",
+            "com.weather.Weather"
         )
         for (pkg in commonPkgs) {
             if (launchPackage(pkg)) return
         }
 
-        // Try Google search weather intent
-        try {
-            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com/search?q=weather")).apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            context.startActivity(intent)
-        } catch (e: Exception) {
-            Toast.makeText(context, "No weather app found", Toast.LENGTH_SHORT).show()
+        // Try Google search weather intent / browser fallback
+        val weatherIntents = listOf(
+            Intent(Intent.ACTION_VIEW, Uri.parse("dynact://velour/weather/ProxyActivity")),
+            Intent(Intent.ACTION_VIEW, Uri.parse("geo:0,0?q=weather")),
+            Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com/search?q=weather"))
+        )
+        for (intent in weatherIntents) {
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            try {
+                if (intent.resolveActivity(context.packageManager) != null) {
+                    context.startActivity(intent)
+                    return
+                }
+            } catch (_: Exception) {}
         }
+
+        Toast.makeText(context, "No weather app found", Toast.LENGTH_SHORT).show()
     }
 
     fun launchCalendarApp() {
@@ -173,22 +185,36 @@ class WidgetIntegrationsManager(private val context: Context) {
         val customPkg = _integrations.value.clockPackage
         if (customPkg.isNotBlank() && launchPackage(customPkg)) return
 
-        try {
-            val intent = Intent(AlarmClock.ACTION_SHOW_ALARMS).apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            context.startActivity(intent)
-        } catch (e: Exception) {
-            val clockPkgs = listOf(
-                "com.google.android.deskclock",
-                "com.sec.android.app.clockpackage",
-                "com.android.deskclock"
-            )
-            for (pkg in clockPkgs) {
-                if (launchPackage(pkg)) return
-            }
-            Toast.makeText(context, "No clock app found", Toast.LENGTH_SHORT).show()
+        val alarmIntents = listOf(
+            Intent(AlarmClock.ACTION_SHOW_ALARMS),
+            Intent(AlarmClock.ACTION_SET_ALARM),
+            Intent(Intent.ACTION_MAIN).addCategory("android.intent.category.DESK_CLOCK")
+        )
+        for (intent in alarmIntents) {
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            try {
+                if (intent.resolveActivity(context.packageManager) != null) {
+                    context.startActivity(intent)
+                    return
+                }
+            } catch (_: Exception) {}
         }
+
+        val clockPkgs = listOf(
+            "com.google.android.deskclock",
+            "com.sec.android.app.clockpackage",
+            "com.android.deskclock",
+            "com.xiaomi.deskclock",
+            "com.miui.clockpackage",
+            "com.coloros.alarmclock",
+            "com.oppo.alarmclock",
+            "com.oneplus.deskclock",
+            "com.asus.deskclock"
+        )
+        for (pkg in clockPkgs) {
+            if (launchPackage(pkg)) return
+        }
+        Toast.makeText(context, "No clock app found", Toast.LENGTH_SHORT).show()
     }
 
     private fun launchPackage(pkg: String): Boolean {

@@ -2,9 +2,15 @@ package com.example.ui.components
 
 import android.content.Context
 import android.content.Intent
+import android.content.pm.LauncherApps
+import android.content.pm.ShortcutInfo
 import android.graphics.Bitmap
+import android.graphics.drawable.BitmapDrawable
+import android.graphics.drawable.Drawable
 import android.net.Uri
+import android.os.Build
 import android.provider.AlarmClock
+import android.provider.ContactsContract
 import android.provider.MediaStore
 import android.provider.Settings
 import androidx.compose.animation.*
@@ -43,6 +49,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextOverflow
+import java.util.Locale
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -61,6 +69,7 @@ enum class AppCategoryType {
     MAPS,
     CALENDAR,
     CLOCK,
+    WEATHER,
     GENERIC
 }
 
@@ -96,6 +105,7 @@ fun detectAppCategory(packageName: String, label: String = ""): AppCategoryType 
 
         p.contains("calendar") || l.contains("calendar") -> AppCategoryType.CALENDAR
         p.contains("deskclock") || p.contains("alarm") || l.contains("clock") -> AppCategoryType.CLOCK
+        p.contains("weather") || l.contains("weather") -> AppCategoryType.WEATHER
         else -> AppCategoryType.GENERIC
     }
 }
@@ -218,8 +228,9 @@ fun AppPopupDrawer(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // 2. App-Specific Operations (Play/Pause, Reply, Compose, Camera, etc.)
+            // 2. App-Specific Operations & App Shortcuts
             AppSpecificOperationsBar(
+                app = app,
                 category = category,
                 packageName = app.packageName,
                 context = context,
@@ -986,70 +997,23 @@ fun DetailedMessagePreviewPopupDialog(
     }
 }
 
+data class CustomAppShortcutItem(
+    val id: String,
+    val label: String,
+    val iconVector: androidx.compose.ui.graphics.vector.ImageVector? = null,
+    val iconBitmap: Bitmap? = null,
+    val onClick: () -> Unit
+)
+
 @Composable
 private fun AppSpecificOperationsBar(
+    app: AppItem,
     category: AppCategoryType,
     packageName: String,
     context: Context,
     mediaPlayer: com.example.data.MediaPlaybackState = com.example.data.MediaPlaybackState(),
     onDismiss: () -> Unit
 ) {
-    if (packageName == context.packageName) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            FilledTonalButton(
-                onClick = {
-                    try {
-                        val intent = Intent(context, com.example.SettingsActivity::class.java).apply {
-                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                        }
-                        context.startActivity(intent)
-                    } catch (_: Exception) {}
-                    onDismiss()
-                },
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(10.dp),
-                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
-            ) {
-                Icon(
-                    painter = androidx.compose.ui.res.painterResource(id = com.example.R.drawable.ic_shortcut_settings),
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("Settings", fontSize = 12.sp, maxLines = 1)
-            }
-
-            FilledTonalButton(
-                onClick = {
-                    try {
-                        val intent = Intent(context, com.example.MainActivity::class.java).apply {
-                            action = Intent.ACTION_VIEW
-                            putExtra(com.example.util.AppShortcutHelper.EXTRA_CHAT_ID, com.example.util.AppShortcutHelper.DEFAULT_CHAT_ID)
-                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-                        }
-                        context.startActivity(intent)
-                    } catch (_: Exception) {}
-                    onDismiss()
-                },
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(10.dp),
-                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
-            ) {
-                Icon(
-                    painter = androidx.compose.ui.res.painterResource(id = com.example.R.drawable.ic_shortcut_chat),
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("Recent Chat", fontSize = 12.sp, maxLines = 1)
-            }
-        }
-        return
-    }
-
     if (category == AppCategoryType.MUSIC || packageName == YT_MUSIC_PACKAGE_NAME || packageName.contains("youtube.music", ignoreCase = true)) {
         YouTubeMusicFluxWidget(
             media = mediaPlayer,
@@ -1082,151 +1046,298 @@ private fun AppSpecificOperationsBar(
                 } catch (_: Exception) {}
             }
         )
-        return
+        Spacer(modifier = Modifier.height(10.dp))
     }
 
-    when (category) {
+    val shortcuts = remember(app.packageName, app.label) {
+        getAppShortcuts(context, app, category)
+    }
 
-        AppCategoryType.CAMERA -> {
+    if (shortcuts.isEmpty()) return
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Shortcut,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(13.dp)
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = "${(app.disguisedName ?: app.label).uppercase(Locale.getDefault())} SHORTCUTS",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.8.sp,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+
+        val chunks = remember(shortcuts) { shortcuts.chunked(2) }
+        chunks.forEach { rowShortcuts ->
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                FilledTonalButton(
-                    onClick = {
-                        try {
-                            val intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE).apply {
-                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            }
-                            context.startActivity(intent)
-                        } catch (_: Exception) {}
-                        onDismiss()
-                    },
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(10.dp),
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
-                ) {
-                    Icon(Icons.Filled.PhotoCamera, contentDescription = null, modifier = Modifier.size(15.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Take Photo", fontSize = 12.sp)
-                }
-
-                FilledTonalButton(
-                    onClick = {
-                        try {
-                            val intent = Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA).apply {
-                                putExtra("android.intent.extras.CAMERA_FACING", 1)
-                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            }
-                            context.startActivity(intent)
-                        } catch (_: Exception) {}
-                        onDismiss()
-                    },
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(10.dp),
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
-                ) {
-                    Icon(Icons.Filled.CameraFront, contentDescription = null, modifier = Modifier.size(15.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Selfie", fontSize = 12.sp)
-                }
-            }
-        }
-
-        AppCategoryType.BROWSER -> {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                FilledTonalButton(
-                    onClick = {
-                        try {
-                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com")).apply {
-                                setPackage(packageName)
-                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            }
-                            context.startActivity(intent)
-                        } catch (_: Exception) {
-                            val launchIntent = context.packageManager.getLaunchIntentForPackage(packageName)
-                            launchIntent?.let { context.startActivity(it) }
+                rowShortcuts.forEach { shortcut ->
+                    FilledTonalButton(
+                        onClick = {
+                            shortcut.onClick()
+                            onDismiss()
+                        },
+                        modifier = Modifier.weight(1f).height(42.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                    ) {
+                        if (shortcut.iconBitmap != null) {
+                            Image(
+                                bitmap = shortcut.iconBitmap.asImageBitmap(),
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                        } else if (shortcut.iconVector != null) {
+                            Icon(
+                                imageVector = shortcut.iconVector,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
                         }
-                        onDismiss()
-                    },
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(10.dp),
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
-                ) {
-                    Icon(Icons.Filled.OpenInBrowser, contentDescription = null, modifier = Modifier.size(15.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("New Tab", fontSize = 12.sp)
+                        Text(
+                            text = shortcut.label,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 }
-
-                FilledTonalButton(
-                    onClick = {
-                        try {
-                            val launchIntent = context.packageManager.getLaunchIntentForPackage(packageName)
-                            launchIntent?.let { context.startActivity(it) }
-                        } catch (_: Exception) {}
-                        onDismiss()
-                    },
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(10.dp),
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
-                ) {
-                    Icon(Icons.Filled.Shield, contentDescription = null, modifier = Modifier.size(15.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Private / Open", fontSize = 12.sp)
+                if (rowShortcuts.size == 1) {
+                    Spacer(modifier = Modifier.weight(1f))
                 }
             }
-        }
-
-        AppCategoryType.EMAIL -> {
-            FilledTonalButton(
-                onClick = {
-                    try {
-                        val intent = Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:")).apply {
-                            setPackage(packageName)
-                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                        }
-                        context.startActivity(intent)
-                    } catch (_: Exception) {}
-                    onDismiss()
-                },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(10.dp),
-                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
-            ) {
-                Icon(Icons.Filled.Edit, contentDescription = null, modifier = Modifier.size(15.dp))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("Compose New Email", fontSize = 12.sp)
-            }
-        }
-
-        AppCategoryType.CLOCK -> {
-            FilledTonalButton(
-                onClick = {
-                    try {
-                        val intent = Intent(AlarmClock.ACTION_SET_ALARM).apply {
-                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                        }
-                        context.startActivity(intent)
-                    } catch (_: Exception) {}
-                    onDismiss()
-                },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(10.dp),
-                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
-            ) {
-                Icon(Icons.Filled.Alarm, contentDescription = null, modifier = Modifier.size(15.dp))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("Set Alarm / Timer", fontSize = 12.sp)
-            }
-        }
-
-        else -> {
-            // Generic apps: no redundant buttons, keeps context menu minimal
         }
     }
+}
+
+private fun getAppShortcuts(context: Context, app: AppItem, category: AppCategoryType): List<CustomAppShortcutItem> {
+    val result = mutableListOf<CustomAppShortcutItem>()
+    val pkg = app.packageName
+
+    // 1. Query System LauncherApps Shortcuts (Android 7.1+)
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N_MR1) {
+        try {
+            val launcherApps = context.getSystemService(Context.LAUNCHER_APPS_SERVICE) as? LauncherApps
+            if (launcherApps != null) {
+                val query = LauncherApps.ShortcutQuery().apply {
+                    setPackage(pkg)
+                    setQueryFlags(
+                        LauncherApps.ShortcutQuery.FLAG_MATCH_DYNAMIC or
+                        LauncherApps.ShortcutQuery.FLAG_MATCH_MANIFEST or
+                        LauncherApps.ShortcutQuery.FLAG_MATCH_PINNED
+                    )
+                }
+                val shortcuts = launcherApps.getShortcuts(query, android.os.Process.myUserHandle())
+                if (!shortcuts.isNullOrEmpty()) {
+                    for (shortcut in shortcuts.take(4)) {
+                        val label = shortcut.shortLabel?.toString() ?: shortcut.longLabel?.toString() ?: continue
+                        val drawable = try {
+                            launcherApps.getShortcutIconDrawable(shortcut, context.resources.displayMetrics.densityDpi)
+                        } catch (_: Exception) { null }
+                        val bitmap = drawable?.let { drawableToBitmap(it) }
+
+                        result.add(
+                            CustomAppShortcutItem(
+                                id = shortcut.id,
+                                label = label,
+                                iconBitmap = bitmap,
+                                iconVector = Icons.Filled.Shortcut,
+                                onClick = {
+                                    try {
+                                        launcherApps.startShortcut(shortcut, null, null)
+                                    } catch (_: Exception) {
+                                        shortcut.intent?.let {
+                                            it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                            context.startActivity(it)
+                                        }
+                                    }
+                                }
+                            )
+                        )
+                    }
+                }
+            }
+        } catch (_: Exception) {}
+    }
+
+    if (result.isNotEmpty()) {
+        return result
+    }
+
+    // 2. App-Specific Tailored Shortcuts based on package & category
+    val appLabel = app.label
+    val lowercasePkg = pkg.lowercase(Locale.getDefault())
+
+    if (lowercasePkg.contains("youtube") && !lowercasePkg.contains("music")) {
+        result.add(CustomAppShortcutItem("yt_sub", "Subscriptions", iconVector = Icons.Filled.Subscriptions) {
+            launchUriIntent(context, "vnd.youtube://www.youtube.com/feed/subscriptions", pkg)
+        })
+        result.add(CustomAppShortcutItem("yt_shorts", "Shorts", iconVector = Icons.Filled.VideoLibrary) {
+            launchUriIntent(context, "vnd.youtube://www.youtube.com/shorts", pkg)
+        })
+        result.add(CustomAppShortcutItem("yt_search", "Search Videos", iconVector = Icons.Filled.Search) {
+            launchUriIntent(context, "vnd.youtube://www.youtube.com/results", pkg)
+        })
+    } else if (lowercasePkg.contains("whatsapp")) {
+        result.add(CustomAppShortcutItem("wa_chat", "New Chat", iconVector = Icons.Filled.Chat) {
+            launchUriIntent(context, "https://api.whatsapp.com/send", pkg)
+        })
+        result.add(CustomAppShortcutItem("wa_camera", "Status / Camera", iconVector = Icons.Filled.PhotoCamera) {
+            launchPackageIntent(context, pkg)
+        })
+    } else if (lowercasePkg.contains("telegram")) {
+        result.add(CustomAppShortcutItem("tg_msg", "New Message", iconVector = Icons.Filled.Send) {
+            launchUriIntent(context, "tg://msg", pkg)
+        })
+        result.add(CustomAppShortcutItem("tg_saved", "Saved Messages", iconVector = Icons.Filled.Bookmark) {
+            launchPackageIntent(context, pkg)
+        })
+    } else if (lowercasePkg.contains("instagram")) {
+        result.add(CustomAppShortcutItem("ig_post", "New Post", iconVector = Icons.Filled.AddBox) {
+            launchUriIntent(context, "instagram://camera", pkg)
+        })
+        result.add(CustomAppShortcutItem("ig_direct", "Direct Messages", iconVector = Icons.Filled.Email) {
+            launchUriIntent(context, "instagram://direct", pkg)
+        })
+    } else if (lowercasePkg.contains("twitter") || lowercasePkg.contains("x.android")) {
+        result.add(CustomAppShortcutItem("tw_post", "New Post", iconVector = Icons.Filled.Create) {
+            launchUriIntent(context, "twitter://post", pkg)
+        })
+        result.add(CustomAppShortcutItem("tw_dm", "Direct Messages", iconVector = Icons.Filled.Email) {
+            launchUriIntent(context, "twitter://messages", pkg)
+        })
+    } else if (lowercasePkg.contains("chrome") || category == AppCategoryType.BROWSER) {
+        result.add(CustomAppShortcutItem("br_tab", "New Tab", iconVector = Icons.Filled.OpenInBrowser) {
+            launchUriIntent(context, "https://www.google.com", pkg)
+        })
+        result.add(CustomAppShortcutItem("br_bookmarks", "Bookmarks", iconVector = Icons.Filled.Bookmark) {
+            launchPackageIntent(context, pkg)
+        })
+    } else if (lowercasePkg.contains("maps") || lowercasePkg.contains("navigation")) {
+        result.add(CustomAppShortcutItem("map_home", "Navigate Home", iconVector = Icons.Filled.Home) {
+            launchUriIntent(context, "google.navigation:q=Home", pkg)
+        })
+        result.add(CustomAppShortcutItem("map_work", "Navigate Work", iconVector = Icons.Filled.Work) {
+            launchUriIntent(context, "google.navigation:q=Work", pkg)
+        })
+        result.add(CustomAppShortcutItem("map_nearby", "Search Nearby", iconVector = Icons.Filled.Place) {
+            launchUriIntent(context, "geo:0,0?q=restaurants", pkg)
+        })
+    } else if (category == AppCategoryType.CAMERA || lowercasePkg.contains("camera")) {
+        result.add(CustomAppShortcutItem("cam_photo", "Take Photo", iconVector = Icons.Filled.PhotoCamera) {
+            try { context.startActivity(Intent(MediaStore.ACTION_IMAGE_CAPTURE).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } catch (_: Exception) {}
+        })
+        result.add(CustomAppShortcutItem("cam_selfie", "Selfie", iconVector = Icons.Filled.CameraFront) {
+            try { context.startActivity(Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA).putExtra("android.intent.extras.CAMERA_FACING", 1).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } catch (_: Exception) {}
+        })
+    } else if (category == AppCategoryType.EMAIL || lowercasePkg.contains("gmail") || lowercasePkg.contains("mail")) {
+        result.add(CustomAppShortcutItem("mail_compose", "Compose Email", iconVector = Icons.Filled.Edit) {
+            try { context.startActivity(Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:")).setPackage(pkg).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } catch (_: Exception) {}
+        })
+        result.add(CustomAppShortcutItem("mail_inbox", "Inbox", iconVector = Icons.Filled.Inbox) {
+            launchPackageIntent(context, pkg)
+        })
+    } else if (category == AppCategoryType.CLOCK || lowercasePkg.contains("clock") || lowercasePkg.contains("deskclock") || lowercasePkg.contains("alarm")) {
+        result.add(CustomAppShortcutItem("clk_alarm", "Set Alarm", iconVector = Icons.Filled.Alarm) {
+            try { context.startActivity(Intent(AlarmClock.ACTION_SET_ALARM).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } catch (_: Exception) {}
+        })
+        result.add(CustomAppShortcutItem("clk_app", "Open Clock", iconVector = Icons.Filled.Timer) {
+            com.example.util.WidgetIntegrationsManager(context).launchClockApp()
+        })
+    } else if (category == AppCategoryType.WEATHER || lowercasePkg.contains("weather")) {
+        result.add(CustomAppShortcutItem("wtr_app", "Forecast & Radar", iconVector = Icons.Filled.WbSunny) {
+            com.example.util.WidgetIntegrationsManager(context).launchWeatherApp()
+        })
+    } else if (lowercasePkg.contains("settings") || pkg == context.packageName) {
+        result.add(CustomAppShortcutItem("stg_wifi", "Wi-Fi & Network", iconVector = Icons.Filled.Wifi) {
+            try { context.startActivity(Intent(Settings.ACTION_WIFI_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } catch (_: Exception) {}
+        })
+        result.add(CustomAppShortcutItem("stg_bt", "Bluetooth", iconVector = Icons.Filled.Bluetooth) {
+            try { context.startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } catch (_: Exception) {}
+        })
+    } else if (lowercasePkg.contains("dialer") || lowercasePkg.contains("phone") || lowercasePkg.contains("contacts")) {
+        result.add(CustomAppShortcutItem("ph_dial", "Keypad Dialer", iconVector = Icons.Filled.Dialpad) {
+            try { context.startActivity(Intent(Intent.ACTION_DIAL).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } catch (_: Exception) {}
+        })
+        result.add(CustomAppShortcutItem("ph_contacts", "Contacts", iconVector = Icons.Filled.Contacts) {
+            try { context.startActivity(Intent(Intent.ACTION_VIEW, ContactsContract.Contacts.CONTENT_URI).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } catch (_: Exception) {}
+        })
+    } else {
+        // App-specific shortcuts generated for any other app
+        result.add(CustomAppShortcutItem("app_open", "Open $appLabel", iconVector = Icons.Filled.Launch) {
+            launchPackageIntent(context, pkg)
+        })
+        result.add(CustomAppShortcutItem("app_info", "$appLabel Info", iconVector = Icons.Filled.Info) {
+            try {
+                val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                    data = Uri.fromParts("package", pkg, null)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(intent)
+            } catch (_: Exception) {}
+        })
+        result.add(CustomAppShortcutItem("app_notif", "Notifications", iconVector = Icons.Filled.Notifications) {
+            try {
+                val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                    putExtra(Settings.EXTRA_APP_PACKAGE, pkg)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(intent)
+            } catch (_: Exception) {}
+        })
+    }
+
+    return result
+}
+
+private fun launchPackageIntent(context: Context, packageName: String) {
+    try {
+        val launchIntent = context.packageManager.getLaunchIntentForPackage(packageName)
+        if (launchIntent != null) {
+            launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(launchIntent)
+        }
+    } catch (_: Exception) {}
+}
+
+private fun launchUriIntent(context: Context, uriString: String, fallbackPackage: String) {
+    try {
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(uriString)).apply {
+            setPackage(fallbackPackage)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        context.startActivity(intent)
+    } catch (_: Exception) {
+        launchPackageIntent(context, fallbackPackage)
+    }
+}
+
+private fun drawableToBitmap(drawable: Drawable): Bitmap {
+    if (drawable is BitmapDrawable && drawable.bitmap != null) {
+        return drawable.bitmap
+    }
+    val width = if (drawable.intrinsicWidth > 0) drawable.intrinsicWidth else 64
+    val height = if (drawable.intrinsicHeight > 0) drawable.intrinsicHeight else 64
+    val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+    val canvas = android.graphics.Canvas(bitmap)
+    drawable.setBounds(0, 0, canvas.width, canvas.height)
+    drawable.draw(canvas)
+    return bitmap
 }
 
 @Composable

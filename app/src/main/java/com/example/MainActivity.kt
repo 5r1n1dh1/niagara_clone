@@ -191,11 +191,25 @@ fun NiagaraLauncherScreen(
     val appWidgetHost = remember { AppWidgetHost(context, 1024) }
     var pendingAppWidgetId by remember { mutableStateOf<Int?>(null) }
 
-    DisposableEffect(appWidgetHost) {
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, appWidgetHost) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_START) {
+                try {
+                    appWidgetHost.startListening()
+                } catch (_: Throwable) {}
+            } else if (event == androidx.lifecycle.Lifecycle.Event.ON_STOP) {
+                try {
+                    appWidgetHost.stopListening()
+                } catch (_: Throwable) {}
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
         try {
             appWidgetHost.startListening()
         } catch (_: Throwable) {}
         onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
             try {
                 appWidgetHost.stopListening()
             } catch (_: Throwable) {}
@@ -287,7 +301,6 @@ fun NiagaraLauncherScreen(
     val coroutineScope = rememberCoroutineScope()
     val keyboardController = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
-    val lifecycleOwner = LocalLifecycleOwner.current
 
     // Ensure keyboard is dismissed and focus cleared whenever switching away from All Apps screen
     LaunchedEffect(pagerState.currentPage) {
@@ -459,6 +472,7 @@ fun NiagaraLauncherScreen(
                                 onToggleHeadphones = { viewModel.toggleHeadphonesConnected() },
                                 onRefreshWeather = { viewModel.showToast("Updated weather for ${weather.location} ⛅") },
                                 onOpenWeather = { viewModel.launchIntegration(com.example.util.IntegrationCategory.WEATHER) },
+                                onOpenClock = { viewModel.launchIntegration(com.example.util.IntegrationCategory.CLOCK) },
                                 onOpenCalendar = { viewModel.launchIntegration(com.example.util.IntegrationCategory.CALENDAR) },
                                 onUpdateWidgetSize = { id, size -> viewModel.updateLeftWidgetSize(id, size) }
                             )
@@ -494,6 +508,7 @@ fun NiagaraLauncherScreen(
                                 onSeekMedia = { viewModel.seekMedia(it) },
                                 onToggleHeadphones = { viewModel.toggleHeadphonesConnected() },
                                 onOpenWeather = { viewModel.launchIntegration(com.example.util.IntegrationCategory.WEATHER) },
+                                onOpenClock = { viewModel.launchIntegration(com.example.util.IntegrationCategory.CLOCK) },
                                 onOpenCalendar = { viewModel.launchIntegration(com.example.util.IntegrationCategory.CALENDAR) },
                                 onOpenCarouselCustomize = { viewModel.openCarouselCustomize() },
                                 onAddSystemWidget = launchAddSystemWidget,

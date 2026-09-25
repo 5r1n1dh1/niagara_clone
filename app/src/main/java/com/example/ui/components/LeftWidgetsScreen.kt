@@ -58,6 +58,7 @@ fun LeftWidgetsScreen(
     onToggleHeadphones: () -> Unit,
     onRefreshWeather: () -> Unit,
     onOpenWeather: () -> Unit = {},
+    onOpenClock: () -> Unit = {},
     onOpenCalendar: () -> Unit = {},
     onUpdateWidgetSize: (String, String) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier
@@ -246,6 +247,8 @@ fun LeftWidgetsScreen(
                             onMediaPrev = onMediaPrev,
                             onToggleHeadphones = onToggleHeadphones,
                             onRefreshWeather = onRefreshWeather,
+                            onOpenWeather = onOpenWeather,
+                            onOpenClock = onOpenClock,
                             onUpdateSize = { newSize -> onUpdateWidgetSize(item.id, newSize) }
                         )
                     }
@@ -281,6 +284,8 @@ private fun LeftWidgetCardWrapper(
     onMediaPrev: () -> Unit,
     onToggleHeadphones: () -> Unit,
     onRefreshWeather: () -> Unit,
+    onOpenWeather: () -> Unit = {},
+    onOpenClock: () -> Unit = {},
     onUpdateSize: (String) -> Unit = {}
 ) {
     FrostedGlassPanel(
@@ -413,10 +418,10 @@ private fun LeftWidgetCardWrapper(
                 // Body depending on widget type
                 when (widget.type) {
                     WidgetType.CLOCK -> {
-                        ClockWidgetBody(size = widget.heightCategory)
+                        ClockWidgetBody(size = widget.heightCategory, onOpenClock = onOpenClock)
                     }
                     WidgetType.WEATHER_FORECAST -> {
-                        WeatherWidgetBody(weather = weather, size = widget.heightCategory, onRefresh = onRefreshWeather)
+                        WeatherWidgetBody(weather = weather, size = widget.heightCategory, onRefresh = onRefreshWeather, onOpenWeather = onOpenWeather)
                     }
                     WidgetType.NEWS_FEED -> {
                         NewsWidgetBody(size = widget.heightCategory)
@@ -446,7 +451,7 @@ private fun LeftWidgetCardWrapper(
                         MindfulnessWidgetBody(size = widget.heightCategory)
                     }
                     WidgetType.DUAL_CLOCK -> {
-                        DualClockWidgetBody(size = widget.heightCategory)
+                        DualClockWidgetBody(size = widget.heightCategory, onOpenClock = onOpenClock)
                     }
                 }
             }
@@ -455,8 +460,14 @@ private fun LeftWidgetCardWrapper(
 }
 
 @Composable
-private fun WeatherWidgetBody(weather: WeatherInfo, size: String = "4x2", onRefresh: () -> Unit) {
-    when (size) {
+private fun WeatherWidgetBody(
+    weather: WeatherInfo,
+    size: String = "4x2",
+    onRefresh: () -> Unit,
+    onOpenWeather: () -> Unit = {}
+) {
+    Box(modifier = Modifier.clickable(onClick = onOpenWeather)) {
+        when (size) {
         "4x1" -> {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -680,6 +691,7 @@ private fun WeatherWidgetBody(weather: WeatherInfo, size: String = "4x2", onRefr
                 }
             }
         }
+    }
     }
 }
 
@@ -919,7 +931,7 @@ private fun MindfulnessWidgetBody(size: String = "4x2") {
 }
 
 @Composable
-private fun ClockWidgetBody(size: String = "4x2") {
+private fun ClockWidgetBody(size: String = "4x2", onOpenClock: () -> Unit = {}) {
     var currentTime by remember { mutableStateOf(Calendar.getInstance()) }
     LaunchedEffect(Unit) {
         while (true) {
@@ -932,6 +944,7 @@ private fun ClockWidgetBody(size: String = "4x2") {
     val dateFormat = remember { SimpleDateFormat("EEEE, MMMM d, yyyy", Locale.getDefault()) }
     val shortDateFormat = remember { SimpleDateFormat("EEE, MMM d", Locale.getDefault()) }
 
+    Box(modifier = Modifier.fillMaxSize().clickable(onClick = onOpenClock)) {
     when (size) {
         "4x1" -> {
             Row(
@@ -1138,12 +1151,14 @@ private fun ClockWidgetBody(size: String = "4x2") {
             }
         }
     }
+    }
 }
 
 @Composable
-private fun DualClockWidgetBody(size: String = "4x2") {
+private fun DualClockWidgetBody(size: String = "4x2", onOpenClock: () -> Unit = {}) {
     val sdf = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
     val now = Date()
+    Box(modifier = Modifier.fillMaxSize().clickable(onClick = onOpenClock)) {
     when (size) {
         "4x1" -> {
             Row(
@@ -1208,6 +1223,7 @@ private fun DualClockWidgetBody(size: String = "4x2") {
             }
         }
     }
+}
 }
 
 /**

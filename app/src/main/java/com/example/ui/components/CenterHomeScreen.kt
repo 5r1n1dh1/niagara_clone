@@ -255,6 +255,7 @@ fun CenterHomeScreen(
     onSeekMedia: (Float) -> Unit = {},
     onToggleHeadphones: () -> Unit,
     onOpenWeather: () -> Unit,
+    onOpenClock: () -> Unit = {},
     onOpenCalendar: () -> Unit,
     onOpenCarouselCustomize: () -> Unit,
     onAddSystemWidget: () -> Unit = {},
@@ -379,6 +380,7 @@ fun CenterHomeScreen(
                                 onSeekMedia = onSeekMedia,
                                 onToggleHeadphones = onToggleHeadphones,
                                 onOpenWeather = onOpenWeather,
+                                onOpenClock = onOpenClock,
                                 onOpenCalendar = onOpenCalendar,
                                 onOpenCustomize = onOpenCarouselCustomize,
                                 onOpenSettings = onOpenSettings

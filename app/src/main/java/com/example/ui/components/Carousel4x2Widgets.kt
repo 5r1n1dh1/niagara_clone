@@ -52,6 +52,7 @@ fun Carousel4x2WidgetCard(
     onSeekMedia: (Float) -> Unit = {},
     onToggleHeadphones: () -> Unit,
     onOpenWeather: () -> Unit,
+    onOpenClock: () -> Unit = {},
     onOpenCalendar: () -> Unit,
     onOpenCustomize: () -> Unit,
     onOpenSettings: () -> Unit = {},
@@ -87,6 +88,7 @@ fun Carousel4x2WidgetCard(
                         showSeconds = showSeconds,
                         clockColorTintHex = clockColorTintHex,
                         clockScale = clockScale,
+                        onOpenClock = onOpenClock,
                         onOpenWeather = onOpenWeather,
                         onOpenCalendar = onOpenCalendar,
                         onOpenSettings = onOpenSettings
@@ -131,7 +133,7 @@ fun Carousel4x2WidgetCard(
                     Mindfulness4x2Widget()
                 }
                 WidgetType.DUAL_CLOCK -> {
-                    DualClock4x2Widget()
+                    DualClock4x2Widget(onOpenClock = onOpenClock)
                 }
             }
         }
@@ -397,13 +399,13 @@ private fun Mindfulness4x2Widget() {
 }
 
 @Composable
-private fun DualClock4x2Widget() {
+private fun DualClock4x2Widget(onOpenClock: () -> Unit = {}) {
     val sdfLocal = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
     val sdfDate = remember { SimpleDateFormat("EEE, MMM d", Locale.getDefault()) }
     val now = Date()
 
     Column(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxSize().clickable(onClick = onOpenClock),
         verticalArrangement = Arrangement.SpaceBetween
     ) {
         Text(
@@ -450,6 +452,7 @@ private fun Clock4x2Widget(
     showSeconds: Boolean = false,
     clockColorTintHex: String = "#FFFFFF",
     clockScale: Float = 1.0f,
+    onOpenClock: () -> Unit = {},
     onOpenWeather: () -> Unit,
     onOpenCalendar: () -> Unit,
     onOpenSettings: () -> Unit
@@ -489,7 +492,8 @@ private fun Clock4x2Widget(
             verticalAlignment = Alignment.Top
         ) {
             Row(
-                verticalAlignment = Alignment.Bottom
+                verticalAlignment = Alignment.Bottom,
+                modifier = Modifier.clickable(onClick = onOpenClock)
             ) {
                 Text(
                     text = timeFormat.format(currentTime.time),
