@@ -7,4 +7,9 @@
     <string name="usage_breaker_title">Mindful Pause</string>
     <string name="take_a_breath">Take a mindful breath before continuing</string>
     <string name="accessibility_service_description">Enables double-tap to turn off and lock the screen seamlessly.</string>
+    <string name="shortcut_settings_short_label">Settings</string>
+    <string name="shortcut_settings_long_label">Open Settings</string>
+    <string name="shortcut_settings_disabled_message">Settings is currently disabled</string>
+    <string name="shortcut_chat_short_label">Recent Chat</string>
+    <string name="shortcut_chat_long_label">Open Recent Chat</string>
 </resources>

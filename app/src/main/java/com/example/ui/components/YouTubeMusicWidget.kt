@@ -292,6 +292,15 @@ fun YouTubeMusicFluxWidget(
             )
         } else {
             when (size) {
+                "4x1" -> {
+                    YouTubeMusicLayout4x1(
+                        media = media,
+                        onTogglePlay = onTogglePlay,
+                        onNext = onNext,
+                        onPrev = onPrev,
+                        onOpenApp = handleOpenApp
+                    )
+                }
                 "4x3" -> {
                     YouTubeMusicLayout4x3(
                         media = media,
@@ -373,6 +382,87 @@ fun YouTubeMusicFluxWidget(
             ) {
                 widgetContent()
             }
+        }
+    }
+}
+
+/**
+ * 4x1 Compact Single-Row Layout
+ */
+@Composable
+private fun YouTubeMusicLayout4x1(
+    media: MediaPlaybackState,
+    onTogglePlay: () -> Unit,
+    onNext: () -> Unit,
+    onPrev: () -> Unit,
+    onOpenApp: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onOpenApp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            YouTubeMusicAlbumArt(
+                bitmap = media.albumArtBitmap,
+                isPlaying = media.isPlaying,
+                size = 36.dp,
+                onClick = onOpenApp
+            )
+
+            Spacer(modifier = Modifier.width(10.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = media.trackTitle.ifBlank { "YouTube Music" },
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = if (media.artistName.isNotBlank()) "${media.artistName} • ${media.currentTimeText}/${media.durationText}"
+                           else "Ready to play",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onPrev, modifier = Modifier.size(28.dp)) {
+                    Icon(Icons.Filled.SkipPrevious, contentDescription = "Prev", modifier = Modifier.size(18.dp))
+                }
+                IconButton(onClick = onTogglePlay, modifier = Modifier.size(32.dp)) {
+                    Icon(
+                        imageVector = if (media.isPlaying) Icons.Filled.PauseCircle else Icons.Filled.PlayCircle,
+                        contentDescription = "Play/Pause",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(26.dp)
+                    )
+                }
+                IconButton(onClick = onNext, modifier = Modifier.size(28.dp)) {
+                    Icon(Icons.Filled.SkipNext, contentDescription = "Next", modifier = Modifier.size(18.dp))
+                }
+            }
+        }
+
+        if (media.progressPercent > 0f) {
+            Spacer(modifier = Modifier.height(4.dp))
+            LinearProgressIndicator(
+                progress = { media.progressPercent },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(3.dp)
+                    .clip(RoundedCornerShape(1.5.dp)),
+                color = MaterialTheme.colorScheme.primary,
+                trackColor = MaterialTheme.colorScheme.surfaceVariant
+            )
         }
     }
 }

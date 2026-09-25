@@ -606,12 +606,12 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         vibrateClick()
     }
 
-    fun addLeftSystemWidget(appWidgetId: Int, label: String = "System Widget") {
+    fun addLeftSystemWidget(appWidgetId: Int, label: String = "System Widget", heightCategory: String = "4x2") {
         if (settings.value.isLayoutLocked) {
             showToast("🔒 Layout is locked. Unlock to modify widgets.")
             return
         }
-        repository.addLeftSystemWidget(appWidgetId, label)
+        repository.addLeftSystemWidget(appWidgetId, label, heightCategory)
         _isAddWidgetOpen.value = false
         showToast("Added $label")
         vibrateClick()

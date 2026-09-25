@@ -1233,13 +1233,13 @@ class LauncherRepository(private val context: Context) {
         prefs.edit().putString("left_widgets_json", arr.toString()).apply()
     }
 
-    fun addLeftSystemWidget(appWidgetId: Int, label: String = "System Widget") {
+    fun addLeftSystemWidget(appWidgetId: Int, label: String = "System Widget", heightCategory: String = "4x2") {
         val newWidget = CustomWidgetConfig(
             id = "sys_${appWidgetId}_${System.currentTimeMillis()}",
             type = WidgetType.SYSTEM_WIDGET,
             title = label.ifBlank { "System Widget" },
             appWidgetId = appWidgetId,
-            heightCategory = "4x2"
+            heightCategory = heightCategory
         )
         val updated = _leftWidgets.value + newWidget
         _leftWidgets.value = updated

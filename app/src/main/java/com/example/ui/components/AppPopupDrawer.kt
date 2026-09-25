@@ -994,6 +994,62 @@ private fun AppSpecificOperationsBar(
     mediaPlayer: com.example.data.MediaPlaybackState = com.example.data.MediaPlaybackState(),
     onDismiss: () -> Unit
 ) {
+    if (packageName == context.packageName) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            FilledTonalButton(
+                onClick = {
+                    try {
+                        val intent = Intent(context, com.example.SettingsActivity::class.java).apply {
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        context.startActivity(intent)
+                    } catch (_: Exception) {}
+                    onDismiss()
+                },
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(10.dp),
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+            ) {
+                Icon(
+                    painter = androidx.compose.ui.res.painterResource(id = com.example.R.drawable.ic_shortcut_settings),
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Settings", fontSize = 12.sp, maxLines = 1)
+            }
+
+            FilledTonalButton(
+                onClick = {
+                    try {
+                        val intent = Intent(context, com.example.MainActivity::class.java).apply {
+                            action = Intent.ACTION_VIEW
+                            putExtra(com.example.util.AppShortcutHelper.EXTRA_CHAT_ID, com.example.util.AppShortcutHelper.DEFAULT_CHAT_ID)
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                        }
+                        context.startActivity(intent)
+                    } catch (_: Exception) {}
+                    onDismiss()
+                },
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(10.dp),
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+            ) {
+                Icon(
+                    painter = androidx.compose.ui.res.painterResource(id = com.example.R.drawable.ic_shortcut_chat),
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Recent Chat", fontSize = 12.sp, maxLines = 1)
+            }
+        }
+        return
+    }
+
     if (category == AppCategoryType.MUSIC || packageName == YT_MUSIC_PACKAGE_NAME || packageName.contains("youtube.music", ignoreCase = true)) {
         YouTubeMusicFluxWidget(
             media = mediaPlayer,

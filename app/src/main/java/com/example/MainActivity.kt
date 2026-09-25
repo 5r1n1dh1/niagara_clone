@@ -66,11 +66,21 @@ import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
+    companion object {
+        private const val TAG = "MainActivity"
+    }
+
     private val viewModel: LauncherViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        // Handle shortcut intent if launched via static/dynamic shortcut
+        handleShortcutIntent(intent)
+
+        // Publish or refresh dynamic shortcut on app start
+        com.example.util.AppShortcutHelper.publishRecentChatShortcut(this)
 
         setContent {
             val settings by viewModel.settings.collectAsState()
@@ -102,8 +112,17 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        handleShortcutIntent(intent)
         if (intent.action == Intent.ACTION_MAIN || intent.hasCategory(Intent.CATEGORY_HOME)) {
             viewModel.onHomeGestureTriggered()
+        }
+    }
+
+    private fun handleShortcutIntent(intent: Intent?) {
+        if (intent == null) return
+        val chatId = intent.getStringExtra(com.example.util.AppShortcutHelper.EXTRA_CHAT_ID)
+        if (!chatId.isNullOrBlank()) {
+            android.util.Log.i(TAG, "Intercepted App Shortcut - Recent Chat triggered with EXTRA_CHAT_ID: $chatId")
         }
     }
 
@@ -183,63 +202,61 @@ fun NiagaraLauncherScreen(
         }
     }
 
+    var isSystemWidgetPickerOpen by remember { mutableStateOf(false) }
+    var pendingWidgetProviderInfo by remember { mutableStateOf<android.appwidget.AppWidgetProviderInfo?>(null) }
+    var pendingWidgetHeightCategory by remember { mutableStateOf("4x2") }
+
     val configureWidgetLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
         val appWidgetId = pendingAppWidgetId
+        val providerInfo = pendingWidgetProviderInfo
+        val heightCategory = pendingWidgetHeightCategory
         if (result.resultCode == Activity.RESULT_OK && appWidgetId != null && appWidgetId > 0) {
-            val info = appWidgetManager.getAppWidgetInfo(appWidgetId)
+            val info = appWidgetManager.getAppWidgetInfo(appWidgetId) ?: providerInfo
             val label = info?.loadLabel(context.packageManager)?.toString() ?: "System Widget"
-            viewModel.addLeftSystemWidget(appWidgetId, label)
+            viewModel.addLeftSystemWidget(appWidgetId, label, heightCategory)
         } else if (appWidgetId != null && appWidgetId > 0) {
             try {
                 appWidgetHost.deleteAppWidgetId(appWidgetId)
             } catch (_: Throwable) {}
         }
         pendingAppWidgetId = null
+        pendingWidgetProviderInfo = null
     }
 
-    val pickWidgetLauncher = rememberLauncherForActivityResult(
+    val bindWidgetLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
-            val appWidgetId = result.data?.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, -1) ?: -1
-            if (appWidgetId != -1) {
-                val info = appWidgetManager.getAppWidgetInfo(appWidgetId)
-                if (info?.configure != null) {
-                    pendingAppWidgetId = appWidgetId
-                    val configureIntent = Intent(AppWidgetManager.ACTION_APPWIDGET_CONFIGURE).apply {
-                        component = info.configure
-                        putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
-                    }
-                    configureWidgetLauncher.launch(configureIntent)
-                } else {
-                    val label = info?.loadLabel(context.packageManager)?.toString() ?: "System Widget"
-                    viewModel.addLeftSystemWidget(appWidgetId, label)
+        val appWidgetId = pendingAppWidgetId
+        val providerInfo = pendingWidgetProviderInfo
+        val heightCategory = pendingWidgetHeightCategory
+        if (result.resultCode == Activity.RESULT_OK && appWidgetId != null && appWidgetId > 0 && providerInfo != null) {
+            if (providerInfo.configure != null) {
+                val configureIntent = Intent(AppWidgetManager.ACTION_APPWIDGET_CONFIGURE).apply {
+                    component = providerInfo.configure
+                    putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
                 }
+                configureWidgetLauncher.launch(configureIntent)
+            } else {
+                val label = providerInfo.loadLabel(context.packageManager)?.toString() ?: "System Widget"
+                viewModel.addLeftSystemWidget(appWidgetId, label, heightCategory)
+                pendingAppWidgetId = null
+                pendingWidgetProviderInfo = null
             }
         } else {
-            val appWidgetId = pendingAppWidgetId
             if (appWidgetId != null && appWidgetId > 0) {
                 try {
                     appWidgetHost.deleteAppWidgetId(appWidgetId)
                 } catch (_: Throwable) {}
             }
             pendingAppWidgetId = null
+            pendingWidgetProviderInfo = null
         }
     }
 
     val launchAddSystemWidget: () -> Unit = {
-        try {
-            val newId = appWidgetHost.allocateAppWidgetId()
-            pendingAppWidgetId = newId
-            val pickIntent = Intent(AppWidgetManager.ACTION_APPWIDGET_PICK).apply {
-                putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, newId)
-            }
-            pickWidgetLauncher.launch(pickIntent)
-        } catch (_: Throwable) {
-            viewModel.showToast("Could not open system widget picker")
-        }
+        isSystemWidgetPickerOpen = true
     }
 
     val isSearchOpen by viewModel.isSearchOpen.collectAsState()
@@ -425,7 +442,15 @@ fun NiagaraLauncherScreen(
                                 appWidgetManager = appWidgetManager,
                                 onAddWidgetClick = { viewModel.openAddWidgetDialog() },
                                 onAddSystemWidgetClick = launchAddSystemWidget,
-                                onDeleteWidget = { id -> viewModel.deleteLeftWidget(id) },
+                                onDeleteWidget = { id ->
+                                    val target = leftWidgets.firstOrNull { it.id == id }
+                                    if (target != null && target.type == WidgetType.SYSTEM_WIDGET && target.appWidgetId > 0) {
+                                        try {
+                                            appWidgetHost.deleteAppWidgetId(target.appWidgetId)
+                                        } catch (_: Throwable) {}
+                                    }
+                                    viewModel.deleteLeftWidget(id)
+                                },
                                 onReorderWidget = { from, to -> viewModel.reorderLeftWidget(from, to) },
                                 onEditNoteClick = { widget -> viewModel.openEditNoteWidget(widget) },
                                 onToggleMediaPlay = { viewModel.toggleMediaPlayPause() },
@@ -652,6 +677,57 @@ fun NiagaraLauncherScreen(
         if (isDiscoverOpen) {
             GoogleDiscoverSheet(
                 onDismiss = { viewModel.closeDiscover() }
+            )
+        }
+
+        // System App Widget Picker Sheet
+        if (isSystemWidgetPickerOpen) {
+            SystemWidgetPickerSheet(
+                onSelectWidget = { providerInfo, heightCat ->
+                    isSystemWidgetPickerOpen = false
+                    try {
+                        val newId = appWidgetHost.allocateAppWidgetId()
+                        pendingAppWidgetId = newId
+                        pendingWidgetProviderInfo = providerInfo
+                        pendingWidgetHeightCategory = heightCat
+
+                        val canBind = try {
+                            appWidgetManager.bindAppWidgetIdIfAllowed(newId, providerInfo.provider)
+                        } catch (_: Throwable) {
+                            false
+                        }
+
+                        if (canBind) {
+                            if (providerInfo.configure != null) {
+                                val configureIntent = Intent(AppWidgetManager.ACTION_APPWIDGET_CONFIGURE).apply {
+                                    component = providerInfo.configure
+                                    putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, newId)
+                                }
+                                configureWidgetLauncher.launch(configureIntent)
+                            } else {
+                                val label = providerInfo.loadLabel(context.packageManager)?.toString() ?: "System Widget"
+                                viewModel.addLeftSystemWidget(newId, label, heightCat)
+                                pendingAppWidgetId = null
+                                pendingWidgetProviderInfo = null
+                            }
+                        } else {
+                            val bindIntent = Intent(AppWidgetManager.ACTION_APPWIDGET_BIND).apply {
+                                putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, newId)
+                                putExtra(AppWidgetManager.EXTRA_APPWIDGET_PROVIDER, providerInfo.provider)
+                            }
+                            bindWidgetLauncher.launch(bindIntent)
+                        }
+                    } catch (e: Throwable) {
+                        viewModel.showToast("Could not add widget: ${e.localizedMessage ?: "Unknown error"}")
+                        val idToClean = pendingAppWidgetId
+                        if (idToClean != null && idToClean > 0) {
+                            try { appWidgetHost.deleteAppWidgetId(idToClean) } catch (_: Throwable) {}
+                        }
+                        pendingAppWidgetId = null
+                        pendingWidgetProviderInfo = null
+                    }
+                },
+                onDismiss = { isSystemWidgetPickerOpen = false }
             )
         }
 

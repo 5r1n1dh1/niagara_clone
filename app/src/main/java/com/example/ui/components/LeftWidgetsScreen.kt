@@ -2,6 +2,8 @@ package com.example.ui.components
 
 import android.content.Intent
 import android.net.Uri
+import android.os.Bundle
+import android.appwidget.AppWidgetManager
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -61,6 +63,7 @@ fun LeftWidgetsScreen(
     modifier: Modifier = Modifier
 ) {
     var isEditMode by remember { mutableStateOf(false) }
+    var selectedWidgetForOptions by remember { mutableStateOf<CustomWidgetConfig?>(null) }
 
     FrostedGlassBackground(
         isFrostedTheme = isFrostedTheme,
@@ -69,6 +72,34 @@ fun LeftWidgetsScreen(
         glassEffect = glassEffect,
         modifier = modifier.testTag("left_widgets_screen")
     ) {
+        if (selectedWidgetForOptions != null) {
+            val targetWidget = selectedWidgetForOptions!!
+            val widgetIndex = widgets.indexOfFirst { it.id == targetWidget.id }
+            WidgetResizeAndOptionsSheet(
+                widget = targetWidget,
+                canMoveUp = widgetIndex > 0,
+                canMoveDown = widgetIndex >= 0 && widgetIndex < widgets.size - 1,
+                onUpdateSize = { newSz ->
+                    onUpdateWidgetSize(targetWidget.id, newSz)
+                    selectedWidgetForOptions = targetWidget.copy(heightCategory = newSz)
+                },
+                onMoveUp = {
+                    if (widgetIndex > 0) {
+                        onReorderWidget(widgetIndex, widgetIndex - 1)
+                    }
+                },
+                onMoveDown = {
+                    if (widgetIndex >= 0 && widgetIndex < widgets.size - 1) {
+                        onReorderWidget(widgetIndex, widgetIndex + 1)
+                    }
+                },
+                onDelete = {
+                    onDeleteWidget(targetWidget.id)
+                    selectedWidgetForOptions = null
+                },
+                onDismiss = { selectedWidgetForOptions = null }
+            )
+        }
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -167,10 +198,17 @@ fun LeftWidgetsScreen(
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center
                     )
                     Spacer(modifier = Modifier.height(16.dp))
-                    Button(onClick = onAddWidgetClick) {
-                        Icon(Icons.Filled.Add, contentDescription = null)
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Add First Widget")
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Button(onClick = onAddWidgetClick) {
+                            Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Add Widget")
+                        }
+                        OutlinedButton(onClick = onAddSystemWidgetClick) {
+                            Icon(Icons.Filled.Extension, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("System Widget")
+                        }
                     }
                 }
             }
@@ -198,6 +236,7 @@ fun LeftWidgetsScreen(
                             glassEffect = glassEffect,
                             appWidgetHost = appWidgetHost,
                             appWidgetManager = appWidgetManager,
+                            onOptionsClick = { selectedWidgetForOptions = item },
                             onDelete = { onDeleteWidget(item.id) },
                             onMoveUp = { onReorderWidget(index, index - 1) },
                             onMoveDown = { onReorderWidget(index, index + 1) },
@@ -232,6 +271,7 @@ private fun LeftWidgetCardWrapper(
     glassEffect: Float = 0.30f,
     appWidgetHost: android.appwidget.AppWidgetHost? = null,
     appWidgetManager: android.appwidget.AppWidgetManager? = null,
+    onOptionsClick: () -> Unit = {},
     onDelete: () -> Unit,
     onMoveUp: () -> Unit,
     onMoveDown: () -> Unit,
@@ -259,7 +299,10 @@ private fun LeftWidgetCardWrapper(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.clickable { onOptionsClick() }
+                ) {
                     Text(text = widget.type.iconEmoji, fontSize = 16.sp)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
@@ -269,6 +312,32 @@ private fun LeftWidgetCardWrapper(
                         letterSpacing = 1.sp,
                         color = MaterialTheme.colorScheme.primary
                     )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    // Size Badge
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
+                        modifier = Modifier.testTag("widget_size_badge_${widget.id}")
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = widget.heightCategory,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                            Spacer(modifier = Modifier.width(2.dp))
+                            Icon(
+                                Icons.Filled.Tune,
+                                contentDescription = "Resize",
+                                modifier = Modifier.size(10.dp),
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+                    }
                 }
 
                 // Edit controls & size picker chips
@@ -276,19 +345,21 @@ private fun LeftWidgetCardWrapper(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         val sizes = listOf("4x1", "4x2", "4x3", "4x4")
                         sizes.forEach { sz ->
+                            val isSelected = widget.heightCategory == sz
                             Surface(
                                 shape = RoundedCornerShape(6.dp),
-                                color = if (widget.heightCategory == sz) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
                                 modifier = Modifier
                                     .padding(horizontal = 2.dp)
                                     .clickable { onUpdateSize(sz) }
+                                    .testTag("resize_chip_${widget.id}_$sz")
                             ) {
                                 Text(
                                     text = sz,
-                                    fontSize = 9.sp,
+                                    fontSize = 10.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = if (widget.heightCategory == sz) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
                                 )
                             }
                         }
@@ -312,6 +383,18 @@ private fun LeftWidgetCardWrapper(
                             Icon(Icons.Filled.Delete, contentDescription = "Delete widget", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
                         }
                     }
+                } else {
+                    IconButton(
+                        onClick = onOptionsClick,
+                        modifier = Modifier.size(28.dp).testTag("widget_options_btn_${widget.id}")
+                    ) {
+                        Icon(
+                            Icons.Filled.MoreVert,
+                            contentDescription = "Widget options and resize",
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
 
@@ -319,24 +402,24 @@ private fun LeftWidgetCardWrapper(
 
             // Container size constraints based on heightCategory
             val bodyModifier = when (widget.heightCategory) {
-                "4x1" -> Modifier.fillMaxWidth().heightIn(max = 90.dp)
-                "4x2" -> Modifier.fillMaxWidth().heightIn(max = 170.dp)
-                "4x3" -> Modifier.fillMaxWidth().heightIn(max = 250.dp)
-                "4x4" -> Modifier.fillMaxWidth().heightIn(max = 330.dp)
-                else -> Modifier.fillMaxWidth()
+                "4x1" -> Modifier.fillMaxWidth().heightIn(min = 70.dp, max = 100.dp)
+                "4x2" -> Modifier.fillMaxWidth().heightIn(min = 150.dp, max = 185.dp)
+                "4x3" -> Modifier.fillMaxWidth().heightIn(min = 230.dp, max = 275.dp)
+                "4x4" -> Modifier.fillMaxWidth().heightIn(min = 310.dp, max = 365.dp)
+                else -> Modifier.fillMaxWidth().heightIn(min = 150.dp, max = 185.dp)
             }
 
             Box(modifier = bodyModifier) {
                 // Body depending on widget type
                 when (widget.type) {
                     WidgetType.CLOCK -> {
-                        ClockWidgetBody()
+                        ClockWidgetBody(size = widget.heightCategory)
                     }
                     WidgetType.WEATHER_FORECAST -> {
-                        WeatherWidgetBody(weather = weather, onRefresh = onRefreshWeather)
+                        WeatherWidgetBody(weather = weather, size = widget.heightCategory, onRefresh = onRefreshWeather)
                     }
                     WidgetType.NEWS_FEED -> {
-                        NewsWidgetBody()
+                        NewsWidgetBody(size = widget.heightCategory)
                     }
                     WidgetType.MEDIA_PLAYER -> {
                         YouTubeMusicFluxWidget(
@@ -351,18 +434,19 @@ private fun LeftWidgetCardWrapper(
                     WidgetType.SYSTEM_WIDGET -> {
                         SystemAppWidgetView(
                             appWidgetId = widget.appWidgetId,
+                            heightCategory = widget.heightCategory,
                             appWidgetHost = appWidgetHost,
                             appWidgetManager = appWidgetManager
                         )
                     }
                     WidgetType.QUICK_NOTE -> {
-                        QuickNoteWidgetBody(content = widget.content, onEdit = onEditNote)
+                        QuickNoteWidgetBody(content = widget.content, size = widget.heightCategory, onEdit = onEditNote)
                     }
                     WidgetType.MINDFULNESS_QUOTE -> {
-                        MindfulnessWidgetBody()
+                        MindfulnessWidgetBody(size = widget.heightCategory)
                     }
                     WidgetType.DUAL_CLOCK -> {
-                        DualClockWidgetBody()
+                        DualClockWidgetBody(size = widget.heightCategory)
                     }
                 }
             }
@@ -371,46 +455,228 @@ private fun LeftWidgetCardWrapper(
 }
 
 @Composable
-private fun WeatherWidgetBody(weather: WeatherInfo, onRefresh: () -> Unit) {
-    Column {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(text = weather.conditionIcon, fontSize = 34.sp)
-                Spacer(modifier = Modifier.width(10.dp))
-                Column {
-                    Text(
-                        text = "${weather.temperatureCelsius}°C  •  ${weather.condition}",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 17.sp,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = "${weather.location} • Rain ${weather.rainProbability}% • H:${weather.highTemp}° L:${weather.lowTemp}°",
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+private fun WeatherWidgetBody(weather: WeatherInfo, size: String = "4x2", onRefresh: () -> Unit) {
+    when (size) {
+        "4x1" -> {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(text = weather.conditionIcon, fontSize = 28.sp)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Text(
+                            text = "${weather.temperatureCelsius}°C  •  ${weather.condition}",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "${weather.location} • H:${weather.highTemp}° L:${weather.lowTemp}°",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                IconButton(onClick = onRefresh) {
+                    Icon(Icons.Filled.Refresh, contentDescription = "Refresh weather", tint = MaterialTheme.colorScheme.primary)
                 }
             }
-            IconButton(onClick = onRefresh) {
-                Icon(Icons.Filled.Refresh, contentDescription = "Refresh weather", tint = MaterialTheme.colorScheme.primary)
+        }
+        "4x3" -> {
+            Column {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(text = weather.conditionIcon, fontSize = 34.sp)
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                text = "${weather.temperatureCelsius}°C  •  ${weather.condition}",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 17.sp,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "${weather.location} • Rain ${weather.rainProbability}% • H:${weather.highTemp}° L:${weather.lowTemp}°",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    IconButton(onClick = onRefresh) {
+                        Icon(Icons.Filled.Refresh, contentDescription = "Refresh weather", tint = MaterialTheme.colorScheme.primary)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    weather.hourlyForecast.take(5).forEach { item ->
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(text = item.time, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(text = item.icon, fontSize = 18.sp, modifier = Modifier.padding(vertical = 2.dp))
+                            Text(text = "${item.temp}°", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        modifier = Modifier.weight(1f).padding(end = 4.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("Humidity", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("58%", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        modifier = Modifier.weight(1f).padding(horizontal = 2.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("Wind", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("14 km/h", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        modifier = Modifier.weight(1f).padding(start = 4.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("UV Index", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("4 Moderate", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
             }
         }
+        "4x4" -> {
+            Column {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(text = weather.conditionIcon, fontSize = 38.sp)
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                text = "${weather.temperatureCelsius}°C  •  ${weather.condition}",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 18.sp,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "${weather.location} • Rain ${weather.rainProbability}% • H:${weather.highTemp}° L:${weather.lowTemp}°",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    IconButton(onClick = onRefresh) {
+                        Icon(Icons.Filled.Refresh, contentDescription = "Refresh weather", tint = MaterialTheme.colorScheme.primary)
+                    }
+                }
 
-        Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            weather.hourlyForecast.forEach { item ->
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(text = item.time, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(text = item.icon, fontSize = 18.sp, modifier = Modifier.padding(vertical = 2.dp))
-                    Text(text = "${item.temp}°", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    weather.hourlyForecast.forEach { item ->
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(text = item.time, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(text = item.icon, fontSize = 18.sp, modifier = Modifier.padding(vertical = 2.dp))
+                            Text(text = "${item.temp}°", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                val upcomingDays = listOf(
+                    Triple("Tomorrow", "⛅", "25° / 17°"),
+                    Triple("Wednesday", "🌧️", "21° / 15°"),
+                    Triple("Thursday", "☀️", "26° / 18°")
+                )
+                upcomingDays.forEach { (day, ic, t) ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(day, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(ic, fontSize = 14.sp)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(t, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+                }
+            }
+        }
+        else -> { // Default 4x2
+            Column {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(text = weather.conditionIcon, fontSize = 34.sp)
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                text = "${weather.temperatureCelsius}°C  •  ${weather.condition}",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 17.sp,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "${weather.location} • Rain ${weather.rainProbability}% • H:${weather.highTemp}° L:${weather.lowTemp}°",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    IconButton(onClick = onRefresh) {
+                        Icon(Icons.Filled.Refresh, contentDescription = "Refresh weather", tint = MaterialTheme.colorScheme.primary)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    weather.hourlyForecast.forEach { item ->
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(text = item.time, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(text = item.icon, fontSize = 18.sp, modifier = Modifier.padding(vertical = 2.dp))
+                            Text(text = "${item.temp}°", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
                 }
             }
         }
@@ -570,7 +836,7 @@ private fun MediaWidgetBody(
 }
 
 @Composable
-private fun QuickNoteWidgetBody(content: String, onEdit: () -> Unit) {
+private fun QuickNoteWidgetBody(content: String, size: String = "4x2", onEdit: () -> Unit) {
     Surface(
         shape = RoundedCornerShape(12.dp),
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.6f),
@@ -580,48 +846,80 @@ private fun QuickNoteWidgetBody(content: String, onEdit: () -> Unit) {
             .clickable(onClick = onEdit)
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
+            val maxLines = when (size) {
+                "4x1" -> 1
+                "4x2" -> 3
+                "4x3" -> 7
+                "4x4" -> 12
+                else -> 3
+            }
             Text(
                 text = if (content.isBlank()) "Tap here to write your quick thoughts or to-do notes..." else content,
                 fontSize = 13.sp,
                 lineHeight = 18.sp,
+                maxLines = maxLines,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                 color = if (content.isBlank()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
             )
-            Spacer(modifier = Modifier.height(8.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(Icons.Filled.Edit, contentDescription = null, modifier = Modifier.size(12.dp), tint = MaterialTheme.colorScheme.primary)
-                Spacer(modifier = Modifier.width(4.dp))
-                Text("Tap to edit", fontSize = 11.sp, color = MaterialTheme.colorScheme.primary)
+            if (size != "4x1") {
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = if (content.isNotBlank()) "${content.length} chars" else "",
+                        fontSize = 10.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Filled.Edit, contentDescription = null, modifier = Modifier.size(12.dp), tint = MaterialTheme.colorScheme.primary)
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Tap to edit", fontSize = 11.sp, color = MaterialTheme.colorScheme.primary)
+                    }
+                }
             }
         }
     }
 }
 
 @Composable
-private fun MindfulnessWidgetBody() {
+private fun MindfulnessWidgetBody(size: String = "4x2") {
     Column {
         Text(
             text = "\"Simplicity is about subtracting the obvious and adding the meaningful.\"",
-            fontSize = 13.sp,
+            fontSize = if (size == "4x1") 12.sp else 13.sp,
             fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
-            color = MaterialTheme.colorScheme.onSurface
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = if (size == "4x1") 2 else 4
         )
-        Spacer(modifier = Modifier.height(8.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text("Screen Time: 1h 42m", fontSize = 12.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Medium)
-            Text("Mindful Interventions: 3", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (size != "4x1") {
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text("Screen Time: 1h 42m", fontSize = 12.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Medium)
+                Text("Mindful Breaks: 3", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        if (size == "4x3" || size == "4x4") {
+            Spacer(modifier = Modifier.height(10.dp))
+            LinearProgressIndicator(
+                progress = { 0.38f },
+                modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
+                color = MaterialTheme.colorScheme.primary,
+                trackColor = MaterialTheme.colorScheme.surfaceVariant
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Text("Focus Goal: 3h max today (1h 18m remaining)", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
 
 @Composable
-private fun ClockWidgetBody() {
+private fun ClockWidgetBody(size: String = "4x2") {
     var currentTime by remember { mutableStateOf(Calendar.getInstance()) }
     LaunchedEffect(Unit) {
         while (true) {
@@ -630,68 +928,284 @@ private fun ClockWidgetBody() {
         }
     }
     val timeFormat = remember { SimpleDateFormat("HH:mm:ss", Locale.getDefault()) }
+    val shortTimeFormat = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
     val dateFormat = remember { SimpleDateFormat("EEEE, MMMM d, yyyy", Locale.getDefault()) }
+    val shortDateFormat = remember { SimpleDateFormat("EEE, MMM d", Locale.getDefault()) }
 
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column {
-            Text(
-                text = timeFormat.format(currentTime.time),
-                fontSize = 28.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = (-0.5).sp,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = dateFormat.format(currentTime.time),
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.primary
-            )
-        }
-        Surface(
-            shape = RoundedCornerShape(12.dp),
-            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
-            modifier = Modifier.padding(start = 8.dp)
-        ) {
-            Column(
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+    when (size) {
+        "4x1" -> {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(Icons.Filled.Schedule, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    text = currentTime.timeZone.id.substringAfterLast('/'),
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                    text = timeFormat.format(currentTime.time),
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
+                Text(
+                    text = "${shortDateFormat.format(currentTime.time)} • ${currentTime.timeZone.id.substringAfterLast('/')}",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+        }
+        "4x3" -> {
+            Column {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = timeFormat.format(currentTime.time),
+                            fontSize = 36.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = dateFormat.format(currentTime.time),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                        modifier = Modifier.padding(start = 8.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Icon(Icons.Filled.Schedule, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = currentTime.timeZone.id.substringAfterLast('/'),
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(14.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                Spacer(modifier = Modifier.height(10.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceAround
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("London (GMT)", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("10:45", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("Tokyo (JST)", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("19:45", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("New York (EST)", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("05:45", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+        "4x4" -> {
+            Column {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = timeFormat.format(currentTime.time),
+                            fontSize = 42.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = dateFormat.format(currentTime.time),
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                        modifier = Modifier.padding(start = 8.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Icon(Icons.Filled.Schedule, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = currentTime.timeZone.id.substringAfterLast('/'),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceAround
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("London", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("10:45", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("Tokyo", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("19:45", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("New York", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("05:45", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(10.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Next Alarm: 07:00 AM", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface)
+                        Icon(Icons.Filled.Alarm, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                    }
+                }
+            }
+        }
+        else -> { // Default 4x2
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = timeFormat.format(currentTime.time),
+                        fontSize = 28.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = (-0.5).sp,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = dateFormat.format(currentTime.time),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                    modifier = Modifier.padding(start = 8.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(Icons.Filled.Schedule, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = currentTime.timeZone.id.substringAfterLast('/'),
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
+                }
             }
         }
     }
 }
 
 @Composable
-private fun DualClockWidgetBody() {
+private fun DualClockWidgetBody(size: String = "4x2") {
     val sdf = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
     val now = Date()
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceAround,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("LOCAL", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(sdf.format(now), fontSize = 24.sp, fontWeight = FontWeight.Bold)
+    when (size) {
+        "4x1" -> {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceAround,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("LOCAL: ${sdf.format(now)}", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                Text("•", color = MaterialTheme.colorScheme.outline)
+                Text("TOKYO: 23:45", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+            }
         }
-        VerticalDivider(modifier = Modifier.height(30.dp).width(1.dp))
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("TOKYO (JST)", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text("23:45", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+        "4x3", "4x4" -> {
+            Column {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceAround,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("LOCAL", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(sdf.format(now), fontSize = 28.sp, fontWeight = FontWeight.Bold)
+                    }
+                    VerticalDivider(modifier = Modifier.height(36.dp).width(1.dp))
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("TOKYO (JST)", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("23:45", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    }
+                }
+                Spacer(modifier = Modifier.height(14.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceAround,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("NEW YORK (EST)", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("09:45", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("LONDON (GMT)", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("14:45", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+        else -> { // Default 4x2
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceAround,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("LOCAL", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(sdf.format(now), fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                }
+                VerticalDivider(modifier = Modifier.height(30.dp).width(1.dp))
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("TOKYO (JST)", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("23:45", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                }
+            }
         }
     }
 }
@@ -871,7 +1385,7 @@ private val sampleNewsStories = listOf(
 )
 
 @Composable
-private fun NewsWidgetBody() {
+private fun NewsWidgetBody(size: String = "4x2") {
     val context = LocalContext.current
     var stories by remember { mutableStateOf(sampleNewsStories) }
     var currentIndex by remember { mutableIntStateOf(0) }
@@ -1071,15 +1585,24 @@ private fun NewsWidgetBody() {
 @Composable
 fun SystemAppWidgetView(
     appWidgetId: Int,
+    heightCategory: String = "4x2",
     appWidgetHost: android.appwidget.AppWidgetHost?,
     appWidgetManager: android.appwidget.AppWidgetManager?,
     modifier: Modifier = Modifier
 ) {
+    val targetHeight = when (heightCategory) {
+        "4x1" -> 85.dp
+        "4x2" -> 170.dp
+        "4x3" -> 255.dp
+        "4x4" -> 340.dp
+        else -> 170.dp
+    }
+
     if (appWidgetId <= 0 || appWidgetHost == null || appWidgetManager == null) {
         Box(
             modifier = modifier
                 .fillMaxWidth()
-                .height(110.dp),
+                .height(targetHeight),
             contentAlignment = Alignment.Center
         ) {
             Text(
@@ -1103,7 +1626,7 @@ fun SystemAppWidgetView(
         Box(
             modifier = modifier
                 .fillMaxWidth()
-                .height(90.dp),
+                .height(targetHeight),
             contentAlignment = Alignment.Center
         ) {
             Text(
@@ -1115,12 +1638,38 @@ fun SystemAppWidgetView(
         return
     }
 
+    val minHeightDpInt = targetHeight.value.toInt()
+    val minWidthDpInt = 280
+    val maxHeightDpInt = targetHeight.value.toInt()
+    val maxWidthDpInt = 380
+
+    LaunchedEffect(appWidgetId, heightCategory) {
+        try {
+            val options = Bundle().apply {
+                putInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, minWidthDpInt)
+                putInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, maxWidthDpInt)
+                putInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, minHeightDpInt)
+                putInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, maxHeightDpInt)
+            }
+            appWidgetManager.updateAppWidgetOptions(appWidgetId, options)
+        } catch (_: Throwable) {}
+    }
+
     androidx.compose.ui.viewinterop.AndroidView(
         factory = { ctx ->
             try {
-                appWidgetHost.createView(ctx, appWidgetId, info).apply {
-                    setAppWidget(appWidgetId, info)
-                }
+                val hostView = appWidgetHost.createView(ctx, appWidgetId, info)
+                hostView.setAppWidget(appWidgetId, info)
+                try {
+                    val options = Bundle().apply {
+                        putInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, minWidthDpInt)
+                        putInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, maxWidthDpInt)
+                        putInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, minHeightDpInt)
+                        putInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, maxHeightDpInt)
+                    }
+                    hostView.updateAppWidgetSize(options, minWidthDpInt, minHeightDpInt, maxWidthDpInt, maxHeightDpInt)
+                } catch (_: Throwable) {}
+                hostView
             } catch (e: Throwable) {
                 android.widget.TextView(ctx).apply {
                     text = "Widget load error: ${e.message}"
@@ -1130,9 +1679,179 @@ fun SystemAppWidgetView(
         },
         update = { view ->
             try {
-                (view as? android.appwidget.AppWidgetHostView)?.updateAppWidget(null)
+                val hostView = view as? android.appwidget.AppWidgetHostView
+                if (hostView != null) {
+                    val options = Bundle().apply {
+                        putInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, minWidthDpInt)
+                        putInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, maxWidthDpInt)
+                        putInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, minHeightDpInt)
+                        putInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, maxHeightDpInt)
+                    }
+                    hostView.updateAppWidgetSize(options, minWidthDpInt, minHeightDpInt, maxWidthDpInt, maxHeightDpInt)
+                }
             } catch (_: Throwable) {}
         },
-        modifier = modifier.fillMaxWidth()
+        modifier = modifier
+            .fillMaxWidth()
+            .height(targetHeight)
     )
+}
+
+/**
+ * Bottom Sheet modal to resize and configure any widget in the Left Widgets screen.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun WidgetResizeAndOptionsSheet(
+    widget: CustomWidgetConfig,
+    canMoveUp: Boolean,
+    canMoveDown: Boolean,
+    onUpdateSize: (String) -> Unit,
+    onMoveUp: () -> Unit,
+    onMoveDown: () -> Unit,
+    onDelete: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = MaterialTheme.colorScheme.surface,
+        modifier = Modifier.testTag("widget_resize_sheet")
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 12.dp)
+                .navigationBarsPadding()
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(text = widget.type.iconEmoji, fontSize = 24.sp)
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column {
+                        Text(
+                            text = widget.title,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "Resize & Manage Widget",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                IconButton(onClick = onDismiss) {
+                    Icon(Icons.Filled.Close, contentDescription = "Close")
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text(
+                text = "Choose Size",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+
+            val sizeOptions = listOf(
+                Pair("4x1", "Compact"),
+                Pair("4x2", "Standard"),
+                Pair("4x3", "Large"),
+                Pair("4x4", "Full")
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                sizeOptions.forEach { (sz, title) ->
+                    val isSelected = widget.heightCategory == sz
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        border = androidx.compose.foundation.BorderStroke(
+                            width = if (isSelected) 2.dp else 0.5.dp,
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent
+                        ),
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable { onUpdateSize(sz) }
+                            .testTag("sheet_resize_option_$sz")
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(vertical = 12.dp, horizontal = 4.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = sz,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = title,
+                                fontSize = 10.sp,
+                                color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                OutlinedButton(
+                    onClick = onMoveUp,
+                    enabled = canMoveUp,
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Icon(Icons.Filled.KeyboardArrowUp, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Move Up", fontSize = 12.sp)
+                }
+
+                OutlinedButton(
+                    onClick = onMoveDown,
+                    enabled = canMoveDown,
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Icon(Icons.Filled.KeyboardArrowDown, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Move Down", fontSize = 12.sp)
+                }
+
+                Button(
+                    onClick = {
+                        onDelete()
+                        onDismiss()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Icon(Icons.Filled.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Remove", fontSize = 12.sp)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+        }
+    }
 }
