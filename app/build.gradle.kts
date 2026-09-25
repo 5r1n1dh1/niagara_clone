@@ -1,6 +1,7 @@
 import com.google.gms.googleservices.GoogleServicesPlugin.MissingGoogleServicesStrategy
 import java.io.FileInputStream
 import java.security.KeyStore
+import java.util.Properties
 
 plugins {
   alias(libs.plugins.android.application)
@@ -15,12 +16,27 @@ android {
   namespace = "com.example"
   compileSdk { version = release(36) { minorApiLevel = 1 } }
 
+  // Auto-incrementing versionCode and versionName to enable seamless in-place APK updates
+  val versionProps = Properties()
+  val versionPropsFile = file("${rootDir}/version.properties")
+  if (versionPropsFile.exists()) {
+    try {
+      FileInputStream(versionPropsFile).use { versionProps.load(it) }
+    } catch (_: Exception) {}
+  }
+
+  val autoVersionCode: Int = versionProps.getProperty("versionCode")?.toIntOrNull()
+    ?: (((System.currentTimeMillis() / 1000) - 1700000000L) / 10).toInt()
+
+  val autoVersionName: String = versionProps.getProperty("versionName")
+    ?: "1.0.$autoVersionCode"
+
   defaultConfig {
     applicationId = "com.aistudio.fluxlauncher.vknwre"
     minSdk = 24
     targetSdk = 36
-    versionCode = 1
-    versionName = "1.0"
+    versionCode = autoVersionCode
+    versionName = autoVersionName
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
