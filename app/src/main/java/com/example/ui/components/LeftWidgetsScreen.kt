@@ -44,7 +44,6 @@ fun LeftWidgetsScreen(
     translucency: Float = 0.30f,
     glassEffect: Float = 0.30f,
     onAddWidgetClick: () -> Unit,
-    onAddSystemWidgetClick: () -> Unit = {},
     onDeleteWidget: (String) -> Unit,
     onReorderWidget: (from: Int, to: Int) -> Unit,
     onEditNoteClick: (CustomWidgetConfig) -> Unit,
@@ -113,19 +112,11 @@ fun LeftWidgetsScreen(
                     modifier = Modifier.background(MaterialTheme.colorScheme.surfaceContainerHigh)
                 ) {
                     DropdownMenuItem(
-                        text = { Text("Add Custom Widget") },
+                        text = { Text("Add Widget") },
                         leadingIcon = { Icon(Icons.Filled.Add, contentDescription = null) },
                         onClick = {
                             menuExpanded = false
                             onAddWidgetClick()
-                        }
-                    )
-                    DropdownMenuItem(
-                        text = { Text("Add System Widget") },
-                        leadingIcon = { Icon(Icons.Filled.Apps, contentDescription = null) },
-                        onClick = {
-                            menuExpanded = false
-                            onAddSystemWidgetClick()
                         }
                     )
                     HorizontalDivider()
@@ -231,72 +222,6 @@ private fun LeftWidgetCardWrapper(
     onRefreshWeather: () -> Unit,
     onUpdateSize: (String) -> Unit = {}
 ) {
-    if (widget.type == WidgetType.SYSTEM_APPWIDGET) {
-        // System widgets (Outlook, Google Calendar, etc.) are rendered directly with ZERO extra padding
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(18.dp))
-                .testTag("left_widget_${widget.id}")
-        ) {
-            HostedSystemWidgetView(
-                appWidgetId = widget.appWidgetId,
-                providerPackage = widget.providerPackage,
-                providerClass = widget.providerClass,
-                heightCategory = widget.heightCategory,
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            // Edit controls overlay when edit mode is toggled
-            if (isEditMode) {
-                Surface(
-                    shape = RoundedCornerShape(bottomStart = 12.dp),
-                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.90f),
-                    modifier = Modifier.align(Alignment.TopEnd)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp)
-                    ) {
-                        val sizes = listOf("4x1", "4x2", "4x3", "4x4")
-                        sizes.forEach { sz ->
-                            Surface(
-                                shape = RoundedCornerShape(4.dp),
-                                color = if (widget.heightCategory == sz) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
-                                modifier = Modifier
-                                    .padding(horizontal = 2.dp)
-                                    .clickable { onUpdateSize(sz) }
-                            ) {
-                                Text(
-                                    text = sz,
-                                    fontSize = 9.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (widget.heightCategory == sz) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
-                                )
-                            }
-                        }
-                        Spacer(modifier = Modifier.width(4.dp))
-                        if (index > 0) {
-                            IconButton(onClick = onMoveUp, modifier = Modifier.size(22.dp)) {
-                                Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "Move up", modifier = Modifier.size(14.dp))
-                            }
-                        }
-                        if (index < totalCount - 1) {
-                            IconButton(onClick = onMoveDown, modifier = Modifier.size(22.dp)) {
-                                Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "Move down", modifier = Modifier.size(14.dp))
-                            }
-                        }
-                        IconButton(onClick = onDelete, modifier = Modifier.size(22.dp)) {
-                            Icon(Icons.Filled.Delete, contentDescription = "Delete widget", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(14.dp))
-                        }
-                    }
-                }
-            }
-        }
-        return
-    }
-
     val zIndexAlpha = (0.35f + (index.toFloat() / totalCount.coerceAtLeast(1) * 0.45f)).coerceIn(0.35f, 0.95f)
 
     Surface(
@@ -403,32 +328,14 @@ private fun LeftWidgetCardWrapper(
                             onPrev = onMediaPrev
                         )
                     }
-                    WidgetType.CALENDAR_AGENDA -> {
-                        CalendarAgendaWidgetBody(events = calendarEvents)
-                    }
                     WidgetType.QUICK_NOTE -> {
                         QuickNoteWidgetBody(content = widget.content, onEdit = onEditNote)
-                    }
-                    WidgetType.SYSTEM_TOGGLES -> {
-                        SystemTogglesWidgetBody(isHeadphones = isHeadphonesConnected, onToggleHeadphones = onToggleHeadphones)
                     }
                     WidgetType.MINDFULNESS_QUOTE -> {
                         MindfulnessWidgetBody()
                     }
-                    WidgetType.DAILY_HABITS -> {
-                        DailyHabitsWidgetBody(initialHabits = widget.content)
-                    }
                     WidgetType.DUAL_CLOCK -> {
                         DualClockWidgetBody()
-                    }
-                    WidgetType.SYSTEM_APPWIDGET -> {
-                        HostedSystemWidgetView(
-                            appWidgetId = widget.appWidgetId,
-                            providerPackage = widget.providerPackage,
-                            providerClass = widget.providerClass,
-                            heightCategory = widget.heightCategory,
-                            modifier = Modifier.fillMaxWidth()
-                        )
                     }
                 }
             }
@@ -636,35 +543,6 @@ private fun MediaWidgetBody(
 }
 
 @Composable
-private fun CalendarAgendaWidgetBody(events: List<CalendarEvent>) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        if (events.isEmpty()) {
-            Text("No events scheduled today", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        } else {
-            events.take(3).forEach { ev ->
-                Surface(
-                    shape = RoundedCornerShape(10.dp),
-                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier.padding(10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Column {
-                            Text(text = ev.title, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-                            Text(text = ev.location, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        Text(text = ev.time, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
 private fun QuickNoteWidgetBody(content: String, onEdit: () -> Unit) {
     Surface(
         shape = RoundedCornerShape(12.dp),
@@ -696,95 +574,6 @@ private fun QuickNoteWidgetBody(content: String, onEdit: () -> Unit) {
 }
 
 @Composable
-private fun SystemTogglesWidgetBody(isHeadphones: Boolean, onToggleHeadphones: () -> Unit) {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val controlsState by com.example.util.DeviceControlsManager.controlsState.collectAsState()
-
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        ToggleItemPill(
-            icon = Icons.Filled.Wifi,
-            label = if (controlsState.isWifiOn) "Wi-Fi On" else "Wi-Fi",
-            isActive = controlsState.isWifiOn
-        ) {
-            com.example.util.DeviceControlsManager.openWifiSettings(context)
-        }
-
-        ToggleItemPill(
-            icon = Icons.Filled.Bluetooth,
-            label = if (controlsState.isBluetoothOn) "BT On" else "Bluetooth",
-            isActive = controlsState.isBluetoothOn
-        ) {
-            com.example.util.DeviceControlsManager.openBluetoothSettings(context)
-        }
-
-        ToggleItemPill(
-            icon = if (controlsState.isTorchOn) Icons.Filled.FlashlightOn else Icons.Filled.FlashlightOff,
-            label = if (controlsState.isTorchOn) "Torch On" else "Torch",
-            isActive = controlsState.isTorchOn
-        ) {
-            com.example.util.DeviceControlsManager.toggleTorch(context)
-        }
-
-        ToggleItemPill(
-            icon = when (controlsState.ringerMode) {
-                android.media.AudioManager.RINGER_MODE_SILENT -> Icons.Filled.VolumeOff
-                android.media.AudioManager.RINGER_MODE_VIBRATE -> Icons.Filled.Vibration
-                else -> Icons.Filled.VolumeUp
-            },
-            label = when (controlsState.ringerMode) {
-                android.media.AudioManager.RINGER_MODE_SILENT -> "Silent"
-                android.media.AudioManager.RINGER_MODE_VIBRATE -> "Vibrate"
-                else -> "Sound"
-            },
-            isActive = controlsState.ringerMode != android.media.AudioManager.RINGER_MODE_SILENT
-        ) {
-            com.example.util.DeviceControlsManager.toggleRingerMode(context)
-        }
-    }
-}
-
-@Composable
-private fun ToggleItemPill(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    label: String,
-    isActive: Boolean,
-    onClick: () -> Unit
-) {
-    Surface(
-        shape = RoundedCornerShape(12.dp),
-        color = if (isActive) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
-        modifier = Modifier
-            .width(72.dp)
-            .height(60.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .clickable(onClick = onClick)
-    ) {
-        Column(
-            modifier = Modifier.fillMaxSize().padding(6.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = label,
-                tint = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(20.dp)
-            )
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = label,
-                fontSize = 10.sp,
-                fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
-                color = if (isActive) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
-}
-
-@Composable
 private fun MindfulnessWidgetBody() {
     Column {
         Text(
@@ -800,38 +589,6 @@ private fun MindfulnessWidgetBody() {
         ) {
             Text("Screen Time: 1h 42m", fontSize = 12.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Medium)
             Text("Mindful Interventions: 3", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-    }
-}
-
-@Composable
-private fun DailyHabitsWidgetBody(initialHabits: String) {
-    val items = remember(initialHabits) {
-        if (initialHabits.isNotBlank()) {
-            initialHabits.lines().filter { it.isNotBlank() }
-        } else {
-            listOf("Morning walk", "Review agenda", "Drink water")
-        }
-    }
-    val checkedStates = remember { mutableStateMapOf<Int, Boolean>() }
-
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        items.forEachIndexed { i, habitText ->
-            val checked = checkedStates[i] ?: false
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { checkedStates[i] = !checked }
-            ) {
-                Checkbox(checked = checked, onCheckedChange = { checkedStates[i] = it }, modifier = Modifier.size(24.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = habitText,
-                    fontSize = 13.sp,
-                    color = if (checked) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
-                )
-            }
         }
     }
 }

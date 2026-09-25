@@ -39,14 +39,14 @@ import kotlinx.coroutines.withTimeoutOrNull
 /**
  * Intelligent empty space gesture handler that seamlessly and reliably handles:
  * - Downward swipe/fling to open Notification Center
- * - Long press to open Home Screen Quick Customization menu
+ * - Long press on actual empty space to open Home Screen Quick Customization menu
  */
 fun Modifier.emptySpaceGestureHandler(
     onSwipeDown: () -> Unit,
     onLongPress: () -> Unit
 ): Modifier = pointerInput(Unit) {
     awaitEachGesture {
-        val down = awaitFirstDown(requireUnconsumed = false)
+        val down = awaitFirstDown(requireUnconsumed = true)
         var totalDy = 0f
         var totalDx = 0f
         var isDownSwipeTriggered = false
@@ -70,7 +70,7 @@ fun Modifier.emptySpaceGestureHandler(
             }
 
             val change = event.changes.firstOrNull { it.id == down.id } ?: break
-            if (!change.pressed) {
+            if (change.isConsumed || !change.pressed) {
                 break
             }
 
@@ -259,19 +259,11 @@ fun CenterHomeScreen(
     val context = LocalContext.current
     val isYTInstalled = remember(context) { isYouTubeMusicInstalled(context) }
 
-    // Fixed 3-card carousel: Card 1 is Clock, Cards 2 & 3 are user selected
-    // If YouTube Music is not installed, automatically omit it from favorites carousel
+    // Favorites screen: Clock widget is fixed (#1). All other widgets are optional user choices
     val displayWidgets = remember(carouselWidgets, isYTInstalled) {
         val filteredCarousel = if (isYTInstalled) carouselWidgets else carouselWidgets.filter { it != WidgetType.MEDIA_PLAYER }
-        val customOthers = filteredCarousel.filter { it != WidgetType.CLOCK }.take(2)
-        val defaultFill = if (isYTInstalled) {
-            listOf(WidgetType.WEATHER_FORECAST, WidgetType.MEDIA_PLAYER)
-        } else {
-            listOf(WidgetType.WEATHER_FORECAST, WidgetType.CALENDAR_AGENDA)
-        }
-        val fillList = defaultFill.filter { it !in customOthers }
-        val finalOthers = (customOthers + fillList).take(2)
-        listOf(WidgetType.CLOCK) + finalOthers
+        val optionalWidgets = filteredCarousel.filter { it != WidgetType.CLOCK }
+        listOf(WidgetType.CLOCK) + optionalWidgets
     }
 
     val pagerState = rememberPagerState(pageCount = { displayWidgets.size })
@@ -294,10 +286,6 @@ fun CenterHomeScreen(
             .fillMaxSize()
             .statusBarsPadding()
             .padding(horizontal = 16.dp)
-            .emptySpaceGestureHandler(
-                onSwipeDown = onSwipeDownForNotification,
-                onLongPress = { showHomeEmptySpaceOptions = true }
-            )
             .testTag("center_home_screen")
     ) {
         val topOffset = settings.favoritesTopSpacing.heightDp.dp
@@ -375,29 +363,32 @@ fun CenterHomeScreen(
                         }
                     }
 
-                    // Dot page indicator for 3 carousel widgets
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 10.dp, bottom = 12.dp),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        repeat(3) { idx ->
-                            val isSelected = pagerState.currentPage == idx
-                            Box(
-                                modifier = Modifier
-                                    .padding(horizontal = 3.dp)
-                                    .size(if (isSelected) 6.dp else 4.dp)
-                                    .clip(CircleShape)
-                                    .background(
-                                        if (isSelected) MaterialTheme.colorScheme.primary
-                                        else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f)
-                                    )
-                            )
+                    // Dot page indicator for carousel widgets (shown when multiple widgets are configured)
+                    if (displayWidgets.size > 1) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 10.dp, bottom = 12.dp),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            repeat(displayWidgets.size) { idx ->
+                                val isSelected = pagerState.currentPage == idx
+                                Box(
+                                    modifier = Modifier
+                                        .padding(horizontal = 3.dp)
+                                        .size(if (isSelected) 6.dp else 4.dp)
+                                        .clip(CircleShape)
+                                        .background(
+                                            if (isSelected) MaterialTheme.colorScheme.primary
+                                            else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f)
+                                        )
+                                )
+                            }
                         }
+                    } else {
+                        Spacer(modifier = Modifier.height(10.dp))
                     }
-                    Spacer(modifier = Modifier.height(10.dp))
                 }
             }
 

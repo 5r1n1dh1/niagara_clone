@@ -89,9 +89,17 @@ class FluxNotificationListenerService : NotificationListenerService() {
                     }
 
                     // Check for media session / music player notification
+                    val isYouTubeMusicPkg = pkg.equals("app.revanced.android.apps.youtube.music", ignoreCase = true) ||
+                            pkg.equals("com.google.android.apps.youtube.music", ignoreCase = true) ||
+                            pkg.equals("app.rvx.android.apps.youtube.music", ignoreCase = true) ||
+                            pkg.equals("com.vanced.android.apps.youtube.music", ignoreCase = true) ||
+                            pkg.contains("youtube.music", true) ||
+                            (pkg.contains("revanced", true) && (pkg.contains("music", true) || pkg.contains("audio", true)))
+
                     val isMedia = notif.category == Notification.CATEGORY_TRANSPORT ||
                             extras.containsKey(Notification.EXTRA_MEDIA_SESSION) ||
                             extras.containsKey("android.mediaSession") ||
+                            isYouTubeMusicPkg ||
                             pkg.contains("spotify", true) ||
                             pkg.contains("music", true) ||
                             pkg.contains("audio", true) ||
@@ -99,7 +107,8 @@ class FluxNotificationListenerService : NotificationListenerService() {
                             pkg.contains("soundcloud", true) ||
                             pkg.contains("deezer", true)
 
-                    if (isMedia && detectedMedia == null) {
+                    // If we haven't found a media notification yet, or if this notification is from YouTube Music / ReVanced
+                    if (isMedia && (detectedMedia == null || isYouTubeMusicPkg)) {
                         val trackTitle = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()
                             ?: extras.getCharSequence(Notification.EXTRA_TITLE_BIG)?.toString()
                             ?: ""

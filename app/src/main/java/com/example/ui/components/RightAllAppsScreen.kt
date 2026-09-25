@@ -103,8 +103,29 @@ fun RightAllAppsScreen(
             .groupBy { it.customCategory }
     }
 
-    val displayAppsList = remember(allApps, filterText) {
-        if (filterText.isBlank()) {
+    val activeWaveLetters = remember(selectedWaveLetter) {
+        if (selectedWaveLetter == null) null
+        else {
+            val char = selectedWaveLetter
+            when {
+                char in 'A'..'Z' -> {
+                    val prev = if (char > 'A') (char - 1) else null
+                    val next = if (char < 'Z') (char + 1) else null
+                    setOfNotNull(prev, char, next)
+                }
+                char == '★' -> {
+                    setOf('★', 'A', 'B')
+                }
+                char == '#' -> {
+                    setOf('Y', 'Z', '#')
+                }
+                else -> setOf(char)
+            }
+        }
+    }
+
+    val displayAppsList = remember(allApps, filterText, activeWaveLetters) {
+        val baseList = if (filterText.isBlank()) {
             allApps.filter { !it.isHidden && it.customCategory.isBlank() }
                 .sortedBy { it.label.lowercase() }
         } else {
@@ -112,11 +133,25 @@ fun RightAllAppsScreen(
             allApps.filter { !it.isHidden && (it.label.lowercase().contains(q) || it.customCategory.lowercase().contains(q)) }
                 .sortedBy { it.label.lowercase() }
         }
+
+        if (activeWaveLetters != null && filterText.isBlank()) {
+            baseList.filter { app ->
+                val initial = app.label.firstOrNull()?.uppercaseChar() ?: '#'
+                val effectiveChar = if (initial in 'A'..'Z') initial else '#'
+                if (selectedWaveLetter == '★') {
+                    effectiveChar in setOf('A', 'B') || baseList.indexOf(app) < 8
+                } else {
+                    effectiveChar in activeWaveLetters
+                }
+            }
+        } else {
+            baseList
+        }
     }
 
-    val flatList = remember(displayAppsList, folders, categorizedGroupMap, filterText) {
+    val flatList = remember(displayAppsList, folders, categorizedGroupMap, filterText, activeWaveLetters) {
         val items = mutableListOf<AppDrawerItem>()
-        if (filterText.isBlank()) {
+        if (filterText.isBlank() && activeWaveLetters == null) {
             categorizedGroupMap.keys.sorted().forEach { cat ->
                 val catApps = categorizedGroupMap[cat] ?: emptyList()
                 items.add(AppDrawerItem.CategoryCard(cat, catApps))
@@ -127,7 +162,8 @@ fun RightAllAppsScreen(
         }
         var lastHeader: Char? = null
         displayAppsList.forEach { app ->
-            val currentInitial = app.label.firstOrNull()?.uppercaseChar() ?: '#'
+            val initial = app.label.firstOrNull()?.uppercaseChar() ?: '#'
+            val currentInitial = if (initial in 'A'..'Z') initial else '#'
             if (currentInitial != lastHeader) {
                 lastHeader = currentInitial
                 items.add(AppDrawerItem.LetterHeader(currentInitial))

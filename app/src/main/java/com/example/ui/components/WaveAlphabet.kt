@@ -78,9 +78,11 @@ fun WaveAlphabet(
                     },
                     onDragEnd = {
                         currentTouchY = null
+                        onLetterSelected(null)
                     },
                     onDragCancel = {
                         currentTouchY = null
+                        onLetterSelected(null)
                     }
                 )
             }
@@ -95,6 +97,7 @@ fun WaveAlphabet(
                         onLetterConfirmed(letter)
                         tryAwaitRelease()
                         currentTouchY = null
+                        onLetterSelected(null)
                     }
                 )
             },
@@ -120,7 +123,7 @@ fun WaveAlphabet(
                 }
 
                 // Bulge offset and font size
-                val horizontalDisplacement = waveInfluence * 24f * (if (isLeftHanded) 1f else -1f)
+                val horizontalDisplacement = waveInfluence * 20f * (if (isLeftHanded) 1f else -1f)
                 val scale = 1f + waveInfluence * 0.75f
                 val isCurrent = selectedLetter == letter
 
@@ -144,29 +147,32 @@ fun WaveAlphabet(
             }
         }
 
-        // Floating thumb magnifier bubble for the active letter
+        // Floating thumb magnifier bubble: displayed to the immediate left with a small gap
         if (selectedLetter != null && currentTouchY != null) {
             val touchY = currentTouchY ?: 0f
-            val bubbleOffsetY = touchY.coerceIn(70f, (componentHeight - 70f).coerceAtLeast(70f))
+            val density = androidx.compose.ui.platform.LocalDensity.current
+            val bubbleOffsetY = touchY.coerceIn(24f, (componentHeight - 24f).coerceAtLeast(24f))
+            val xOffsetPx = with(density) { if (isLeftHanded) 30.dp.toPx() else (-26).dp.toPx() }
+            val yOffsetPx = with(density) { 19.dp.toPx() }
 
             Surface(
-                shape = CircleShape,
+                shape = RoundedCornerShape(12.dp),
                 color = MaterialTheme.colorScheme.primary,
-                shadowElevation = 8.dp,
+                shadowElevation = 6.dp,
                 modifier = Modifier
                     .graphicsLayer {
-                        translationY = bubbleOffsetY - 36f
-                        translationX = if (isLeftHanded) 42f else -42f
+                        translationY = bubbleOffsetY - yOffsetPx
+                        translationX = xOffsetPx
                     }
-                    .size(48.dp)
-                    .clip(CircleShape)
+                    .size(width = 38.dp, height = 38.dp)
+                    .clip(RoundedCornerShape(12.dp))
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Text(
                         text = selectedLetter.toString(),
                         color = MaterialTheme.colorScheme.onPrimary,
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Black
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.ExtraBold
                     )
                 }
             }

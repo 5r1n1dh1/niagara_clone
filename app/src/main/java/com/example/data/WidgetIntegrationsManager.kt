@@ -121,10 +121,17 @@ class WidgetIntegrationsManager(private val context: Context) {
         val customPkg = _integrations.value.musicPackage
         if (customPkg.isNotBlank() && launchPackage(customPkg)) return
 
+        // Check detected YouTube Music / ReVanced package
+        val detectedYt = com.example.ui.components.getInstalledYouTubeMusicPackage(context)
+        if (detectedYt != null && launchPackage(detectedYt)) return
+
         // Fallback: Common music players
         val musicPkgs = listOf(
-            "com.spotify.music",
+            "app.revanced.android.apps.youtube.music",
             "com.google.android.apps.youtube.music",
+            "app.rvx.android.apps.youtube.music",
+            "com.vanced.android.apps.youtube.music",
+            "com.spotify.music",
             "com.apple.android.music",
             "com.amazon.mp3",
             "deezer.android.app",

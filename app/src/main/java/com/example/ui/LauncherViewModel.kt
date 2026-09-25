@@ -28,7 +28,6 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     val repository = LauncherRepository(application)
 
     val isAppsLoading = repository.isAppsLoading
-    val availableSystemWidgets = repository.availableSystemWidgets
     val allApps = repository.allApps
     val favorites = repository.favorites
     val folders = repository.folders
@@ -63,21 +62,6 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     }
 
     val widgetIntegrations = com.example.util.WidgetIntegrationsManager(application)
-
-    private val _isSystemWidgetPickerOpen = MutableStateFlow(false)
-    val isSystemWidgetPickerOpen: StateFlow<Boolean> = _isSystemWidgetPickerOpen.asStateFlow()
-
-    fun openSystemWidgetPicker() {
-        _isSystemWidgetPickerOpen.value = true
-    }
-
-    fun closeSystemWidgetPicker() {
-        _isSystemWidgetPickerOpen.value = false
-    }
-
-    fun addLeftSystemWidget(providerItem: com.example.util.SystemWidgetProviderItem, appWidgetId: Int) {
-        repository.addLeftSystemWidget(providerItem, appWidgetId)
-    }
 
     fun launchIntegration(category: com.example.util.IntegrationCategory) {
         widgetIntegrations.launch(category)
@@ -282,7 +266,6 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         _isSettingsOpen.value = false
         _isNotificationCenterOpen.value = false
         _isDiscoverOpen.value = false
-        _isSystemWidgetPickerOpen.value = false
         _isAddWidgetOpen.value = false
         _editingNoteWidget.value = null
         _isCarouselCustomizeOpen.value = false
@@ -411,7 +394,6 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
 
     fun refreshAllData() {
         repository.refreshCalendarEvents()
-        repository.loadAvailableSystemWidgets()
         repository.reloadApps()
     }
 

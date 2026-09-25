@@ -1,8 +1,6 @@
 package com.example.data
 
 import android.Manifest
-import android.appwidget.AppWidgetManager
-import android.appwidget.AppWidgetProviderInfo
 import android.content.ComponentName
 import android.content.ContentUris
 import android.content.Context
@@ -29,7 +27,6 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.*
-import com.example.util.SystemWidgetProviderItem
 import com.example.util.IntegrationCategory
 import com.example.util.WidgetIntegrationsManager
 
@@ -40,9 +37,6 @@ class LauncherRepository(private val context: Context) {
 
     private val _isAppsLoading = MutableStateFlow(true)
     val isAppsLoading: StateFlow<Boolean> = _isAppsLoading.asStateFlow()
-
-    private val _availableSystemWidgets = MutableStateFlow<List<AppWidgetProviderInfo>>(emptyList())
-    val availableSystemWidgets: StateFlow<List<AppWidgetProviderInfo>> = _availableSystemWidgets.asStateFlow()
 
     private val _allApps = MutableStateFlow<List<AppItem>>(emptyList())
     val allApps: StateFlow<List<AppItem>> = _allApps.asStateFlow()
@@ -83,10 +77,8 @@ class LauncherRepository(private val context: Context) {
     val widgetIntegrations = WidgetIntegrationsManager(context)
 
     init {
-        com.example.util.SystemWidgetManager.init(context)
         observeLiveNotifications()
         registerPackageListeners()
-        loadAvailableSystemWidgets()
         loadLeftWidgets()
         loadCarouselWidgets()
         loadDockPackages()
@@ -348,37 +340,15 @@ class LauncherRepository(private val context: Context) {
         return list
     }
 
-    fun loadAvailableSystemWidgets() {
-        try {
-            val appWidgetManager = AppWidgetManager.getInstance(context)
-            val providers = appWidgetManager.installedProviders ?: emptyList()
-            _availableSystemWidgets.value = providers
-        } catch (t: Throwable) {
-            _availableSystemWidgets.value = emptyList()
-        }
-    }
-
     fun isWidgetAvailable(type: WidgetType): Boolean {
         return when (type) {
-            WidgetType.CALENDAR_AGENDA -> {
-                try {
-                    val calendarIntent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_APP_CALENDAR)
-                    val resolve = context.packageManager.queryIntentActivities(calendarIntent, 0)
-                    resolve.isNotEmpty() || ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CALENDAR) == PackageManager.PERMISSION_GRANTED
-                } catch (t: Throwable) {
-                    true
-                }
-            }
             WidgetType.MEDIA_PLAYER -> com.example.ui.components.isYouTubeMusicInstalled(context)
             WidgetType.WEATHER_FORECAST -> true
             WidgetType.NEWS_FEED -> true
-            WidgetType.SYSTEM_TOGGLES -> true
             WidgetType.QUICK_NOTE -> true
             WidgetType.CLOCK -> true
-            WidgetType.DAILY_HABITS -> true
             WidgetType.MINDFULNESS_QUOTE -> true
             WidgetType.DUAL_CLOCK -> true
-            WidgetType.SYSTEM_APPWIDGET -> true
         }
     }
 
@@ -1029,7 +999,11 @@ class LauncherRepository(private val context: Context) {
         } catch (_: Exception) {}
 
         val musicPkg = widgetIntegrations.getPackage(IntegrationCategory.MUSIC)
-        val currentApp = if (musicPkg != null) widgetIntegrations.getAppLabel(IntegrationCategory.MUSIC, context.packageManager) else "YouTube Music"
+        val currentApp = if (musicPkg != null) {
+            widgetIntegrations.getAppLabel(IntegrationCategory.MUSIC, context.packageManager)
+        } else {
+            com.example.ui.components.getYouTubeMusicAppLabel(context)
+        }
 
         val tracks = listOf(
             MediaPlaybackState(true, "Midnight City", "M83", currentApp, 0.35f, "4:03", "1:25"),
@@ -1071,7 +1045,12 @@ class LauncherRepository(private val context: Context) {
             audioManager?.dispatchMediaKeyEvent(upEvent)
         } catch (_: Exception) {}
 
-        val currentApp = "YouTube Music"
+        val musicPkg = widgetIntegrations.getPackage(IntegrationCategory.MUSIC)
+        val currentApp = if (musicPkg != null) {
+            widgetIntegrations.getAppLabel(IntegrationCategory.MUSIC, context.packageManager)
+        } else {
+            com.example.ui.components.getYouTubeMusicAppLabel(context)
+        }
         val tracks = listOf(
             MediaPlaybackState(true, "Resonance", "HOME", currentApp, 0.10f, "3:32", "0:21", isShuffleEnabled = _mediaPlayer.value.isShuffleEnabled),
             MediaPlaybackState(true, "Solar Power", "Lorde", currentApp, 0.05f, "3:12", "0:10", isShuffleEnabled = _mediaPlayer.value.isShuffleEnabled),
@@ -1233,10 +1212,6 @@ class LauncherRepository(private val context: Context) {
                                 title = obj.optString("title", type.displayName),
                                 content = obj.optString("content", ""),
                                 isEnabled = obj.optBoolean("isEnabled", true),
-                                appWidgetId = obj.optInt("appWidgetId", -1),
-                                providerPackage = if (obj.has("providerPackage")) obj.optString("providerPackage") else null,
-                                providerClass = if (obj.has("providerClass")) obj.optString("providerClass") else null,
-                                linkedPackageName = if (obj.has("linkedPackageName")) obj.optString("linkedPackageName") else null,
                                 heightCategory = obj.optString("heightCategory", "4x2")
                             )
                         )
@@ -1255,7 +1230,6 @@ class LauncherRepository(private val context: Context) {
         _leftWidgets.value = listOf(
             CustomWidgetConfig("w_weather", WidgetType.WEATHER_FORECAST, "Weather & Forecast", heightCategory = "4x2"),
             CustomWidgetConfig("w_news", WidgetType.NEWS_FEED, "Top News Highlights", heightCategory = "4x2"),
-            CustomWidgetConfig("w_agenda", WidgetType.CALENDAR_AGENDA, "Upcoming Agenda", heightCategory = "4x2"),
             CustomWidgetConfig(
                 id = "w_note",
                 type = WidgetType.QUICK_NOTE,
@@ -1263,7 +1237,7 @@ class LauncherRepository(private val context: Context) {
                 content = "Swipe right to All Apps • Long press dock to swap icons • Swipe left to customize widgets.",
                 heightCategory = "4x2"
             ),
-            CustomWidgetConfig("w_toggles", WidgetType.SYSTEM_TOGGLES, "Quick Device Controls", heightCategory = "4x1")
+            CustomWidgetConfig("w_mindfulness", WidgetType.MINDFULNESS_QUOTE, "Daily Reflection", heightCategory = "4x2")
         )
     }
 
@@ -1276,11 +1250,7 @@ class LauncherRepository(private val context: Context) {
             obj.put("title", w.title)
             obj.put("content", w.content)
             obj.put("isEnabled", w.isEnabled)
-            obj.put("appWidgetId", w.appWidgetId)
             obj.put("heightCategory", w.heightCategory)
-            w.providerPackage?.let { obj.put("providerPackage", it) }
-            w.providerClass?.let { obj.put("providerClass", it) }
-            w.linkedPackageName?.let { obj.put("linkedPackageName", it) }
             arr.put(obj)
         }
         prefs.edit().putString("left_widgets_json", arr.toString()).apply()
@@ -1292,20 +1262,6 @@ class LauncherRepository(private val context: Context) {
             type = type,
             title = title,
             content = content
-        )
-        val updated = _leftWidgets.value + newWidget
-        _leftWidgets.value = updated
-        saveLeftWidgets(updated)
-    }
-
-    fun addLeftSystemWidget(providerItem: SystemWidgetProviderItem, appWidgetId: Int) {
-        val newWidget = CustomWidgetConfig(
-            id = "sys_w_${System.currentTimeMillis()}",
-            type = WidgetType.SYSTEM_APPWIDGET,
-            title = providerItem.widgetLabel,
-            appWidgetId = appWidgetId,
-            providerPackage = providerItem.providerInfo.provider.packageName,
-            providerClass = providerItem.providerInfo.provider.className
         )
         val updated = _leftWidgets.value + newWidget
         _leftWidgets.value = updated
@@ -1327,10 +1283,6 @@ class LauncherRepository(private val context: Context) {
     }
 
     fun deleteLeftWidget(id: String) {
-        val target = _leftWidgets.value.find { it.id == id }
-        if (target != null && target.appWidgetId > 0) {
-            com.example.util.SystemWidgetManager.deleteAppWidgetId(target.appWidgetId)
-        }
         val updated = _leftWidgets.value.filter { it.id != id }
         _leftWidgets.value = updated
         saveLeftWidgets(updated)
@@ -1358,24 +1310,26 @@ class LauncherRepository(private val context: Context) {
                 for (i in 0 until arr.length()) {
                     val name = arr.getString(i)
                     val type = WidgetType.entries.find { it.name == name }
-                    if (type != null && type != WidgetType.MEDIA_PLAYER) {
-                        list.add(type)
+                    if (type != null && type != WidgetType.CLOCK) {
+                        if (type != WidgetType.MEDIA_PLAYER || com.example.ui.components.isYouTubeMusicInstalled(context)) {
+                            list.add(type)
+                        }
                     }
                 }
-                if (list.isNotEmpty()) {
-                    _carouselWidgets.value = list.take(5)
-                    return
-                }
+                _carouselWidgets.value = list.take(5)
+                return
             } catch (e: Exception) {
                 // fallback
             }
         }
 
-        // Default 2 widgets in carousel (clean weather + calendar)
-        _carouselWidgets.value = listOf(
-            WidgetType.WEATHER_FORECAST,
-            WidgetType.CALENDAR_AGENDA
-        )
+        // Default optional widgets in carousel (e.g. Weather and YouTube Music if available)
+        val defaultList = if (com.example.ui.components.isYouTubeMusicInstalled(context)) {
+            listOf(WidgetType.WEATHER_FORECAST, WidgetType.MEDIA_PLAYER)
+        } else {
+            listOf(WidgetType.WEATHER_FORECAST)
+        }
+        _carouselWidgets.value = defaultList
     }
 
     private fun saveCarouselWidgets(widgets: List<WidgetType>) {
@@ -1397,11 +1351,9 @@ class LauncherRepository(private val context: Context) {
 
     fun removeCarouselWidget(type: WidgetType) {
         val current = _carouselWidgets.value
-        if (current.size > 1) {
-            val updated = current.filter { it != type }
-            _carouselWidgets.value = updated
-            saveCarouselWidgets(updated)
-        }
+        val updated = current.filter { it != type }
+        _carouselWidgets.value = updated
+        saveCarouselWidgets(updated)
     }
 
     fun reorderCarouselWidgets(fromIndex: Int, toIndex: Int) {

@@ -98,7 +98,6 @@ fun SettingsStudioSheet(
     onImportBackup: (String) -> Boolean,
     onResetDefaults: () -> Unit,
     onOpenSetupGuide: () -> Unit = {},
-    onOpenSystemWidgetPicker: () -> Unit = {},
     userCategories: List<String> = emptyList(),
     onAddCategory: (String) -> Unit = {},
     onRenameCategory: (String, String) -> Unit = { _, _ -> },
@@ -369,8 +368,7 @@ fun SettingsStudioSheet(
                     SettingsPage.CLOCK_WIDGETS -> {
                         ClockWidgetsSettingsPage(
                             settings = settings,
-                            onUpdateSettings = onUpdateSettings,
-                            onOpenSystemWidgetPicker = onOpenSystemWidgetPicker
+                            onUpdateSettings = onUpdateSettings
                         )
                     }
 
@@ -1490,8 +1488,7 @@ private fun GesturesSettingsPage(
 @Composable
 private fun ClockWidgetsSettingsPage(
     settings: LauncherSettings,
-    onUpdateSettings: (LauncherSettings) -> Unit,
-    onOpenSystemWidgetPicker: () -> Unit
+    onUpdateSettings: (LauncherSettings) -> Unit
 ) {
     var customHexInput by remember(settings.clockColorTintHex) { mutableStateOf(settings.clockColorTintHex) }
 
@@ -1672,20 +1669,6 @@ private fun ClockWidgetsSettingsPage(
                     checked = settings.showDate,
                     onCheckedChange = { onUpdateSettings(settings.copy(showDate = it)) }
                 )
-            }
-        }
-
-        item {
-            SettingsCard(title = "Widgets Screen") {
-                OutlinedButton(
-                    onClick = onOpenSystemWidgetPicker,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(10.dp)
-                ) {
-                    Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Add System Widget to Left Screen", fontSize = 12.sp)
-                }
             }
         }
     }

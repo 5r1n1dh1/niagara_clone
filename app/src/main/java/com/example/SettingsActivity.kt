@@ -51,7 +51,6 @@ class SettingsActivity : ComponentActivity() {
                     onImportBackup = { repository.importBackupJson(it) },
                     onResetDefaults = { repository.resetToDefaults() },
                     onOpenSetupGuide = {},
-                    onOpenSystemWidgetPicker = {},
                     userCategories = userCategories,
                     onAddCategory = { repository.addUserCategory(it) },
                     onRenameCategory = { old, new -> repository.updateUserCategoryName(old, new) },

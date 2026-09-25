@@ -49,22 +49,83 @@ import androidx.compose.ui.unit.sp
 import com.example.data.MediaPlaybackState
 
 const val YT_MUSIC_PACKAGE_NAME = "com.google.android.apps.youtube.music"
+const val YT_MUSIC_REVANCED_PACKAGE_NAME = "app.revanced.android.apps.youtube.music"
+
+val YT_MUSIC_KNOWN_PACKAGES = listOf(
+    "app.revanced.android.apps.youtube.music",
+    "com.google.android.apps.youtube.music",
+    "app.rvx.android.apps.youtube.music",
+    "com.vanced.android.apps.youtube.music",
+    "app.revanced.android.apps.youtube.music.extended"
+)
 
 /**
- * Checks if YouTube Music app is installed on the user device.
+ * Returns the package name of YouTube Music, YouTube Music ReVanced, or modded YouTube Music
+ * installed on the user device, or null if not installed.
+ */
+fun getInstalledYouTubeMusicPackage(context: Context): String? {
+    val pm = context.packageManager
+
+    // 1. Direct check of known package names
+    for (pkg in YT_MUSIC_KNOWN_PACKAGES) {
+        try {
+            pm.getPackageInfo(pkg, 0)
+            return pkg
+        } catch (_: Throwable) {}
+    }
+
+    // 2. Check launch intents for known packages
+    for (pkg in YT_MUSIC_KNOWN_PACKAGES) {
+        try {
+            if (pm.getLaunchIntentForPackage(pkg) != null) {
+                return pkg
+            }
+        } catch (_: Throwable) {}
+    }
+
+    // 3. Scan installed launcher activities for YouTube Music / ReVanced signatures
+    try {
+        val launcherIntent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+        val resolveInfos = pm.queryIntentActivities(launcherIntent, 0)
+        for (info in resolveInfos) {
+            val pkg = info.activityInfo.packageName
+            val label = info.loadLabel(pm).toString()
+            if (pkg.equals(YT_MUSIC_REVANCED_PACKAGE_NAME, ignoreCase = true) ||
+                pkg.equals(YT_MUSIC_PACKAGE_NAME, ignoreCase = true) ||
+                pkg.contains("youtube.music", ignoreCase = true) ||
+                pkg.contains("revanced.android.apps.youtube.music", ignoreCase = true) ||
+                (pkg.contains("revanced", ignoreCase = true) && pkg.contains("music", ignoreCase = true)) ||
+                label.contains("YouTube Music", ignoreCase = true) ||
+                label.contains("Music ReVanced", ignoreCase = true) ||
+                label.contains("ReVanced Music", ignoreCase = true) ||
+                label.contains("YT Music", ignoreCase = true)
+            ) {
+                return pkg
+            }
+        }
+    } catch (_: Throwable) {}
+
+    return null
+}
+
+/**
+ * Checks if YouTube Music or YouTube Music ReVanced app is installed on the user device.
  */
 fun isYouTubeMusicInstalled(context: Context): Boolean {
+    return getInstalledYouTubeMusicPackage(context) != null
+}
+
+/**
+ * Returns the human-friendly app title for the installed YouTube Music / ReVanced client.
+ */
+fun getYouTubeMusicAppLabel(context: Context): String {
+    val pkg = getInstalledYouTubeMusicPackage(context) ?: return "YouTube Music"
     return try {
-        context.packageManager.getPackageInfo(YT_MUSIC_PACKAGE_NAME, 0)
-        true
+        val pm = context.packageManager
+        val appInfo = pm.getApplicationInfo(pkg, 0)
+        pm.getApplicationLabel(appInfo).toString()
     } catch (_: Throwable) {
-        // Fallback check
-        try {
-            val intent = context.packageManager.getLaunchIntentForPackage(YT_MUSIC_PACKAGE_NAME)
-            intent != null
-        } catch (_: Throwable) {
-            false
-        }
+        "YouTube Music"
     }
 }
 
@@ -100,18 +161,21 @@ fun getConnectedAudioOutputDevice(context: Context): String? {
 }
 
 /**
- * Opens YouTube Music main app.
+ * Opens YouTube Music or YouTube Music ReVanced main app.
  */
 fun openYouTubeMusicApp(context: Context) {
-    try {
-        val launchIntent = context.packageManager.getLaunchIntentForPackage(YT_MUSIC_PACKAGE_NAME)
-        if (launchIntent != null) {
-            launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            context.startActivity(launchIntent)
-            return
-        }
-    } catch (_: Throwable) {}
-    // Open in browser or Play Store
+    val pkg = getInstalledYouTubeMusicPackage(context)
+    if (pkg != null) {
+        try {
+            val launchIntent = context.packageManager.getLaunchIntentForPackage(pkg)
+            if (launchIntent != null) {
+                launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                context.startActivity(launchIntent)
+                return
+            }
+        } catch (_: Throwable) {}
+    }
+    // Fallback: Open in browser or Play Store
     try {
         val webIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://music.youtube.com")).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -124,15 +188,21 @@ fun openYouTubeMusicApp(context: Context) {
  * Opens YouTube Music Library / Playlists tab.
  */
 fun openYouTubeMusicLibrary(context: Context) {
-    try {
-        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://music.youtube.com/library")).apply {
-            `package` = YT_MUSIC_PACKAGE_NAME
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    val pkg = getInstalledYouTubeMusicPackage(context)
+    if (pkg != null) {
+        try {
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://music.youtube.com/library")).apply {
+                `package` = pkg
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+            return
+        } catch (_: Throwable) {
+            openYouTubeMusicApp(context)
+            return
         }
-        context.startActivity(intent)
-    } catch (_: Throwable) {
-        openYouTubeMusicApp(context)
     }
+    openYouTubeMusicApp(context)
 }
 
 /**

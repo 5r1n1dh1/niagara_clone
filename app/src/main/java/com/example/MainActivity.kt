@@ -67,8 +67,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        com.example.util.SystemWidgetManager.init(applicationContext)
-        com.example.util.SystemWidgetManager.startListening()
         enableEdgeToEdge()
 
         setContent {
@@ -98,22 +96,12 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    override fun onStart() {
-        super.onStart()
-        com.example.util.SystemWidgetManager.startListening()
-    }
-
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
         if (intent.action == Intent.ACTION_MAIN || intent.hasCategory(Intent.CATEGORY_HOME)) {
             viewModel.onHomeGestureTriggered()
         }
-    }
-
-    override fun onStop() {
-        super.onStop()
-        com.example.util.SystemWidgetManager.stopListening()
     }
 
     override fun onTrimMemory(level: Int) {
@@ -125,7 +113,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        com.example.util.SystemWidgetManager.stopListening()
         com.example.ui.components.clearIconBitmapCache()
     }
 }
@@ -138,7 +125,6 @@ fun NiagaraLauncherScreen(
 ) {
     val settings by viewModel.settings.collectAsState()
     val isAppsLoading by viewModel.isAppsLoading.collectAsState()
-    val availableSystemWidgets by viewModel.availableSystemWidgets.collectAsState()
     val allApps by viewModel.allApps.collectAsState()
     val favorites by viewModel.favorites.collectAsState()
     val folders by viewModel.folders.collectAsState()
@@ -175,7 +161,7 @@ fun NiagaraLauncherScreen(
         }
     }
 
-    val availableWidgetTypes = remember(availableSystemWidgets) {
+    val availableWidgetTypes = remember {
         WidgetType.entries.filter { viewModel.repository.isWidgetAvailable(it) }
     }
 
@@ -195,7 +181,6 @@ fun NiagaraLauncherScreen(
     val mathResult by viewModel.mathResult.collectAsState()
 
     val isAddWidgetOpen by viewModel.isAddWidgetOpen.collectAsState()
-    val isSystemWidgetPickerOpen by viewModel.isSystemWidgetPickerOpen.collectAsState()
     val editingNoteWidget by viewModel.editingNoteWidget.collectAsState()
     val isCarouselCustomizeOpen by viewModel.isCarouselCustomizeOpen.collectAsState()
     val dockPickerSlot by viewModel.dockPickerSlot.collectAsState()
@@ -298,7 +283,7 @@ fun NiagaraLauncherScreen(
     }
 
     val isAnyPanelOpen = isSearchOpen || isSettingsOpen || isNotificationCenterOpen ||
-        isSystemWidgetPickerOpen || isAddWidgetOpen || (editingNoteWidget != null) ||
+        isAddWidgetOpen || (editingNoteWidget != null) ||
         isCarouselCustomizeOpen || (activeAppForPopup != null) ||
         (dockPickerSlot != null) || isSecretLabOpen || isDebugOverlayOpen || isDiscoverOpen || (activeUsageBreakerApp != null)
 
@@ -313,7 +298,6 @@ fun NiagaraLauncherScreen(
             isDiscoverOpen -> viewModel.closeDiscover()
             isSettingsOpen -> viewModel.closeSettings()
             isOnboardingOpen -> viewModel.closeSetupGuide()
-            isSystemWidgetPickerOpen -> viewModel.closeSystemWidgetPicker()
             isAddWidgetOpen -> viewModel.closeAddWidgetDialog()
             editingNoteWidget != null -> viewModel.closeEditNoteWidget()
             isCarouselCustomizeOpen -> viewModel.closeCarouselCustomize()
@@ -403,7 +387,6 @@ fun NiagaraLauncherScreen(
                                 translucency = settings.frostedTranslucency,
                                 glassEffect = settings.frostedGlassEffect,
                                 onAddWidgetClick = { viewModel.openAddWidgetDialog() },
-                                onAddSystemWidgetClick = { viewModel.openSystemWidgetPicker() },
                                 onDeleteWidget = { id -> viewModel.deleteLeftWidget(id) },
                                 onReorderWidget = { from, to -> viewModel.reorderLeftWidget(from, to) },
                                 onEditNoteClick = { widget -> viewModel.openEditNoteWidget(widget) },
@@ -655,40 +638,12 @@ fun NiagaraLauncherScreen(
                 onImportBackup = { viewModel.repository.importBackupJson(it) },
                 onResetDefaults = { viewModel.repository.resetToDefaults() },
                 onOpenSetupGuide = { viewModel.openSetupGuide() },
-                onOpenSystemWidgetPicker = { viewModel.openSystemWidgetPicker() },
                 userCategories = userCategories,
                 onAddCategory = { viewModel.addUserCategory(it) },
                 onRenameCategory = { oldName, newName -> viewModel.updateUserCategoryName(oldName, newName) },
                 onRemoveCategory = { viewModel.removeUserCategory(it) },
                 onAssignCategory = { pkg, cat -> viewModel.setAppCategory(pkg, cat) },
                 onDismiss = { viewModel.closeSettings() }
-            )
-        }
-
-        // System Widget Picker Sheet
-        if (isSystemWidgetPickerOpen) {
-            SystemWidgetPickerSheet(
-                targetScreenTitle = "Left Widgets Screen",
-                onSelectProvider = { providerItem ->
-                    viewModel.closeSystemWidgetPicker()
-                    val newId = com.example.util.SystemWidgetManager.allocateAppWidgetId(context)
-                    if (newId > 0) {
-                        val success = com.example.util.SystemWidgetManager.bindWidgetIfAllowed(
-                            context,
-                            newId,
-                            providerItem.providerInfo.provider
-                        )
-                        if (!success) {
-                            val intent = Intent(android.appwidget.AppWidgetManager.ACTION_APPWIDGET_BIND).apply {
-                                putExtra(android.appwidget.AppWidgetManager.EXTRA_APPWIDGET_ID, newId)
-                                putExtra(android.appwidget.AppWidgetManager.EXTRA_APPWIDGET_PROVIDER, providerItem.providerInfo.provider)
-                            }
-                            (context as? android.app.Activity)?.startActivityForResult(intent, 501)
-                        }
-                        viewModel.addLeftSystemWidget(providerItem, newId)
-                    }
-                },
-                onDismiss = { viewModel.closeSystemWidgetPicker() }
             )
         }
 

@@ -58,7 +58,7 @@ fun SetupGuideScreen(
     var selectedCarousel by remember(initialCarouselWidgets) {
         mutableStateOf(
             if (initialCarouselWidgets.isNotEmpty()) initialCarouselWidgets
-            else listOf(WidgetType.WEATHER_FORECAST, WidgetType.MEDIA_PLAYER, WidgetType.CALENDAR_AGENDA)
+            else listOf(WidgetType.WEATHER_FORECAST)
         )
     }
 
@@ -72,7 +72,7 @@ fun SetupGuideScreen(
     var selectedLeftWidgetTypes by remember(initialLeftWidgets) {
         mutableStateOf(
             if (initialLeftWidgets.isNotEmpty()) initialLeftWidgets.map { it.type }.toSet()
-            else setOf(WidgetType.DAILY_HABITS, WidgetType.QUICK_NOTE, WidgetType.SYSTEM_TOGGLES)
+            else setOf(WidgetType.WEATHER_FORECAST, WidgetType.QUICK_NOTE, WidgetType.NEWS_FEED)
         )
     }
 
@@ -280,7 +280,6 @@ fun SetupGuideScreen(
                                     title = type.displayName,
                                     content = when (type) {
                                         WidgetType.QUICK_NOTE -> "Tap edit to write quick thoughts, reminders, or grocery items."
-                                        WidgetType.DAILY_HABITS -> "Morning stretch\nReview calendar\nRead 15 min"
                                         else -> ""
                                     }
                                 )

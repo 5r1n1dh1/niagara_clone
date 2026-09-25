@@ -220,15 +220,11 @@ data class LauncherSettings(
 enum class WidgetType(val displayName: String, val description: String, val iconEmoji: String) {
     CLOCK("Clock Widget", "Customizable digital, analog, or word clock with date", "🕒"),
     WEATHER_FORECAST("Weather & Forecast", "Current condition and hourly forecast", "⛅"),
+    MEDIA_PLAYER("YouTube Music", "Live playback, controls and album art", "🎵"),
     NEWS_FEED("News Highlights", "Top breaking stories & articles with photo cards", "📰"),
-    MEDIA_PLAYER("Media Player", "Live playback and controls", "🎵"),
-    CALENDAR_AGENDA("Calendar Agenda", "Upcoming events and schedule", "📅"),
     QUICK_NOTE("Sticky Note", "Editable scratchpad for quick thoughts", "📝"),
-    SYSTEM_TOGGLES("System Toggles", "Battery, Wi-Fi, Bluetooth, Torch", "⚡"),
     MINDFULNESS_QUOTE("Daily Reflection", "Mindfulness quotes and wellbeing stats", "🧘"),
-    DAILY_HABITS("Habit Tracker", "Check off daily tasks & habits", "✅"),
-    DUAL_CLOCK("World Time", "Local time & secondary timezone", "🌍"),
-    SYSTEM_APPWIDGET("System Widget", "Native Android system widget from installed apps", "📱")
+    DUAL_CLOCK("World Time", "Local time & secondary timezone", "🌍")
 }
 
 data class CustomWidgetConfig(
@@ -237,10 +233,6 @@ data class CustomWidgetConfig(
     val title: String,
     val content: String = "",
     val isEnabled: Boolean = true,
-    val appWidgetId: Int = -1,
-    val providerPackage: String? = null,
-    val providerClass: String? = null,
-    val linkedPackageName: String? = null,
-    val heightCategory: String = "4x2" // "4x1", "4x2", "4x3", "Full"
+    val heightCategory: String = "4x2" // "4x1", "4x2", "4x3", "4x4"
 )
 
