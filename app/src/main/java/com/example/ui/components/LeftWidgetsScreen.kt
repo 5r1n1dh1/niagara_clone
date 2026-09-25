@@ -177,30 +177,32 @@ fun LeftWidgetsScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(horizontal = 16.dp),
-                contentPadding = PaddingValues(top = 8.dp, bottom = 110.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+                contentPadding = PaddingValues(top = 12.dp, bottom = 120.dp),
+                verticalArrangement = Arrangement.spacedBy(22.dp)
             ) {
                 itemsIndexed(widgets, key = { _, w -> w.id }) { index, item ->
-                    LeftWidgetCardWrapper(
-                        widget = item,
-                        index = index,
-                        totalCount = widgets.size,
-                        isEditMode = isEditMode,
-                        weather = weather,
-                        mediaPlayer = mediaPlayer,
-                        calendarEvents = calendarEvents,
-                        isHeadphonesConnected = isHeadphonesConnected,
-                        onDelete = { onDeleteWidget(item.id) },
-                        onMoveUp = { onReorderWidget(index, index - 1) },
-                        onMoveDown = { onReorderWidget(index, index + 1) },
-                        onEditNote = { onEditNoteClick(item) },
-                        onToggleMediaPlay = onToggleMediaPlay,
-                        onMediaNext = onMediaNext,
-                        onMediaPrev = onMediaPrev,
-                        onToggleHeadphones = onToggleHeadphones,
-                        onRefreshWeather = onRefreshWeather,
-                        onUpdateSize = { newSize -> onUpdateWidgetSize(item.id, newSize) }
-                    )
+                    Box(modifier = Modifier.animateItem()) {
+                        LeftWidgetCardWrapper(
+                            widget = item,
+                            index = index,
+                            totalCount = widgets.size,
+                            isEditMode = isEditMode,
+                            weather = weather,
+                            mediaPlayer = mediaPlayer,
+                            calendarEvents = calendarEvents,
+                            isHeadphonesConnected = isHeadphonesConnected,
+                            onDelete = { onDeleteWidget(item.id) },
+                            onMoveUp = { onReorderWidget(index, index - 1) },
+                            onMoveDown = { onReorderWidget(index, index + 1) },
+                            onEditNote = { onEditNoteClick(item) },
+                            onToggleMediaPlay = onToggleMediaPlay,
+                            onMediaNext = onMediaNext,
+                            onMediaPrev = onMediaPrev,
+                            onToggleHeadphones = onToggleHeadphones,
+                            onRefreshWeather = onRefreshWeather,
+                            onUpdateSize = { newSize -> onUpdateWidgetSize(item.id, newSize) }
+                        )
+                    }
                 }
             }
         }
@@ -392,13 +394,13 @@ private fun LeftWidgetCardWrapper(
                         NewsWidgetBody()
                     }
                     WidgetType.MEDIA_PLAYER -> {
-                        MediaWidgetBody(
+                        YouTubeMusicFluxWidget(
                             media = mediaPlayer,
-                            isHeadphones = isHeadphonesConnected,
+                            size = widget.heightCategory,
+                            isHeadphonesOverride = isHeadphonesConnected,
                             onTogglePlay = onToggleMediaPlay,
                             onNext = onMediaNext,
-                            onPrev = onMediaPrev,
-                            onToggleHeadphones = onToggleHeadphones
+                            onPrev = onMediaPrev
                         )
                     }
                     WidgetType.CALENDAR_AGENDA -> {

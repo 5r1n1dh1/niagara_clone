@@ -269,6 +269,32 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         _searchQuery.value = ""
     }
 
+    private val _homeGestureEvent = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val homeGestureEvent: SharedFlow<Unit> = _homeGestureEvent.asSharedFlow()
+
+    fun onHomeGestureTriggered() {
+        closeAllPanelsAndPopups()
+        _homeGestureEvent.tryEmit(Unit)
+    }
+
+    fun closeAllPanelsAndPopups() {
+        _isSearchOpen.value = false
+        _isSettingsOpen.value = false
+        _isNotificationCenterOpen.value = false
+        _isDiscoverOpen.value = false
+        _isSystemWidgetPickerOpen.value = false
+        _isAddWidgetOpen.value = false
+        _editingNoteWidget.value = null
+        _isCarouselCustomizeOpen.value = false
+        _dockPickerSlot.value = null
+        _isSecretLabOpen.value = false
+        _isDebugOverlayOpen.value = false
+        _isSleepOverlayVisible.value = false
+        _activeAppForPopup.value = null
+        _activeUsageBreakerApp.value = null
+        _activeFolderPopup.value = null
+    }
+
     fun openDiscover() {
         _isDiscoverOpen.value = true
         vibrateClick()
@@ -289,7 +315,10 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
 
     fun openNotificationCenter() {
         vibrateClick()
-        triggerSystemNotificationShade()
+        val opened = triggerSystemNotificationShade()
+        if (!opened) {
+            _isNotificationCenterOpen.value = true
+        }
     }
 
     fun triggerSystemNotificationShade(): Boolean {
@@ -518,6 +547,11 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
 
     fun seekMedia(percent: Float) {
         repository.seekMedia(percent)
+        vibrateTick()
+    }
+
+    fun toggleShuffleMedia() {
+        repository.toggleShuffleMedia()
         vibrateTick()
     }
 

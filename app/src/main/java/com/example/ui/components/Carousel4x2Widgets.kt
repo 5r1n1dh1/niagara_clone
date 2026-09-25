@@ -93,14 +93,14 @@ fun Carousel4x2WidgetCard(
                     }
                 }
                 WidgetType.MEDIA_PLAYER -> {
-                    MediaPlayer4x2Widget(
+                    YouTubeMusicFluxWidget(
                         media = mediaPlayer,
-                        isHeadphones = isHeadphonesConnected,
+                        size = "4x2",
+                        isHeadphonesOverride = isHeadphonesConnected,
                         onTogglePlay = onToggleMediaPlay,
                         onNext = onMediaNext,
                         onPrev = onMediaPrev,
-                        onSeek = onSeekMedia,
-                        onToggleHeadphones = onToggleHeadphones
+                        onSeek = onSeekMedia
                     )
                 }
                 WidgetType.CALENDAR_AGENDA -> {

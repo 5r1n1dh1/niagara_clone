@@ -35,6 +35,7 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -100,6 +101,14 @@ class MainActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         com.example.util.SystemWidgetManager.startListening()
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        if (intent.action == Intent.ACTION_MAIN || intent.hasCategory(Intent.CATEGORY_HOME)) {
+            viewModel.onHomeGestureTriggered()
+        }
     }
 
     override fun onStop() {
@@ -209,6 +218,21 @@ fun NiagaraLauncherScreen(
         }
     }
 
+    // Home Gesture / Intent handling: always scroll to page 1 (Favorites) smoothly
+    LaunchedEffect(Unit) {
+        viewModel.homeGestureEvent.collect {
+            if (pagerState.currentPage != 1) {
+                pagerState.animateScrollToPage(
+                    1,
+                    animationSpec = androidx.compose.animation.core.spring(
+                        dampingRatio = androidx.compose.animation.core.Spring.DampingRatioLowBouncy,
+                        stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow
+                    )
+                )
+            }
+        }
+    }
+
     // Dismiss keyboard when launcher resumes from opened external app or when paused
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -240,28 +264,25 @@ fun NiagaraLauncherScreen(
                 source: NestedScrollSource
             ): Offset {
                 if (!settings.swipeDownForNotificationCenter) return Offset.Zero
-                // Only trigger if no scrollable component consumed the drag (consumed.y == 0)
-                if (source == NestedScrollSource.UserInput && consumed.y == 0f && available.y > 0f) {
+                if (source == NestedScrollSource.UserInput && available.y > 0f) {
                     accumulatedDragY += available.y
-                    if (accumulatedDragY > 120f) {
+                    if (accumulatedDragY > 45f) {
                         accumulatedDragY = 0f
                         viewModel.openNotificationCenter()
                         return Offset(0f, available.y)
                     }
-                } else {
-                    accumulatedDragY = 0f
                 }
                 return Offset.Zero
             }
 
             override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
-                val isTopEdgeFling = accumulatedDragY > 0f && consumed.y == 0f
-                accumulatedDragY = 0f
                 if (!settings.swipeDownForNotificationCenter) return Velocity.Zero
-                if (isTopEdgeFling && available.y > 300f) {
+                if (available.y > 150f || accumulatedDragY > 15f) {
+                    accumulatedDragY = 0f
                     viewModel.openNotificationCenter()
                     return available
                 }
+                accumulatedDragY = 0f
                 return Velocity.Zero
             }
         }
@@ -348,150 +369,189 @@ fun NiagaraLauncherScreen(
                 .fillMaxSize()
                 .then(panelBlurModifier)
         ) {
-            // 3-Page Horizontal Pager
+            // 3-Page Horizontal Pager with Smooth Page Transitions
             HorizontalPager(
                 state = pagerState,
                 modifier = Modifier
                     .fillMaxSize()
                     .testTag("home_screens_pager")
             ) { page ->
-            when (page) {
-                0 -> {
-                    // 2. Left most page houses widgets - user can customize (CRUD)
-                    LeftWidgetsScreen(
-                        widgets = leftWidgets,
-                        weather = weather,
-                        mediaPlayer = mediaPlayer,
-                        calendarEvents = calendarEvents,
-                        isHeadphonesConnected = settings.isHeadphonesConnected,
-                        isFrostedTheme = settings.themePreset == LauncherThemePreset.FROSTED_GLASS,
-                        blurRadius = settings.frostedBlurRadius,
-                        translucency = settings.frostedTranslucency,
-                        glassEffect = settings.frostedGlassEffect,
-                        onAddWidgetClick = { viewModel.openAddWidgetDialog() },
-                        onAddSystemWidgetClick = { viewModel.openSystemWidgetPicker() },
-                        onDeleteWidget = { id -> viewModel.deleteLeftWidget(id) },
-                        onReorderWidget = { from, to -> viewModel.reorderLeftWidget(from, to) },
-                        onEditNoteClick = { widget -> viewModel.openEditNoteWidget(widget) },
-                        onToggleMediaPlay = { viewModel.toggleMediaPlayPause() },
-                        onMediaNext = { viewModel.skipMediaNext() },
-                        onMediaPrev = { viewModel.skipMediaPrev() },
-                        onToggleHeadphones = { viewModel.toggleHeadphonesConnected() },
-                        onRefreshWeather = { viewModel.showToast("Updated weather for ${weather.location} ⛅") },
-                        onOpenWeather = { viewModel.launchIntegration(com.example.util.IntegrationCategory.WEATHER) },
-                        onOpenCalendar = { viewModel.launchIntegration(com.example.util.IntegrationCategory.CALENDAR) },
-                        onUpdateWidgetSize = { id, size -> viewModel.updateLeftWidgetSize(id, size) }
-                    )
-                }
-                1 -> {
-                    // 4. Center page: Swipable 4x2 widgets above favorites, NO alphabet scrollbar
-                    CenterHomeScreen(
-                        carouselWidgets = carouselWidgets,
-                        favorites = favorites,
-                        isAppsLoading = isAppsLoading,
-                        settings = settings,
-                        weather = weather,
-                        mediaPlayer = mediaPlayer,
-                        calendarEvents = calendarEvents,
-                        onAppClick = {
-                            keyboardController?.hide()
-                            focusManager.clearFocus(force = true)
-                            viewModel.launchApp(it)
-                        },
-                        onAppLongClick = {
-                            keyboardController?.hide()
-                            focusManager.clearFocus(force = true)
-                            viewModel.openAppPopup(it)
-                        },
-                        onReplyNotification = { pkg, text, isDualApp -> viewModel.replyToNotification(pkg, text, isDualApp = isDualApp) },
-                        onDismissNotification = { pkg, isDualApp -> viewModel.dismissNotification(pkg, isDualApp = isDualApp) },
-                        onToggleMediaPlay = { viewModel.toggleMediaPlayPause() },
-                        onMediaNext = { viewModel.skipMediaNext() },
-                        onMediaPrev = { viewModel.skipMediaPrev() },
-                        onSeekMedia = { viewModel.seekMedia(it) },
-                        onToggleHeadphones = { viewModel.toggleHeadphonesConnected() },
-                        onOpenWeather = { viewModel.launchIntegration(com.example.util.IntegrationCategory.WEATHER) },
-                        onOpenCalendar = { viewModel.launchIntegration(com.example.util.IntegrationCategory.CALENDAR) },
-                        onOpenCarouselCustomize = { viewModel.openCarouselCustomize() },
-                        onOpenSettings = {
-                            keyboardController?.hide()
-                            focusManager.clearFocus(force = true)
-                            viewModel.openSettings()
-                        },
-                        onNavigateToAllApps = {
-                            keyboardController?.hide()
-                            focusManager.clearFocus(force = true)
-                            coroutineScope.launch { pagerState.animateScrollToPage(2) }
-                        }
-                    )
-                }
-                2 -> {
-                    // 3. Right most screen: Lists all apps with strict margins
-                    RightAllAppsScreen(
-                        allApps = allApps,
-                        folders = folders,
-                        isAppsLoading = isAppsLoading,
-                        settings = settings,
-                        selectedWaveLetter = waveSelectedLetter,
-                        onWaveLetterSelected = { viewModel.setWaveSelectedLetter(it) },
-                        onAppClick = {
-                            keyboardController?.hide()
-                            focusManager.clearFocus(force = true)
-                            viewModel.launchApp(it)
-                        },
-                        onAppLongClick = {
-                            keyboardController?.hide()
-                            focusManager.clearFocus(force = true)
-                            viewModel.openAppPopup(it)
-                        },
-                        onReplyNotification = { pkg, text, isDualApp -> viewModel.replyToNotification(pkg, text, isDualApp = isDualApp) },
-                        onDismissNotification = { pkg, isDualApp -> viewModel.dismissNotification(pkg, isDualApp = isDualApp) },
-                        onToggleFolderExpanded = { folderId -> viewModel.repository.toggleFolderExpanded(folderId) },
-                        onOpenSettings = {
-                            keyboardController?.hide()
-                            focusManager.clearFocus(force = true)
-                            viewModel.openSettings()
-                        }
-                    )
-                }
-            }
-        }
+                val pageOffset = ((pagerState.currentPage - page) + pagerState.currentPageOffsetFraction)
+                val pageScale = (1f - 0.04f * kotlin.math.abs(pageOffset)).coerceIn(0.92f, 1f)
+                val pageAlpha = (1f - 0.25f * kotlin.math.abs(pageOffset)).coerceIn(0.65f, 1f)
 
-        // Top Screen Indicator (Dots indicating Left / Center / Right page)
-        Row(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .statusBarsPadding()
-                .padding(top = 4.dp)
-                .pointerInput(settings.swipeDownForNotificationCenter) {
-                    if (settings.swipeDownForNotificationCenter) {
-                        detectVerticalDragGestures { _, dragAmount ->
-                            if (dragAmount > 15f) {
-                                viewModel.openNotificationCenter()
-                            }
-                        }
-                    }
-                },
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            val titles = listOf("Widgets", "Home", "All Apps")
-            repeat(3) { idx ->
-                val isSelected = pagerState.currentPage == idx
                 Box(
                     modifier = Modifier
-                        .size(if (isSelected) 18.dp else 6.dp, 4.dp)
-                        .clip(CircleShape)
-                        .background(
-                            if (isSelected) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.25f)
-                        )
-                        .clickable {
-                            coroutineScope.launch { pagerState.animateScrollToPage(idx) }
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            scaleX = pageScale
+                            scaleY = pageScale
+                            alpha = pageAlpha
                         }
-                )
+                ) {
+                    when (page) {
+                        0 -> {
+                            // 2. Left most page houses widgets - user can customize (CRUD)
+                            LeftWidgetsScreen(
+                                widgets = leftWidgets,
+                                weather = weather,
+                                mediaPlayer = mediaPlayer,
+                                calendarEvents = calendarEvents,
+                                isHeadphonesConnected = settings.isHeadphonesConnected,
+                                isFrostedTheme = settings.themePreset == LauncherThemePreset.FROSTED_GLASS,
+                                blurRadius = settings.frostedBlurRadius,
+                                translucency = settings.frostedTranslucency,
+                                glassEffect = settings.frostedGlassEffect,
+                                onAddWidgetClick = { viewModel.openAddWidgetDialog() },
+                                onAddSystemWidgetClick = { viewModel.openSystemWidgetPicker() },
+                                onDeleteWidget = { id -> viewModel.deleteLeftWidget(id) },
+                                onReorderWidget = { from, to -> viewModel.reorderLeftWidget(from, to) },
+                                onEditNoteClick = { widget -> viewModel.openEditNoteWidget(widget) },
+                                onToggleMediaPlay = { viewModel.toggleMediaPlayPause() },
+                                onMediaNext = { viewModel.skipMediaNext() },
+                                onMediaPrev = { viewModel.skipMediaPrev() },
+                                onToggleHeadphones = { viewModel.toggleHeadphonesConnected() },
+                                onRefreshWeather = { viewModel.showToast("Updated weather for ${weather.location} ⛅") },
+                                onOpenWeather = { viewModel.launchIntegration(com.example.util.IntegrationCategory.WEATHER) },
+                                onOpenCalendar = { viewModel.launchIntegration(com.example.util.IntegrationCategory.CALENDAR) },
+                                onUpdateWidgetSize = { id, size -> viewModel.updateLeftWidgetSize(id, size) }
+                            )
+                        }
+                        1 -> {
+                            // 4. Center page: Swipable 4x2 widgets above favorites, NO alphabet scrollbar
+                            CenterHomeScreen(
+                                carouselWidgets = carouselWidgets,
+                                favorites = favorites,
+                                isAppsLoading = isAppsLoading,
+                                settings = settings,
+                                weather = weather,
+                                mediaPlayer = mediaPlayer,
+                                calendarEvents = calendarEvents,
+                                onAppClick = {
+                                    keyboardController?.hide()
+                                    focusManager.clearFocus(force = true)
+                                    viewModel.launchApp(it)
+                                },
+                                onAppLongClick = {
+                                    keyboardController?.hide()
+                                    focusManager.clearFocus(force = true)
+                                    viewModel.openAppPopup(it)
+                                },
+                                onSwipeDownForNotification = { viewModel.openNotificationCenter() },
+                                onReplyNotification = { pkg, text, isDualApp -> viewModel.replyToNotification(pkg, text, isDualApp = isDualApp) },
+                                onDismissNotification = { pkg, isDualApp -> viewModel.dismissNotification(pkg, isDualApp = isDualApp) },
+                                onToggleMediaPlay = { viewModel.toggleMediaPlayPause() },
+                                onMediaNext = { viewModel.skipMediaNext() },
+                                onMediaPrev = { viewModel.skipMediaPrev() },
+                                onSeekMedia = { viewModel.seekMedia(it) },
+                                onToggleHeadphones = { viewModel.toggleHeadphonesConnected() },
+                                onOpenWeather = { viewModel.launchIntegration(com.example.util.IntegrationCategory.WEATHER) },
+                                onOpenCalendar = { viewModel.launchIntegration(com.example.util.IntegrationCategory.CALENDAR) },
+                                onOpenCarouselCustomize = { viewModel.openCarouselCustomize() },
+                                onOpenSettings = {
+                                    keyboardController?.hide()
+                                    focusManager.clearFocus(force = true)
+                                    viewModel.openSettings()
+                                },
+                                onNavigateToAllApps = {
+                                    keyboardController?.hide()
+                                    focusManager.clearFocus(force = true)
+                                    coroutineScope.launch {
+                                        pagerState.animateScrollToPage(
+                                            2,
+                                            animationSpec = androidx.compose.animation.core.spring(
+                                                dampingRatio = androidx.compose.animation.core.Spring.DampingRatioLowBouncy,
+                                                stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow
+                                            )
+                                        )
+                                    }
+                                }
+                            )
+                        }
+                        2 -> {
+                            // 3. Right most screen: Lists all apps with strict margins
+                            RightAllAppsScreen(
+                                allApps = allApps,
+                                folders = folders,
+                                isAppsLoading = isAppsLoading,
+                                settings = settings,
+                                selectedWaveLetter = waveSelectedLetter,
+                                onWaveLetterSelected = { viewModel.setWaveSelectedLetter(it) },
+                                onAppClick = {
+                                    keyboardController?.hide()
+                                    focusManager.clearFocus(force = true)
+                                    viewModel.launchApp(it)
+                                },
+                                onAppLongClick = {
+                                    keyboardController?.hide()
+                                    focusManager.clearFocus(force = true)
+                                    viewModel.openAppPopup(it)
+                                },
+                                onReplyNotification = { pkg, text, isDualApp -> viewModel.replyToNotification(pkg, text, isDualApp = isDualApp) },
+                                onDismissNotification = { pkg, isDualApp -> viewModel.dismissNotification(pkg, isDualApp = isDualApp) },
+                                onToggleFolderExpanded = { folderId -> viewModel.repository.toggleFolderExpanded(folderId) },
+                                onOpenSettings = {
+                                    keyboardController?.hide()
+                                    focusManager.clearFocus(force = true)
+                                    viewModel.openSettings()
+                                }
+                            )
+                        }
+                    }
+                }
             }
-        }
+
+            // Top Screen Indicator (Smooth animated dots indicating Left / Center / Right page)
+            Row(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .statusBarsPadding()
+                    .padding(top = 4.dp)
+                    .pointerInput(settings.swipeDownForNotificationCenter) {
+                        if (settings.swipeDownForNotificationCenter) {
+                            detectVerticalDragGestures { _, dragAmount ->
+                                if (dragAmount > 12f) {
+                                    viewModel.openNotificationCenter()
+                                }
+                            }
+                        }
+                    },
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                repeat(3) { idx ->
+                    val isSelected = pagerState.currentPage == idx
+                    val animatedWidth by androidx.compose.animation.core.animateDpAsState(
+                        targetValue = if (isSelected) 20.dp else 6.dp,
+                        animationSpec = androidx.compose.animation.core.spring(
+                            dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
+                            stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow
+                        ),
+                        label = "dot_width_$idx"
+                    )
+
+                    Box(
+                        modifier = Modifier
+                            .size(animatedWidth, 4.dp)
+                            .clip(CircleShape)
+                            .background(
+                                if (isSelected) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f)
+                            )
+                            .clickable {
+                                coroutineScope.launch {
+                                    pagerState.animateScrollToPage(
+                                        idx,
+                                        animationSpec = androidx.compose.animation.core.spring(
+                                            dampingRatio = androidx.compose.animation.core.Spring.DampingRatioLowBouncy,
+                                            stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow
+                                        )
+                                    )
+                                }
+                            }
+                    )
+                }
+            }
 
         // 5. Fixed Dock (Visible ONLY on Home Screen per user request)
         if (pagerState.currentPage == 1 && settings.showDock) {

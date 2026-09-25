@@ -1,7 +1,14 @@
 package com.example.ui.components
 
+import android.content.Intent
+import android.provider.Settings
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -18,11 +25,70 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.*
+import kotlinx.coroutines.withTimeoutOrNull
+
+/**
+ * Intelligent empty space gesture handler that seamlessly and reliably handles:
+ * - Downward swipe/fling to open Notification Center
+ * - Long press to open Home Screen Quick Customization menu
+ */
+fun Modifier.emptySpaceGestureHandler(
+    onSwipeDown: () -> Unit,
+    onLongPress: () -> Unit
+): Modifier = pointerInput(Unit) {
+    awaitEachGesture {
+        val down = awaitFirstDown(requireUnconsumed = false)
+        var totalDy = 0f
+        var totalDx = 0f
+        var isDownSwipeTriggered = false
+        var isLongPressTriggered = false
+        val longPressTimeout = viewConfiguration.longPressTimeoutMillis
+        val startTime = System.currentTimeMillis()
+
+        while (true) {
+            val event = withTimeoutOrNull(40L) {
+                awaitPointerEvent()
+            }
+
+            if (event == null) {
+                if (!isDownSwipeTriggered && !isLongPressTriggered && (System.currentTimeMillis() - startTime >= longPressTimeout)) {
+                    if (kotlin.math.abs(totalDy) < 20f && kotlin.math.abs(totalDx) < 20f) {
+                        isLongPressTriggered = true
+                        onLongPress()
+                    }
+                }
+                continue
+            }
+
+            val change = event.changes.firstOrNull { it.id == down.id } ?: break
+            if (!change.pressed) {
+                break
+            }
+
+            val drag = change.positionChange()
+            totalDx += drag.x
+            totalDy += drag.y
+
+            if (!isDownSwipeTriggered && !isLongPressTriggered) {
+                if (totalDy > 30f && totalDy > kotlin.math.abs(totalDx) * 1.15f) {
+                    isDownSwipeTriggered = true
+                    change.consume()
+                    onSwipeDown()
+                    break
+                }
+            }
+        }
+    }
+}
 
 @Composable
 fun UsageDetailsWidgetCard(
@@ -162,6 +228,7 @@ fun UsageDetailsWidgetCard(
  * - Only shows favorite apps below the 4x2 widgets
  * - Has NO alphabet-based fast scrollbar
  */
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun CenterHomeScreen(
     carouselWidgets: List<WidgetType>,
@@ -174,6 +241,7 @@ fun CenterHomeScreen(
     onAppClick: (AppItem) -> Unit,
     onAppLongClick: (AppItem) -> Unit,
     onSwipeRightForPopup: ((AppItem) -> Unit)? = null,
+    onSwipeDownForNotification: () -> Unit = {},
     onReplyNotification: (packageName: String, text: String, isDualApp: Boolean) -> Unit = { _, _, _ -> },
     onDismissNotification: (packageName: String, isDualApp: Boolean) -> Unit = { _, _ -> },
     onToggleMediaPlay: () -> Unit,
@@ -188,41 +256,78 @@ fun CenterHomeScreen(
     onNavigateToAllApps: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    val isYTInstalled = remember(context) { isYouTubeMusicInstalled(context) }
+
     // Fixed 3-card carousel: Card 1 is Clock, Cards 2 & 3 are user selected
-    val displayWidgets = remember(carouselWidgets) {
-        val customOthers = carouselWidgets.filter { it != WidgetType.CLOCK }.take(2)
-        val fillList = listOf(WidgetType.WEATHER_FORECAST, WidgetType.MEDIA_PLAYER).filter { it !in customOthers }
+    // If YouTube Music is not installed, automatically omit it from favorites carousel
+    val displayWidgets = remember(carouselWidgets, isYTInstalled) {
+        val filteredCarousel = if (isYTInstalled) carouselWidgets else carouselWidgets.filter { it != WidgetType.MEDIA_PLAYER }
+        val customOthers = filteredCarousel.filter { it != WidgetType.CLOCK }.take(2)
+        val defaultFill = if (isYTInstalled) {
+            listOf(WidgetType.WEATHER_FORECAST, WidgetType.MEDIA_PLAYER)
+        } else {
+            listOf(WidgetType.WEATHER_FORECAST, WidgetType.CALENDAR_AGENDA)
+        }
+        val fillList = defaultFill.filter { it !in customOthers }
         val finalOthers = (customOthers + fillList).take(2)
         listOf(WidgetType.CLOCK) + finalOthers
     }
 
-    val pagerState = rememberPagerState(pageCount = { 3 })
+    val pagerState = rememberPagerState(pageCount = { displayWidgets.size })
+    var showHomeEmptySpaceOptions by remember { mutableStateOf(false) }
+
+    val openSystemWallpaperPicker: () -> Unit = {
+        try {
+            val intent = Intent(Intent.ACTION_SET_WALLPAPER)
+            context.startActivity(Intent.createChooser(intent, "Choose Wallpaper"))
+        } catch (_: Exception) {
+            try {
+                val displayIntent = Intent(Settings.ACTION_DISPLAY_SETTINGS)
+                context.startActivity(displayIntent)
+            } catch (_: Exception) {}
+        }
+    }
 
     BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
             .statusBarsPadding()
             .padding(horizontal = 16.dp)
+            .emptySpaceGestureHandler(
+                onSwipeDown = onSwipeDownForNotification,
+                onLongPress = { showHomeEmptySpaceOptions = true }
+            )
             .testTag("center_home_screen")
     ) {
-        val topOffset = (maxHeight * 0.12f).coerceAtLeast(16.dp)
+        val topOffset = settings.favoritesTopSpacing.heightDp.dp
 
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = 110.dp)
+            contentPadding = PaddingValues(bottom = 120.dp)
         ) {
-            // Top minimal breathing space
+            // Top customizable empty space above widgets (Low: 1 row, Medium: 2 rows, High: 3 rows)
             item(key = "center_top_spacer") {
-                Spacer(modifier = Modifier.height(topOffset))
+                Spacer(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(topOffset)
+                        .emptySpaceGestureHandler(
+                            onSwipeDown = onSwipeDownForNotification,
+                            onLongPress = { showHomeEmptySpaceOptions = true }
+                        )
+                )
             }
 
             // 4x1 Digital Wellbeing widget above clock (Daily screen usage, no container around it, no padding/margin)
             item(key = "center_digital_wellbeing_4x1") {
-                DigitalWellbeing4x1Widget(
-                    onOpenSettings = onOpenSettings,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(modifier = Modifier.height(14.dp))
+                Box(modifier = Modifier.animateItem()) {
+                    DigitalWellbeing4x1Widget(
+                        onOpenSettings = onOpenSettings,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+                Spacer(modifier = Modifier.height(20.dp))
             }
 
             // 4.1 Swipable 4x2 Widgets Carousel (Clock is Fixed #1)
@@ -234,33 +339,47 @@ fun CenterHomeScreen(
                             .fillMaxWidth()
                             .testTag("center_4x2_carousel")
                     ) { page ->
-                        val widgetType = displayWidgets.getOrNull(page) ?: WidgetType.CLOCK
-                        Carousel4x2WidgetCard(
-                            type = widgetType,
-                            weather = weather,
-                            mediaPlayer = mediaPlayer,
-                            calendarEvents = calendarEvents,
-                            isHeadphonesConnected = settings.isHeadphonesConnected,
-                            showSeconds = settings.showSeconds,
-                            clockColorTintHex = settings.clockColorTintHex,
-                            clockScale = settings.clockScale,
-                            onToggleMediaPlay = onToggleMediaPlay,
-                            onMediaNext = onMediaNext,
-                            onMediaPrev = onMediaPrev,
-                            onSeekMedia = onSeekMedia,
-                            onToggleHeadphones = onToggleHeadphones,
-                            onOpenWeather = onOpenWeather,
-                            onOpenCalendar = onOpenCalendar,
-                            onOpenCustomize = onOpenCarouselCustomize,
-                            onOpenSettings = onOpenSettings
-                        )
+                        val cardOffset = ((pagerState.currentPage - page) + pagerState.currentPageOffsetFraction)
+                        val cardScale = (1f - 0.05f * kotlin.math.abs(cardOffset)).coerceIn(0.92f, 1f)
+                        val cardAlpha = (1f - 0.2f * kotlin.math.abs(cardOffset)).coerceIn(0.6f, 1f)
+
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .graphicsLayer {
+                                    scaleX = cardScale
+                                    scaleY = cardScale
+                                    alpha = cardAlpha
+                                }
+                        ) {
+                            val widgetType = displayWidgets.getOrNull(page) ?: WidgetType.CLOCK
+                            Carousel4x2WidgetCard(
+                                type = widgetType,
+                                weather = weather,
+                                mediaPlayer = mediaPlayer,
+                                calendarEvents = calendarEvents,
+                                isHeadphonesConnected = settings.isHeadphonesConnected,
+                                showSeconds = settings.showSeconds,
+                                clockColorTintHex = settings.clockColorTintHex,
+                                clockScale = settings.clockScale,
+                                onToggleMediaPlay = onToggleMediaPlay,
+                                onMediaNext = onMediaNext,
+                                onMediaPrev = onMediaPrev,
+                                onSeekMedia = onSeekMedia,
+                                onToggleHeadphones = onToggleHeadphones,
+                                onOpenWeather = onOpenWeather,
+                                onOpenCalendar = onOpenCalendar,
+                                onOpenCustomize = onOpenCarouselCustomize,
+                                onOpenSettings = onOpenSettings
+                            )
+                        }
                     }
 
                     // Dot page indicator for 3 carousel widgets
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(top = 10.dp, bottom = 8.dp),
+                            .padding(top = 10.dp, bottom = 12.dp),
                         horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -278,10 +397,11 @@ fun CenterHomeScreen(
                             )
                         }
                     }
+                    Spacer(modifier = Modifier.height(10.dp))
                 }
             }
 
-            // 4. Center page ONLY shows favourite apps
+            // 4. Center page ONLY shows favourite apps (max 10)
         if (isAppsLoading) {
             item(key = "loading_favorites") {
                 Box(
@@ -333,7 +453,7 @@ fun CenterHomeScreen(
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "Swipe right to All Apps, then long-press an app or tap options to star it as a favorite.",
+                            text = "Swipe right to All Apps, then long-press an app or tap options to star it as a favorite (up to 10 apps).",
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center
@@ -342,23 +462,187 @@ fun CenterHomeScreen(
                 }
             }
         } else {
-            itemsIndexed(favorites, key = { _, app -> "fav_${app.uniqueKey}" }) { _, app ->
-                AppListItem(
-                    app = app,
-                    iconPackType = settings.iconPackType,
-                    customIconSettings = settings.customIconSettings,
-                    isLeftHanded = settings.leftHandedMode,
-                    fontScale = settings.fontScale,
-                    iconScale = settings.appIconScale,
-                    showBadges = settings.showAppNotificationBadges,
-                    compactSpacing = settings.compactAppRowSpacing,
-                    onAppClick = { onAppClick(app) },
-                    onAppLongClick = { onAppLongClick(app) },
-                    onReplyNotification = { text -> onReplyNotification(app.packageName, text, app.isDualApp) },
-                    onDismissNotification = { onDismissNotification(app.packageName, app.isDualApp) }
+            itemsIndexed(favorites.take(10), key = { _, app -> "fav_${app.uniqueKey}" }) { _, app ->
+                Box(modifier = Modifier.animateItem()) {
+                    AppListItem(
+                        app = app,
+                        iconPackType = settings.iconPackType,
+                        customIconSettings = settings.customIconSettings,
+                        isLeftHanded = settings.leftHandedMode,
+                        fontScale = settings.fontScale,
+                        iconScale = settings.appIconScale,
+                        showBadges = settings.showAppNotificationBadges,
+                        compactSpacing = settings.compactAppRowSpacing,
+                        onAppClick = { onAppClick(app) },
+                        onAppLongClick = { onAppLongClick(app) },
+                        onReplyNotification = { text -> onReplyNotification(app.packageName, text, app.isDualApp) },
+                        onDismissNotification = { onDismissNotification(app.packageName, app.isDualApp) }
+                    )
+                }
+            }
+        }
+
+            // Bottom empty space that can also receive long-press or swipe down
+            item(key = "center_bottom_empty_filler") {
+                Spacer(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(140.dp)
+                        .emptySpaceGestureHandler(
+                            onSwipeDown = onSwipeDownForNotification,
+                            onLongPress = { showHomeEmptySpaceOptions = true }
+                        )
                 )
             }
         }
+
+        // Long Press Empty Space Bottom Sheet
+        if (showHomeEmptySpaceOptions) {
+            ModalBottomSheet(
+                onDismissRequest = { showHomeEmptySpaceOptions = false },
+                containerColor = MaterialTheme.colorScheme.surface,
+                tonalElevation = 8.dp,
+                shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+                dragHandle = {
+                    Box(
+                        modifier = Modifier
+                            .padding(vertical = 12.dp)
+                            .size(width = 36.dp, height = 4.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
+                    )
+                }
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp)
+                        .padding(bottom = 36.dp)
+                ) {
+                    Text(
+                        text = "Home Screen",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = "Quick options & customizations",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 16.dp)
+                    )
+
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(16.dp))
+                            .clickable {
+                                showHomeEmptySpaceOptions = false
+                                onOpenSettings()
+                            }
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .padding(16.dp)
+                                .fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.primaryContainer),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Settings,
+                                    contentDescription = "Flux Launcher Settings",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(16.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Flux Launcher Settings",
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = "Customize icons, themes, widgets & gestures",
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(16.dp))
+                            .clickable {
+                                showHomeEmptySpaceOptions = false
+                                openSystemWallpaperPicker()
+                            }
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .padding(16.dp)
+                                .fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.secondaryContainer),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Wallpaper,
+                                    contentDescription = "Change System Wallpaper",
+                                    tint = MaterialTheme.colorScheme.secondary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(16.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Change System Wallpaper",
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = "Open device wallpaper settings & picker",
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
     }
-}
 }

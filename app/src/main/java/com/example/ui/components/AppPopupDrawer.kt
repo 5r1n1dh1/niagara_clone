@@ -994,149 +994,42 @@ private fun AppSpecificOperationsBar(
     mediaPlayer: com.example.data.MediaPlaybackState = com.example.data.MediaPlaybackState(),
     onDismiss: () -> Unit
 ) {
-    when (category) {
-        AppCategoryType.MUSIC -> {
-            Surface(
-                shape = RoundedCornerShape(16.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)),
-                modifier = Modifier.fillMaxWidth().testTag("media_controls_panel")
-            ) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    // Header with Album Art and Track Info
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        // Album Art Image or Styled Vinyl Placeholder
-                        if (mediaPlayer.albumArtBitmap != null) {
-                            Image(
-                                bitmap = mediaPlayer.albumArtBitmap.asImageBitmap(),
-                                contentDescription = "Album Art",
-                                modifier = Modifier
-                                    .size(52.dp)
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f), RoundedCornerShape(10.dp)),
-                                contentScale = ContentScale.Crop
-                            )
-                        } else {
-                            Box(
-                                contentAlignment = Alignment.Center,
-                                modifier = Modifier
-                                    .size(52.dp)
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(MaterialTheme.colorScheme.primaryContainer)
-                                    .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f), RoundedCornerShape(10.dp))
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Filled.MusicNote,
-                                    contentDescription = "Album Art Placeholder",
-                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                    modifier = Modifier.size(28.dp)
-                                )
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.width(10.dp))
-
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = mediaPlayer.trackTitle.ifBlank { "Now Playing" },
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                maxLines = 1
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = mediaPlayer.artistName.ifBlank { mediaPlayer.appName },
-                                fontSize = 11.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = mediaPlayer.appName,
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.primary,
-                                maxLines = 1
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    // Playback Controls Row
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        FilledTonalButton(
-                            onClick = {
-                                val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? android.media.AudioManager
-                                try {
-                                    val downEvent = android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_MEDIA_PREVIOUS)
-                                    val upEvent = android.view.KeyEvent(android.view.KeyEvent.ACTION_UP, android.view.KeyEvent.KEYCODE_MEDIA_PREVIOUS)
-                                    audioManager?.dispatchMediaKeyEvent(downEvent)
-                                    audioManager?.dispatchMediaKeyEvent(upEvent)
-                                } catch (_: Exception) {}
-                            },
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(10.dp),
-                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 6.dp)
-                        ) {
-                            Icon(Icons.Filled.SkipPrevious, contentDescription = "Previous Track", modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Prev", fontSize = 11.sp)
-                        }
-
-                        Button(
-                            onClick = {
-                                val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? android.media.AudioManager
-                                try {
-                                    val downEvent = android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)
-                                    val upEvent = android.view.KeyEvent(android.view.KeyEvent.ACTION_UP, android.view.KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)
-                                    audioManager?.dispatchMediaKeyEvent(downEvent)
-                                    audioManager?.dispatchMediaKeyEvent(upEvent)
-                                } catch (_: Exception) {}
-                            },
-                            modifier = Modifier.weight(1.3f),
-                            shape = RoundedCornerShape(10.dp),
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
-                        ) {
-                            Icon(
-                                imageVector = if (mediaPlayer.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                                contentDescription = if (mediaPlayer.isPlaying) "Pause" else "Play",
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(if (mediaPlayer.isPlaying) "Pause" else "Play", fontSize = 11.sp, maxLines = 1)
-                        }
-
-                        FilledTonalButton(
-                            onClick = {
-                                val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? android.media.AudioManager
-                                try {
-                                    val downEvent = android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_MEDIA_NEXT)
-                                    val upEvent = android.view.KeyEvent(android.view.KeyEvent.ACTION_UP, android.view.KeyEvent.KEYCODE_MEDIA_NEXT)
-                                    audioManager?.dispatchMediaKeyEvent(downEvent)
-                                    audioManager?.dispatchMediaKeyEvent(upEvent)
-                                } catch (_: Exception) {}
-                            },
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(10.dp),
-                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 6.dp)
-                        ) {
-                            Icon(Icons.Filled.SkipNext, contentDescription = "Next Track", modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Next", fontSize = 11.sp)
-                        }
-                    }
-                }
+    if (category == AppCategoryType.MUSIC || packageName == YT_MUSIC_PACKAGE_NAME || packageName.contains("youtube.music", ignoreCase = true)) {
+        YouTubeMusicFluxWidget(
+            media = mediaPlayer,
+            size = "4x2",
+            onTogglePlay = {
+                val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? android.media.AudioManager
+                try {
+                    val downEvent = android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)
+                    val upEvent = android.view.KeyEvent(android.view.KeyEvent.ACTION_UP, android.view.KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)
+                    audioManager?.dispatchMediaKeyEvent(downEvent)
+                    audioManager?.dispatchMediaKeyEvent(upEvent)
+                } catch (_: Exception) {}
+            },
+            onNext = {
+                val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? android.media.AudioManager
+                try {
+                    val downEvent = android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_MEDIA_NEXT)
+                    val upEvent = android.view.KeyEvent(android.view.KeyEvent.ACTION_UP, android.view.KeyEvent.KEYCODE_MEDIA_NEXT)
+                    audioManager?.dispatchMediaKeyEvent(downEvent)
+                    audioManager?.dispatchMediaKeyEvent(upEvent)
+                } catch (_: Exception) {}
+            },
+            onPrev = {
+                val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? android.media.AudioManager
+                try {
+                    val downEvent = android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_MEDIA_PREVIOUS)
+                    val upEvent = android.view.KeyEvent(android.view.KeyEvent.ACTION_UP, android.view.KeyEvent.KEYCODE_MEDIA_PREVIOUS)
+                    audioManager?.dispatchMediaKeyEvent(downEvent)
+                    audioManager?.dispatchMediaKeyEvent(upEvent)
+                } catch (_: Exception) {}
             }
-        }
+        )
+        return
+    }
+
+    when (category) {
 
         AppCategoryType.CAMERA -> {
             Row(

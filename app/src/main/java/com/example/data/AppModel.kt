@@ -76,6 +76,12 @@ enum class AppFontFamily(val displayName: String) {
     CONDENSED("Compact Bold")
 }
 
+enum class FavoritesTopSpacing(val displayName: String, val rowCount: Int, val heightDp: Int) {
+    HIGH("High - 3 empty rows", 3, 180),
+    MEDIUM("Medium - 2 empty rows", 2, 120),
+    LOW("Low - 1 empty row", 1, 60)
+}
+
 data class AppItem(
     val packageName: String,
     val activityName: String = "",
@@ -152,15 +158,19 @@ data class CalendarEvent(
 )
 
 data class MediaPlaybackState(
-    val isPlaying: Boolean = true,
-    val trackTitle: String = "Midnight City",
-    val artistName: String = "M83",
+    val isPlaying: Boolean = false,
+    val trackTitle: String = "YouTube Music",
+    val artistName: String = "Tap to Play",
     val appName: String = "YouTube Music",
-    val progressPercent: Float = 0.42f,
-    val durationText: String = "4:03",
-    val currentTimeText: String = "1:42",
+    val progressPercent: Float = 0.35f,
+    val durationText: String = "3:45",
+    val currentTimeText: String = "1:20",
+    val isShuffleEnabled: Boolean = false,
+    val isRepeatEnabled: Boolean = false,
     val albumArtBitmap: Bitmap? = null,
-    val packageName: String? = null
+    val packageName: String = "com.google.android.apps.youtube.music",
+    val isExternalOutputConnected: Boolean = false,
+    val outputDeviceName: String? = null
 )
 
 data class LauncherSettings(
@@ -195,6 +205,7 @@ data class LauncherSettings(
     val frostedGlassEffect: Float = 0.30f,
     val showAppNotificationBadges: Boolean = true,
     val compactAppRowSpacing: Boolean = false,
+    val favoritesTopSpacing: FavoritesTopSpacing = FavoritesTopSpacing.LOW,
     val showDock: Boolean = true,
     val dockSlotCount: Int = 3, // 3, 4, or 5
     val showDockLabels: Boolean = false,

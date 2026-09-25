@@ -305,8 +305,9 @@ fun RightAllAppsScreen(
                             items = flatList,
                             key = { _, item -> item.key }
                         ) { _, drawerItem ->
-                            when (drawerItem) {
-                                is AppDrawerItem.CategoryCard -> {
+                            Box(modifier = Modifier.animateItem()) {
+                                when (drawerItem) {
+                                    is AppDrawerItem.CategoryCard -> {
                                     val catApps = drawerItem.apps
                                     var isExpanded by remember { mutableStateOf(false) }
 
@@ -442,9 +443,10 @@ fun RightAllAppsScreen(
                             }
                         }
                     }
+                }
 
-                    // Niagara Wave Alphabet Scrollbar
-                    if (filterText.isBlank()) {
+                // Niagara Wave Alphabet Scrollbar
+                if (filterText.isBlank()) {
                         val scope = rememberCoroutineScope()
                         val alignModifier = if (isLeftHanded) Modifier.align(Alignment.CenterStart) else Modifier.align(Alignment.CenterEnd)
 

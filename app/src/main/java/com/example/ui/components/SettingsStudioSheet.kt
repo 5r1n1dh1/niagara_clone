@@ -76,11 +76,6 @@ enum class SettingsPage(
         subtitle = "Clock styles, accent tint, ticking seconds & layout lock",
         icon = Icons.Filled.Schedule
     ),
-    INTEGRATIONS(
-        title = "Default Integrations",
-        subtitle = "Music player, calendar, weather & default apps",
-        icon = Icons.Filled.Hub
-    ),
     SYSTEM(
         title = "System, Permissions & Backup",
         subtitle = "Default launcher, accessibility, restricted settings & restore",
@@ -128,8 +123,6 @@ fun SettingsStudioSheet(
     var showImportDialog by remember { mutableStateOf(false) }
     var newCategoryInputText by remember { mutableStateOf("") }
     var selectedCategoryForAppAssignment by remember { mutableStateOf<String?>(null) }
-    var selectedIntegrationForPicker by remember { mutableStateOf<IntegrationCategory?>(null) }
-    var integrationSearchFilter by remember { mutableStateOf("") }
     var showRestrictedSettingsGuideDialog by remember { mutableStateOf(false) }
 
     val isDefaultLauncher = remember(context) { DefaultLauncherHelper.isDefaultLauncher(context) }
@@ -381,16 +374,6 @@ fun SettingsStudioSheet(
                         )
                     }
 
-                    SettingsPage.INTEGRATIONS -> {
-                        IntegrationsSettingsPage(
-                            widgetIntegrations = widgetIntegrations,
-                            onSelectIntegrationForPicker = {
-                                selectedIntegrationForPicker = it
-                                integrationSearchFilter = ""
-                            }
-                        )
-                    }
-
                     SettingsPage.SYSTEM -> {
                         SystemSettingsPage(
                             isDefaultLauncher = isDefaultLauncher,
@@ -410,71 +393,6 @@ fun SettingsStudioSheet(
                 }
             }
         }
-    }
-
-    // App Integration Selection Dialog
-    selectedIntegrationForPicker?.let { cat ->
-        val installedApps = allApps.sortedBy { it.label.lowercase() }
-        val filtered = if (integrationSearchFilter.isBlank()) {
-            installedApps
-        } else {
-            installedApps.filter { it.label.contains(integrationSearchFilter, ignoreCase = true) }
-        }
-
-        AlertDialog(
-            onDismissRequest = { selectedIntegrationForPicker = null },
-            title = { Text("Choose ${cat.displayName} App", fontSize = 16.sp, fontWeight = FontWeight.Bold) },
-            text = {
-                Column(modifier = Modifier.fillMaxWidth().heightIn(max = 380.dp)) {
-                    OutlinedTextField(
-                        value = integrationSearchFilter,
-                        onValueChange = { integrationSearchFilter = it },
-                        placeholder = { Text("Filter apps...", fontSize = 12.sp) },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    LazyColumn(modifier = Modifier.fillMaxWidth().weight(1f)) {
-                        item {
-                            Surface(
-                                onClick = {
-                                    widgetIntegrations?.setPackage(cat, null)
-                                    selectedIntegrationForPicker = null
-                                },
-                                shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
-                            ) {
-                                Text("Use System Default / Auto Detect", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(12.dp))
-                            }
-                        }
-                        items(filtered) { app ->
-                            Surface(
-                                onClick = {
-                                    widgetIntegrations?.setPackage(cat, app.packageName)
-                                    selectedIntegrationForPicker = null
-                                },
-                                shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp)
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
-                                ) {
-                                    AppIconRenderer(app = app, iconPackType = IconPackType.DEFAULT_APP, size = 32.dp)
-                                    Spacer(modifier = Modifier.width(10.dp))
-                                    Text(app.label, fontSize = 13.sp)
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { selectedIntegrationForPicker = null }) {
-                    Text("Cancel")
-                }
-            }
-        )
     }
 
     // Export Backup Dialog
@@ -748,6 +666,64 @@ private fun AppearanceSettingsPage(
                     checked = settings.showAppNotificationBadges,
                     onCheckedChange = { onUpdateSettings(settings.copy(showAppNotificationBadges = it)) }
                 )
+            }
+        }
+
+        item {
+            SettingsCard(title = "Empty Space Above Widgets") {
+                Text(
+                    text = "Favorites Screen Top Spacing",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    text = "Customize the empty row spacing above the widgets and favorites on the home screen",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FavoritesTopSpacing.entries.forEach { spacing ->
+                        val isSelected = settings.favoritesTopSpacing == spacing
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                            border = BorderStroke(1.dp, if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onUpdateSettings(settings.copy(favoritesTopSpacing = spacing)) }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = spacing.displayName,
+                                        fontSize = 13.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
+                                        color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = when (spacing) {
+                                            FavoritesTopSpacing.HIGH -> "3 empty rows at the top (~180dp)"
+                                            FavoritesTopSpacing.MEDIUM -> "2 empty rows at the top (~120dp)"
+                                            FavoritesTopSpacing.LOW -> "1 empty row at the top (~60dp)"
+                                        },
+                                        fontSize = 11.sp,
+                                        color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                RadioButton(
+                                    selected = isSelected,
+                                    onClick = { onUpdateSettings(settings.copy(favoritesTopSpacing = spacing)) }
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -1716,54 +1692,7 @@ private fun ClockWidgetsSettingsPage(
 }
 
 /**
- * 6. Integrations Settings Page
- */
-@Composable
-private fun IntegrationsSettingsPage(
-    widgetIntegrations: WidgetIntegrationsManager?,
-    onSelectIntegrationForPicker: (IntegrationCategory) -> Unit
-) {
-    val context = LocalContext.current
-    val pm = context.packageManager
-
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(top = 12.dp, bottom = 32.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        item {
-            SettingsCard(title = "Default App Integrations") {
-                IntegrationItemRow(
-                    title = "Music App",
-                    subtitle = widgetIntegrations?.getAppLabel(IntegrationCategory.MUSIC, pm) ?: "System Default (Spotify / YT Music)",
-                    icon = Icons.Filled.MusicNote,
-                    onClick = { onSelectIntegrationForPicker(IntegrationCategory.MUSIC) }
-                )
-
-                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-
-                IntegrationItemRow(
-                    title = "Calendar App",
-                    subtitle = widgetIntegrations?.getAppLabel(IntegrationCategory.CALENDAR, pm) ?: "Google / System Calendar",
-                    icon = Icons.Filled.CalendarMonth,
-                    onClick = { onSelectIntegrationForPicker(IntegrationCategory.CALENDAR) }
-                )
-
-                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-
-                IntegrationItemRow(
-                    title = "Weather App",
-                    subtitle = widgetIntegrations?.getAppLabel(IntegrationCategory.WEATHER, pm) ?: "Google Weather / Browser",
-                    icon = Icons.Filled.Cloud,
-                    onClick = { onSelectIntegrationForPicker(IntegrationCategory.WEATHER) }
-                )
-            }
-        }
-    }
-}
-
-/**
- * 7. System & Backup Settings Page
+ * 6. System & Backup Settings Page
  */
 @Composable
 private fun SystemSettingsPage(
@@ -2238,39 +2167,3 @@ private fun SettingsToggleRow(
     }
 }
 
-@Composable
-private fun IntegrationItemRow(
-    title: String,
-    subtitle: String,
-    icon: ImageVector,
-    onClick: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(20.dp)
-            )
-            Spacer(modifier = Modifier.width(12.dp))
-            Column {
-                Text(text = title, fontWeight = FontWeight.Medium, fontSize = 13.sp)
-                Text(text = subtitle, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-        Icon(
-            imageVector = Icons.Outlined.ChevronRight,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(18.dp)
-        )
-    }
-}

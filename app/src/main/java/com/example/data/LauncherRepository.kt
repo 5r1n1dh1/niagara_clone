@@ -233,6 +233,7 @@ class LauncherRepository(private val context: Context) {
             frostedGlassEffect = prefs.getFloat("frosted_glass_effect", 0.30f),
             showAppNotificationBadges = prefs.getBoolean("app_notif_badges", true),
             compactAppRowSpacing = prefs.getBoolean("compact_row_spacing", false),
+            favoritesTopSpacing = FavoritesTopSpacing.entries.getOrElse(prefs.getInt("fav_top_spacing", FavoritesTopSpacing.LOW.ordinal)) { FavoritesTopSpacing.LOW },
             showDock = prefs.getBoolean("show_dock", true),
             dockSlotCount = prefs.getInt("dock_slot_count", 3).coerceIn(3, 5),
             showDockLabels = prefs.getBoolean("show_dock_labels", false),
@@ -276,6 +277,7 @@ class LauncherRepository(private val context: Context) {
             .putFloat("frosted_glass_effect", newSettings.frostedGlassEffect)
             .putBoolean("app_notif_badges", newSettings.showAppNotificationBadges)
             .putBoolean("compact_row_spacing", newSettings.compactAppRowSpacing)
+            .putInt("fav_top_spacing", newSettings.favoritesTopSpacing.ordinal)
             .putBoolean("show_dock", newSettings.showDock)
             .putInt("dock_slot_count", newSettings.dockSlotCount)
             .putBoolean("show_dock_labels", newSettings.showDockLabels)
@@ -367,7 +369,7 @@ class LauncherRepository(private val context: Context) {
                     true
                 }
             }
-            WidgetType.MEDIA_PLAYER -> true
+            WidgetType.MEDIA_PLAYER -> com.example.ui.components.isYouTubeMusicInstalled(context)
             WidgetType.WEATHER_FORECAST -> true
             WidgetType.NEWS_FEED -> true
             WidgetType.SYSTEM_TOGGLES -> true
@@ -691,21 +693,8 @@ class LauncherRepository(private val context: Context) {
             }
         }
 
-        // Default folders
-        _folders.value = listOf(
-            FolderItem(
-                id = "f_social",
-                name = "Social & Chat",
-                iconEmoji = "💬",
-                appPackageNames = listOf("com.whatsapp", "com.instagram.android", "com.twitter.android", "com.discord")
-            ),
-            FolderItem(
-                id = "f_work",
-                name = "Work & Tools",
-                iconEmoji = "💼",
-                appPackageNames = listOf("com.slack", "com.github.android", "com.google.android.gm", "com.google.android.keep")
-            )
-        )
+        // Default folders is empty unless user creates folders
+        _folders.value = emptyList()
     }
 
     fun toggleFolderExpanded(folderId: String) {
@@ -747,6 +736,10 @@ class LauncherRepository(private val context: Context) {
             currentFavs.remove(packageName)
             false
         } else {
+            if (currentFavs.size >= 10) {
+                android.widget.Toast.makeText(context, "Maximum 10 favorite apps allowed", android.widget.Toast.LENGTH_SHORT).show()
+                return
+            }
             currentFavs.add(packageName)
             true
         }
@@ -760,7 +753,7 @@ class LauncherRepository(private val context: Context) {
         val targetApp = updatedApps.find { it.packageName == packageName }
         if (isNowFav && targetApp != null) {
             if (!_favorites.value.any { it.packageName == packageName }) {
-                _favorites.value = _favorites.value + targetApp
+                _favorites.value = (_favorites.value + targetApp).take(10)
             }
         } else {
             _favorites.value = _favorites.value.filter { it.packageName != packageName }
@@ -857,10 +850,10 @@ class LauncherRepository(private val context: Context) {
                 for (i in 0 until arr.length()) {
                     list.add(arr.getString(i))
                 }
-                if (list.isNotEmpty()) return list
+                return list
             } catch (_: Exception) {}
         }
-        return listOf("Social", "Work", "Games", "Media", "Utilities", "Tools")
+        return emptyList()
     }
 
     fun addUserCategory(categoryName: String) {
@@ -1062,6 +1055,13 @@ class LauncherRepository(private val context: Context) {
         }
     }
 
+    fun toggleShuffleMedia() {
+        val current = _mediaPlayer.value
+        _mediaPlayer.value = current.copy(
+            isShuffleEnabled = !current.isShuffleEnabled
+        )
+    }
+
     fun skipPreviousMedia() {
         val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? android.media.AudioManager
         try {
@@ -1071,13 +1071,12 @@ class LauncherRepository(private val context: Context) {
             audioManager?.dispatchMediaKeyEvent(upEvent)
         } catch (_: Exception) {}
 
-        val musicPkg = widgetIntegrations.getPackage(IntegrationCategory.MUSIC)
-        val currentApp = if (musicPkg != null) widgetIntegrations.getAppLabel(IntegrationCategory.MUSIC, context.packageManager) else "YouTube Music"
+        val currentApp = "YouTube Music"
         val tracks = listOf(
-            MediaPlaybackState(true, "Resonance", "HOME", currentApp, 0.10f, "3:32", "0:21"),
-            MediaPlaybackState(true, "Solar Power", "Lorde", currentApp, 0.05f, "3:12", "0:10"),
-            MediaPlaybackState(true, "Starboy", "The Weeknd, Daft Punk", currentApp, 0.08f, "3:50", "0:18"),
-            MediaPlaybackState(true, "Midnight City", "M83", currentApp, 0.15f, "4:03", "0:36")
+            MediaPlaybackState(true, "Resonance", "HOME", currentApp, 0.10f, "3:32", "0:21", isShuffleEnabled = _mediaPlayer.value.isShuffleEnabled),
+            MediaPlaybackState(true, "Solar Power", "Lorde", currentApp, 0.05f, "3:12", "0:10", isShuffleEnabled = _mediaPlayer.value.isShuffleEnabled),
+            MediaPlaybackState(true, "Starboy", "The Weeknd, Daft Punk", currentApp, 0.08f, "3:50", "0:18", isShuffleEnabled = _mediaPlayer.value.isShuffleEnabled),
+            MediaPlaybackState(true, "Midnight City", "M83", currentApp, 0.15f, "4:03", "0:36", isShuffleEnabled = _mediaPlayer.value.isShuffleEnabled)
         )
         _mediaPlayer.value = tracks.random()
     }
