@@ -37,6 +37,9 @@ data class DiscoverArticle(
 @Composable
 fun GoogleDiscoverSheet(
     onDismiss: () -> Unit,
+    blurRadius: Float = 15f,
+    translucency: Float = 0.30f,
+    glassEffect: Float = 0.30f,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -85,15 +88,25 @@ fun GoogleDiscoverSheet(
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = MaterialTheme.colorScheme.surface,
+        containerColor = Color.Transparent,
+        scrimColor = Color.Black.copy(alpha = 0.45f),
         modifier = modifier.testTag("google_discover_sheet")
     ) {
-        Column(
+        FrostedGlassPanel(
+            cornerRadius = 28.dp,
+            blurRadius = blurRadius.dp,
+            translucency = translucency,
+            glassEffect = glassEffect,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp)
-                .padding(bottom = 32.dp)
+                .padding(horizontal = 12.dp)
+                .padding(bottom = 20.dp)
         ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 18.dp, vertical = 18.dp)
+            ) {
             // Header
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -208,4 +221,5 @@ fun GoogleDiscoverSheet(
             }
         }
     }
+}
 }

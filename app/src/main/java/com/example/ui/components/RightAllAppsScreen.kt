@@ -339,7 +339,7 @@ fun RightAllAppsScreen(
                     ) {
                         itemsIndexed(
                             items = flatList,
-                            key = { _, item -> item.key }
+                            key = { index, item -> "${item.key}_$index" }
                         ) { _, drawerItem ->
                             Box(modifier = Modifier.animateItem()) {
                                 when (drawerItem) {

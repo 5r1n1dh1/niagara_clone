@@ -45,6 +45,9 @@ fun FixedDock(
     blurBackground: Boolean = true,
     iconScale: Float = 1.0f,
     isFrostedTheme: Boolean = false,
+    blurRadius: Float = 15f,
+    translucency: Float = 0.30f,
+    glassEffect: Float = 0.30f,
     onAppClick: (AppItem) -> Unit,
     onAppLongClick: (Int) -> Unit, // Slot index 0..(slotCount-1)
     modifier: Modifier = Modifier
@@ -60,32 +63,14 @@ fun FixedDock(
             .testTag("fixed_dock_container"),
         contentAlignment = Alignment.Center
     ) {
-        Surface(
-            shape = RoundedCornerShape(28.dp),
-            color = if (isFrostedTheme) {
-                Color(0x551E293B)
-            } else if (blurBackground) {
-                MaterialTheme.colorScheme.surface.copy(alpha = 0.88f)
-            } else {
-                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
-            },
-            tonalElevation = if (blurBackground) 8.dp else 2.dp,
-            shadowElevation = if (blurBackground) 10.dp else 0.dp,
-            border = if (isFrostedTheme) {
-                androidx.compose.foundation.BorderStroke(
-                    1.dp,
-                    androidx.compose.ui.graphics.Brush.linearGradient(
-                        listOf(
-                            Color.White.copy(alpha = 0.35f),
-                            Color.White.copy(alpha = 0.10f)
-                        )
-                    )
-                )
-            } else null,
+        FrostedGlassPanel(
+            cornerRadius = 28.dp,
+            blurRadius = if (blurBackground) blurRadius.dp else 0.dp,
+            translucency = if (blurBackground) translucency else 0.15f,
+            glassEffect = if (blurBackground) glassEffect else 0f,
             modifier = Modifier
                 .wrapContentWidth()
                 .height(if (showLabels) (76 * iconScale).dp else (64 * iconScale).dp)
-                .clip(RoundedCornerShape(28.dp))
         ) {
             Row(
                 modifier = Modifier
@@ -188,19 +173,33 @@ fun DockAppPickerDialog(
     allApps: List<AppItem>,
     iconPackType: IconPackType,
     onSelectApp: (AppItem) -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    blurRadius: Float = 15f,
+    translucency: Float = 0.30f,
+    glassEffect: Float = 0.30f
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = MaterialTheme.colorScheme.surface
+        containerColor = Color.Transparent,
+        scrimColor = Color.Black.copy(alpha = 0.45f)
     ) {
-        Column(
+        FrostedGlassPanel(
+            cornerRadius = 28.dp,
+            blurRadius = blurRadius.dp,
+            translucency = translucency,
+            glassEffect = glassEffect,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 12.dp)
-                .navigationBarsPadding()
+                .padding(horizontal = 12.dp)
+                .padding(bottom = 20.dp)
         ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 18.dp)
+                    .navigationBarsPadding()
+            ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -311,4 +310,5 @@ fun DockAppPickerDialog(
             Spacer(modifier = Modifier.height(16.dp))
         }
     }
+}
 }

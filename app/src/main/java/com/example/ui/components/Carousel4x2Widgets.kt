@@ -590,19 +590,33 @@ fun CarouselCustomizeDialog(
     onAddWidget: (WidgetType) -> Unit,
     onRemoveWidget: (WidgetType) -> Unit,
     onReorder: (from: Int, to: Int) -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    blurRadius: Float = 15f,
+    translucency: Float = 0.30f,
+    glassEffect: Float = 0.30f
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = MaterialTheme.colorScheme.surface
+        containerColor = Color.Transparent,
+        scrimColor = Color.Black.copy(alpha = 0.45f)
     ) {
-        Column(
+        FrostedGlassPanel(
+            cornerRadius = 28.dp,
+            blurRadius = blurRadius.dp,
+            translucency = translucency,
+            glassEffect = glassEffect,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 12.dp)
-                .navigationBarsPadding()
+                .padding(horizontal = 12.dp)
+                .padding(bottom = 20.dp)
         ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 18.dp)
+                    .navigationBarsPadding()
+            ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -728,4 +742,5 @@ fun CarouselCustomizeDialog(
             Spacer(modifier = Modifier.height(20.dp))
         }
     }
+}
 }

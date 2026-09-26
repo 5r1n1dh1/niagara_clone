@@ -9,6 +9,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -299,11 +300,12 @@ fun NotificationCenterSheet(
                         .heightIn(max = 280.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(notifications.values.toList(), key = { "${it.instanceKey}_${it.id}_${it.key}" }) { notif ->
-                        Surface(
-                            shape = RoundedCornerShape(14.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = (translucency * 0.9f).coerceIn(0.20f, 0.50f)),
-                            border = androidx.compose.foundation.BorderStroke(0.5.dp, Color.White.copy(alpha = 0.15f)),
+                    itemsIndexed(notifications.values.toList(), key = { index, notif -> "notif_${notif.instanceKey}_${notif.id}_${notif.key}_$index" }) { _, notif ->
+                        FrostedGlassPanel(
+                            cornerRadius = 14.dp,
+                            blurRadius = blurRadius.dp,
+                            translucency = translucency,
+                            glassEffect = glassEffect,
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Column(modifier = Modifier.padding(12.dp)) {

@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.provider.AlarmClock
 import android.provider.MediaStore
+import android.provider.Settings
 import android.widget.Toast
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarMonth
@@ -25,7 +26,9 @@ enum class IntegrationCategory(
     CALENDAR("calendar", "Calendar", "Launch agenda, schedule, or calendar app"),
     MUSIC("music", "Music Player", "Launch media streaming or audio player app"),
     NOTES("notes", "Notes & Tasks", "Launch note-taking or to-do list app"),
-    CLOCK("clock", "Clock & Timer", "Launch alarm clock or world time app")
+    CLOCK("clock", "Clock & Timer", "Launch alarm clock or world time app"),
+    WELLBEING("wellbeing", "Digital Wellbeing", "Launch digital wellbeing or screen time app"),
+    NEWS("news", "News & Reader", "Launch preferred news or RSS app")
 }
 
 class WidgetIntegrationsManager(private val context: Context) {
@@ -190,6 +193,12 @@ class WidgetIntegrationsManager(private val context: Context) {
                 Intent(Intent.ACTION_MAIN).apply {
                     addCategory("android.intent.category.APP_NOTES")
                 }
+            }
+            IntegrationCategory.WELLBEING -> {
+                Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)
+            }
+            IntegrationCategory.NEWS -> {
+                Intent(Intent.ACTION_VIEW, Uri.parse("https://news.google.com"))
             }
         }.apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)

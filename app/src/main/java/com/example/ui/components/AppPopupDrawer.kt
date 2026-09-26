@@ -130,6 +130,9 @@ fun AppPopupDrawer(
     onToggleUsageBreaker: () -> Unit,
     onDisguiseApp: (String?) -> Unit,
     onAssignCategory: ((String) -> Unit)? = null,
+    blurRadius: Float = 15f,
+    translucency: Float = 0.30f,
+    glassEffect: Float = 0.30f,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -170,9 +173,9 @@ fun AppPopupDrawer(
     ) {
         FrostedGlassPanel(
             cornerRadius = 28.dp,
-            blurRadius = 22.dp,
-            translucency = 0.35f,
-            glassEffect = 0.35f,
+            blurRadius = blurRadius.dp,
+            translucency = translucency,
+            glassEffect = glassEffect,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 12.dp)

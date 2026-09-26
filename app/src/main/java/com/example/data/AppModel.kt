@@ -215,6 +215,7 @@ data class LauncherSettings(
     val dockIconScale: Float = 1.0f,
     val blurBackgrounds: Boolean = true,
     val waveAlphabetHapticIntensity: Int = 2, // 1: subtle, 2: medium, 3: heavy
+    val batteryOptimizationMode: Boolean = true,
     val customIconSettings: CustomIconPackSettings = CustomIconPackSettings(),
     val hasCompletedOnboarding: Boolean = false
 )

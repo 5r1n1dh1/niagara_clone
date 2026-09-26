@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -77,7 +78,10 @@ private fun Drawable.toSafeBitmap(): Bitmap? {
 @Composable
 fun SystemWidgetPickerSheet(
     onSelectWidget: (AppWidgetProviderInfo, heightCategory: String) -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    blurRadius: Float = 15f,
+    translucency: Float = 0.30f,
+    glassEffect: Float = 0.30f
 ) {
     val context = LocalContext.current
     var widgetItems by remember { mutableStateOf<List<SystemWidgetItem>>(emptyList()) }
@@ -172,16 +176,27 @@ fun SystemWidgetPickerSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = MaterialTheme.colorScheme.surface,
+        containerColor = Color.Transparent,
+        scrimColor = Color.Black.copy(alpha = 0.45f),
         modifier = Modifier.testTag("system_widget_picker_sheet")
     ) {
-        Column(
+        FrostedGlassPanel(
+            cornerRadius = 28.dp,
+            blurRadius = blurRadius.dp,
+            translucency = translucency,
+            glassEffect = glassEffect,
             modifier = Modifier
                 .fillMaxWidth()
-                .fillMaxHeight(0.88f)
-                .padding(horizontal = 16.dp)
-                .navigationBarsPadding()
+                .padding(horizontal = 12.dp)
+                .padding(bottom = 20.dp)
         ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight(0.88f)
+                    .padding(horizontal = 16.dp)
+                    .navigationBarsPadding()
+            ) {
             // Header: Title and Close Button
             Row(
                 modifier = Modifier
@@ -308,7 +323,8 @@ fun SystemWidgetPickerSheet(
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     groupedByApp.forEach { (appName, appWidgets) ->
-                        item(key = "header_$appName") {
+                        val pkg = appWidgets.firstOrNull()?.packageName ?: appName
+                        item(key = "header_${pkg}_$appName") {
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -347,7 +363,7 @@ fun SystemWidgetPickerSheet(
                             }
                         }
 
-                        items(appWidgets, key = { "${it.packageName}_${it.label}_${it.minWidth}_${it.minHeight}" }) { widget ->
+                        itemsIndexed(appWidgets, key = { index, widget -> "sys_widget_${widget.packageName}_${widget.label}_${widget.minWidth}_${widget.minHeight}_$index" }) { _, widget ->
                             SystemWidgetCard(
                                 item = widget,
                                 onClick = { onSelectWidget(widget.providerInfo, widget.heightCategory) }
@@ -358,6 +374,7 @@ fun SystemWidgetPickerSheet(
             }
         }
     }
+}
 }
 
 @Composable

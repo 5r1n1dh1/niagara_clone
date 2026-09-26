@@ -331,6 +331,9 @@ fun CenterHomeScreen(
                 Box(modifier = Modifier.animateItem()) {
                     DigitalWellbeing4x1Widget(
                         onOpenSettings = onOpenSettings,
+                        blurRadius = settings.frostedBlurRadius,
+                        translucency = settings.frostedTranslucency,
+                        glassEffect = settings.frostedGlassEffect,
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -478,7 +481,7 @@ fun CenterHomeScreen(
                 }
             }
         } else {
-            itemsIndexed(favorites.take(10), key = { _, app -> "fav_${app.uniqueKey}" }) { _, app ->
+            itemsIndexed(favorites.take(10), key = { index, app -> "fav_${app.uniqueKey}_$index" }) { _, app ->
                 Box(modifier = Modifier.animateItem()) {
                     AppListItem(
                         app = app,

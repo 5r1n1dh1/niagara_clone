@@ -618,6 +618,9 @@ fun NiagaraLauncherScreen(
                 slotCount = settings.dockSlotCount,
                 iconScale = settings.dockIconScale,
                 isFrostedTheme = settings.themePreset == LauncherThemePreset.FROSTED_GLASS,
+                blurRadius = settings.frostedBlurRadius,
+                translucency = settings.frostedTranslucency,
+                glassEffect = settings.frostedGlassEffect,
                 onAppClick = { viewModel.launchApp(it) },
                 onAppLongClick = { slotIndex -> viewModel.openDockPicker(slotIndex) },
                 modifier = Modifier.align(Alignment.BottomCenter)
@@ -635,6 +638,9 @@ fun NiagaraLauncherScreen(
                 slotIndex = slotIndex,
                 allApps = allApps,
                 iconPackType = settings.iconPackType,
+                blurRadius = settings.frostedBlurRadius,
+                translucency = settings.frostedTranslucency,
+                glassEffect = settings.frostedGlassEffect,
                 onSelectApp = { app -> viewModel.selectDockApp(slotIndex, app) },
                 onDismiss = { viewModel.closeDockPicker() }
             )
@@ -644,6 +650,9 @@ fun NiagaraLauncherScreen(
         if (isAddWidgetOpen) {
             AddWidgetDialog(
                 availableWidgets = availableWidgetTypes,
+                blurRadius = settings.frostedBlurRadius,
+                translucency = settings.frostedTranslucency,
+                glassEffect = settings.frostedGlassEffect,
                 onAddWidget = { type -> viewModel.addLeftWidget(type) },
                 onDismiss = { viewModel.closeAddWidgetDialog() }
             )
@@ -665,6 +674,9 @@ fun NiagaraLauncherScreen(
             CarouselCustomizeDialog(
                 currentWidgets = carouselWidgets,
                 availableWidgets = availableWidgetTypes,
+                blurRadius = settings.frostedBlurRadius,
+                translucency = settings.frostedTranslucency,
+                glassEffect = settings.frostedGlassEffect,
                 onAddWidget = { viewModel.addCarouselWidget(it) },
                 onRemoveWidget = { viewModel.removeCarouselWidget(it) },
                 onReorder = { from, to -> viewModel.reorderCarouselWidget(from, to) },
@@ -679,6 +691,9 @@ fun NiagaraLauncherScreen(
                 mathResult = mathResult,
                 filteredApps = searchFilteredApps,
                 iconPackType = settings.iconPackType,
+                blurRadius = settings.frostedBlurRadius,
+                translucency = settings.frostedTranslucency,
+                glassEffect = settings.frostedGlassEffect,
                 onQueryChange = { viewModel.onSearchQueryChange(it) },
                 onAppClick = { app ->
                     viewModel.closeSearch()
@@ -691,6 +706,9 @@ fun NiagaraLauncherScreen(
         // Google Discover Sheet
         if (isDiscoverOpen) {
             GoogleDiscoverSheet(
+                blurRadius = settings.frostedBlurRadius,
+                translucency = settings.frostedTranslucency,
+                glassEffect = settings.frostedGlassEffect,
                 onDismiss = { viewModel.closeDiscover() }
             )
         }
@@ -698,6 +716,9 @@ fun NiagaraLauncherScreen(
         // System App Widget Picker Sheet
         if (isSystemWidgetPickerOpen) {
             SystemWidgetPickerSheet(
+                blurRadius = settings.frostedBlurRadius,
+                translucency = settings.frostedTranslucency,
+                glassEffect = settings.frostedGlassEffect,
                 onSelectWidget = { providerInfo, heightCat ->
                     isSystemWidgetPickerOpen = false
                     try {
@@ -856,7 +877,10 @@ fun NiagaraLauncherScreen(
                 onToggleHide = { viewModel.toggleHideApp(app.packageName) },
                 onToggleUsageBreaker = { viewModel.toggleUsageBreaker(app.packageName) },
                 onDisguiseApp = { newName -> viewModel.repository.disguiseApp(app.packageName, newName) },
-                onAssignCategory = { cat -> viewModel.setAppCategory(app.packageName, cat) }
+                onAssignCategory = { cat -> viewModel.setAppCategory(app.packageName, cat) },
+                blurRadius = settings.frostedBlurRadius,
+                translucency = settings.frostedTranslucency,
+                glassEffect = settings.frostedGlassEffect
             )
         }
 

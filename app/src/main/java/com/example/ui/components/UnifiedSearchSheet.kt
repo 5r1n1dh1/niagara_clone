@@ -7,6 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -43,6 +44,9 @@ fun UnifiedSearchSheet(
     onQueryChange: (String) -> Unit,
     onAppClick: (AppItem) -> Unit,
     onDismiss: () -> Unit,
+    blurRadius: Float = 15f,
+    translucency: Float = 0.30f,
+    glassEffect: Float = 0.30f,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -70,9 +74,9 @@ fun UnifiedSearchSheet(
     ) {
         FrostedGlassPanel(
             cornerRadius = 28.dp,
-            blurRadius = 22.dp,
-            translucency = 0.35f,
-            glassEffect = 0.35f,
+            blurRadius = blurRadius.dp,
+            translucency = translucency,
+            glassEffect = glassEffect,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 12.dp)
@@ -213,7 +217,7 @@ fun UnifiedSearchSheet(
                     .heightIn(max = 380.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                items(filteredApps, key = { it.uniqueKey }) { app ->
+                itemsIndexed(filteredApps, key = { index, app -> "search_${app.uniqueKey}_$index" }) { _, app ->
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()

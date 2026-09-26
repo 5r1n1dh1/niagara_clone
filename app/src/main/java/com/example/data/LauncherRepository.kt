@@ -935,12 +935,33 @@ class LauncherRepository(private val context: Context) {
         current.remove(instanceKey)
         if (!isDualApp) current.remove(packageName)
         _activeNotifications.value = current
-        val currentApps = _allApps.value
-        _allApps.value = currentApps.map {
-            if (it.packageName == packageName && it.isDualApp == isDualApp) it.copy(notification = null) else it
+        if (_allApps.value.any { it.packageName == packageName && it.isDualApp == isDualApp && it.notification != null }) {
+            _allApps.value = _allApps.value.map {
+                if (it.packageName == packageName && it.isDualApp == isDualApp) it.copy(notification = null) else it
+            }
         }
-        _favorites.value = _favorites.value.map {
-            if (it.packageName == packageName && it.isDualApp == isDualApp) it.copy(notification = null) else it
+        if (_favorites.value.any { it.packageName == packageName && it.isDualApp == isDualApp && it.notification != null }) {
+            _favorites.value = _favorites.value.map {
+                if (it.packageName == packageName && it.isDualApp == isDualApp) it.copy(notification = null) else it
+            }
+        }
+    }
+
+    fun clearAllNotifications() {
+        try {
+            com.example.service.FluxNotificationListenerService.instance?.cancelAllNotifications()
+        } catch (_: Throwable) {}
+        if (_activeNotifications.value.isNotEmpty()) {
+            _activeNotifications.value = emptyMap()
+        }
+        if (_allActiveNotifications.value.isNotEmpty()) {
+            _allActiveNotifications.value = emptyMap()
+        }
+        if (_allApps.value.any { it.notification != null }) {
+            _allApps.value = _allApps.value.map { if (it.notification != null) it.copy(notification = null) else it }
+        }
+        if (_favorites.value.any { it.notification != null }) {
+            _favorites.value = _favorites.value.map { if (it.notification != null) it.copy(notification = null) else it }
         }
     }
 

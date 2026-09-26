@@ -119,7 +119,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
             }
         }
         list.take(maxSlots)
-    }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val _dockPickerSlot = MutableStateFlow<Int?>(null)
     val dockPickerSlot: StateFlow<Int?> = _dockPickerSlot.asStateFlow()
@@ -169,7 +169,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         _isOnboardingForcedOpen
     ) { sett, forced ->
         forced || !sett.hasCompletedOnboarding
-    }.stateIn(viewModelScope, SharingStarted.Lazily, false)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     private val _isNotificationCenterOpen = MutableStateFlow(false)
     val isNotificationCenterOpen: StateFlow<Boolean> = _isNotificationCenterOpen.asStateFlow()
@@ -197,7 +197,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
 
     val mathResult: StateFlow<String?> = _searchQuery.map { query ->
         evaluateSimpleMath(query.trim())
-    }.stateIn(viewModelScope, SharingStarted.Lazily, null)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     val searchFilteredApps: StateFlow<List<AppItem>> = combine(allApps, _searchQuery) { apps, query ->
         if (query.isBlank() || query.startsWith("/")) {
@@ -206,7 +206,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
             val q = query.trim().lowercase()
             apps.filter { !it.isHidden && (it.label.lowercase().contains(q) || it.customCategory.lowercase().contains(q)) }
         }
-    }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     fun onSearchQueryChange(query: String) {
         _searchQuery.value = query
@@ -332,10 +332,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun clearAllNotifications() {
-        val packages = activeNotifications.value.keys.toList()
-        for (pkg in packages) {
-            repository.dismissNotification(pkg)
-        }
+        repository.clearAllNotifications()
         showToast("Notifications cleared")
         vibrateClick()
     }

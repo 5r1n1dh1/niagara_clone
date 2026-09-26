@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -798,7 +799,7 @@ private fun StepFavoritesSelection(
                     .fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                items(filteredApps, key = { it.uniqueKey }) { app ->
+                itemsIndexed(filteredApps, key = { index, app -> "setup_app_${app.uniqueKey}_$index" }) { _, app ->
                     val isFav = selectedPackageNames.contains(app.packageName)
 
                     Row(

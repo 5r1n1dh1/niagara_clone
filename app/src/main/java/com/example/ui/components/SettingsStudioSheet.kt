@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -77,6 +78,11 @@ enum class SettingsPage(
         subtitle = "Clock styles, accent tint, ticking seconds & layout lock",
         icon = Icons.Filled.Schedule
     ),
+    INTEGRATIONS(
+        title = "Widget App Integrations",
+        subtitle = "Assign default system/installed app for each Flux widget",
+        icon = Icons.Filled.Extension
+    ),
     SYSTEM(
         title = "System, Permissions & Backup",
         subtitle = "Default launcher, accessibility, restricted settings & restore",
@@ -135,8 +141,11 @@ fun SettingsStudioSheet(
     val isNotificationAccessGranted = remember(context) { FluxNotificationListenerService.isNotificationAccessGranted(context) }
     val isAccessibilityGranted = remember(context) { FluxAccessibilityService.isServiceRunning() }
 
-    Surface(
-        color = MaterialTheme.colorScheme.background,
+    FrostedGlassBackground(
+        isFrostedTheme = true,
+        blurStrength = settings.frostedBlurRadius,
+        translucency = settings.frostedTranslucency,
+        glassEffect = settings.frostedGlassEffect,
         modifier = modifier
             .fillMaxSize()
             .statusBarsPadding()
@@ -385,8 +394,17 @@ fun SettingsStudioSheet(
                         )
                     }
 
+                    SettingsPage.INTEGRATIONS -> {
+                        IntegrationsSettingsPage(
+                            allApps = allApps,
+                            widgetIntegrations = widgetIntegrations
+                        )
+                    }
+
                     SettingsPage.SYSTEM -> {
                         SystemSettingsPage(
+                            settings = settings,
+                            onUpdateSettings = onUpdateSettings,
                             isDefaultLauncher = isDefaultLauncher,
                             isNotificationAccessGranted = isNotificationAccessGranted,
                             isAccessibilityGranted = isAccessibilityGranted,
@@ -1856,6 +1874,8 @@ private fun ClockWidgetsSettingsPage(
  */
 @Composable
 private fun SystemSettingsPage(
+    settings: LauncherSettings,
+    onUpdateSettings: (LauncherSettings) -> Unit,
     isDefaultLauncher: Boolean,
     isNotificationAccessGranted: Boolean,
     isAccessibilityGranted: Boolean,
@@ -1872,6 +1892,72 @@ private fun SystemSettingsPage(
         contentPadding = PaddingValues(top = 12.dp, bottom = 32.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        item {
+            SettingsCard(title = "Battery & Performance Optimization") {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                        Text("Battery Saver & Resource Optimization", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                        Text(
+                            text = "Automatically reduces overdraw and pauses background ticks to save battery",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = settings.batteryOptimizationMode,
+                        onCheckedChange = { onUpdateSettings(settings.copy(batteryOptimizationMode = it)) }
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            try {
+                                val intent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS).apply {
+                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                }
+                                context.startActivity(intent)
+                            } catch (_: Exception) {
+                                try {
+                                    val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                        data = android.net.Uri.fromParts("package", context.packageName, null)
+                                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    }
+                                    context.startActivity(intent)
+                                } catch (_: Exception) {}
+                            }
+                        }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.BatteryChargingFull,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("System Unrestricted Battery Access", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                            Text("Ensure system OS does not kill launcher background services", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Icon(Icons.Outlined.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
+                    }
+                }
+            }
+        }
         item {
             SettingsCard(title = "System Permissions & Defaults") {
                 // 1. Set Default Launcher
@@ -2324,6 +2410,217 @@ private fun SettingsToggleRow(
             onCheckedChange = onCheckedChange,
             modifier = Modifier.height(28.dp)
         )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun IntegrationsSettingsPage(
+    allApps: List<AppItem>,
+    widgetIntegrations: WidgetIntegrationsManager?
+) {
+    val context = LocalContext.current
+    val pm = context.packageManager
+    var selectedCategoryForAppAssign by remember { mutableStateOf<IntegrationCategory?>(null) }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(top = 10.dp, bottom = 32.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        item {
+            Text(
+                text = "WIDGET APP INTEGRATIONS",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.8.sp,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(start = 4.dp, bottom = 2.dp)
+            )
+        }
+
+        items(IntegrationCategory.entries.toTypedArray()) { cat ->
+            val currentLabel = widgetIntegrations?.getAppLabel(cat, pm) ?: "Auto-Detect System Default"
+
+            FrostedGlassPanel(
+                cornerRadius = 16.dp,
+                blurRadius = 15.dp,
+                translucency = 0.30f,
+                glassEffect = 0.30f,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                            Text(
+                                text = cat.displayName,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 15.sp,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = cat.defaultDescription,
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        FilledTonalButton(
+                            onClick = { selectedCategoryForAppAssign = cat },
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                        ) {
+                            Text("Change", fontSize = 12.sp)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Extension,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Assigned: $currentLabel",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    selectedCategoryForAppAssign?.let { cat ->
+        var searchQuery by remember { mutableStateOf("") }
+        val filteredApps = remember(allApps, searchQuery) {
+            if (searchQuery.isBlank()) allApps.filter { !it.isHidden }
+            else allApps.filter { !it.isHidden && it.label.contains(searchQuery, ignoreCase = true) }
+        }
+
+        ModalBottomSheet(
+            onDismissRequest = { selectedCategoryForAppAssign = null },
+            containerColor = Color.Transparent,
+            scrimColor = Color.Black.copy(alpha = 0.45f)
+        ) {
+            FrostedGlassPanel(
+                cornerRadius = 28.dp,
+                blurRadius = 15.dp,
+                translucency = 0.30f,
+                glassEffect = 0.30f,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp)
+                    .padding(bottom = 20.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 18.dp, vertical = 18.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Assign App for ${cat.displayName}",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        IconButton(onClick = { selectedCategoryForAppAssign = null }) {
+                            Icon(Icons.Filled.Close, contentDescription = "Close")
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable {
+                                widgetIntegrations?.setPackage(cat, null)
+                                selectedCategoryForAppAssign = null
+                            }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Filled.AutoAwesome, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text("Auto-Detect System Default", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                Text("Uses default system app handler", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        placeholder = { Text("Search installed apps...", fontSize = 13.sp) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 320.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        itemsIndexed(filteredApps, key = { idx, app -> "assign_${app.uniqueKey}_$idx" }) { _, app ->
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = Color.Transparent,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .clickable {
+                                        widgetIntegrations?.setPackage(cat, app.packageName)
+                                        selectedCategoryForAppAssign = null
+                                    }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    AppIconRenderer(app = app, iconPackType = IconPackType.MATERIAL, size = 32.dp)
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Text(text = app.label, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 

@@ -221,7 +221,7 @@ fun LeftWidgetsScreen(
                 contentPadding = PaddingValues(top = 12.dp, bottom = 120.dp),
                 verticalArrangement = Arrangement.spacedBy(22.dp)
             ) {
-                itemsIndexed(widgets, key = { _, w -> w.id }) { index, item ->
+                itemsIndexed(widgets, key = { index, w -> "widget_${w.id}_$index" }) { index, item ->
                     Box(modifier = Modifier.animateItem()) {
                         LeftWidgetCardWrapper(
                             widget = item,
@@ -305,8 +305,7 @@ private fun LeftWidgetCardWrapper(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.clickable { onOptionsClick() }
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(text = widget.type.iconEmoji, fontSize = 16.sp)
                     Spacer(modifier = Modifier.width(8.dp))
@@ -318,30 +317,19 @@ private fun LeftWidgetCardWrapper(
                         color = MaterialTheme.colorScheme.primary
                     )
                     Spacer(modifier = Modifier.width(6.dp))
-                    // Size Badge
+                    // Size Badge (Static indicator)
                     Surface(
                         shape = RoundedCornerShape(6.dp),
-                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
                         modifier = Modifier.testTag("widget_size_badge_${widget.id}")
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
+                        Text(
+                            text = widget.heightCategory,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                        ) {
-                            Text(
-                                text = widget.heightCategory,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                            Spacer(modifier = Modifier.width(2.dp))
-                            Icon(
-                                Icons.Filled.Tune,
-                                contentDescription = "Resize",
-                                modifier = Modifier.size(10.dp),
-                                tint = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                        }
+                        )
                     }
                 }
 
@@ -1234,19 +1222,33 @@ private fun DualClockWidgetBody(size: String = "4x2", onOpenClock: () -> Unit = 
 fun AddWidgetDialog(
     availableWidgets: List<WidgetType> = WidgetType.entries,
     onAddWidget: (WidgetType) -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    blurRadius: Float = 15f,
+    translucency: Float = 0.30f,
+    glassEffect: Float = 0.30f
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = MaterialTheme.colorScheme.surface
+        containerColor = Color.Transparent,
+        scrimColor = Color.Black.copy(alpha = 0.45f)
     ) {
-        Column(
+        FrostedGlassPanel(
+            cornerRadius = 28.dp,
+            blurRadius = blurRadius.dp,
+            translucency = translucency,
+            glassEffect = glassEffect,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 12.dp)
-                .navigationBarsPadding()
+                .padding(horizontal = 12.dp)
+                .padding(bottom = 20.dp)
         ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 18.dp)
+                    .navigationBarsPadding()
+            ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -1310,6 +1312,7 @@ fun AddWidgetDialog(
             Spacer(modifier = Modifier.height(16.dp))
         }
     }
+}
 }
 
 /**
@@ -1726,20 +1729,34 @@ fun WidgetResizeAndOptionsSheet(
     onMoveUp: () -> Unit,
     onMoveDown: () -> Unit,
     onDelete: () -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    blurRadius: Float = 15f,
+    translucency: Float = 0.30f,
+    glassEffect: Float = 0.30f
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = MaterialTheme.colorScheme.surface,
+        containerColor = Color.Transparent,
+        scrimColor = Color.Black.copy(alpha = 0.45f),
         modifier = Modifier.testTag("widget_resize_sheet")
     ) {
-        Column(
+        FrostedGlassPanel(
+            cornerRadius = 28.dp,
+            blurRadius = blurRadius.dp,
+            translucency = translucency,
+            glassEffect = glassEffect,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 12.dp)
-                .navigationBarsPadding()
+                .padding(horizontal = 12.dp)
+                .padding(bottom = 20.dp)
         ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 18.dp)
+                    .navigationBarsPadding()
+            ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -1870,4 +1887,5 @@ fun WidgetResizeAndOptionsSheet(
             Spacer(modifier = Modifier.height(12.dp))
         }
     }
+}
 }
