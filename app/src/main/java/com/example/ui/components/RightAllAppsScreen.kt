@@ -339,7 +339,8 @@ fun RightAllAppsScreen(
                     ) {
                         itemsIndexed(
                             items = flatList,
-                            key = { index, item -> "${item.key}_$index" }
+                            key = { _, item -> item.key },
+                            contentType = { _, drawerItem -> drawerItem::class.java }
                         ) { _, drawerItem ->
                             Box(modifier = Modifier.animateItem()) {
                                 when (drawerItem) {

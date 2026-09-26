@@ -481,7 +481,7 @@ fun CenterHomeScreen(
                 }
             }
         } else {
-            itemsIndexed(favorites.take(10), key = { index, app -> "fav_${app.uniqueKey}_$index" }) { _, app ->
+            itemsIndexed(favorites.take(10), key = { _, app -> "fav_${app.uniqueKey}" }, contentType = { _, _ -> "fav_app_item" }) { _, app ->
                 Box(modifier = Modifier.animateItem()) {
                     AppListItem(
                         app = app,

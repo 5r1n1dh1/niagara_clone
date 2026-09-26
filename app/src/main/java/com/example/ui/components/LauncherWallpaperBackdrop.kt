@@ -73,7 +73,7 @@ fun LauncherWallpaperBackdrop(
 
     LaunchedEffect(activeWallpaperBitmap, blurRadiusPx) {
         val sourceBitmap = activeWallpaperBitmap ?: systemWallpaperBitmap
-        if (sourceBitmap != null && blurRadiusPx > 0) {
+        if (sourceBitmap != null && blurRadiusPx > 0 && android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.S) {
             withContext(Dispatchers.Default) {
                 try {
                     val androidBmp = sourceBitmap.asAndroidBitmap()

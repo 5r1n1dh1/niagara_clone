@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Calendar
 import java.util.concurrent.TimeUnit
@@ -78,91 +79,108 @@ fun DigitalWellbeing4x1Widget(
     var usageProgress by remember { mutableFloatStateOf(0.45f) }
     var hasUsagePermission by remember { mutableStateOf(true) }
 
-    val fetchUsageStats = remember(targetHoursGoal) {
+    val coroutineScope = rememberCoroutineScope()
+
+    val fetchUsageStats = remember(targetHoursGoal, coroutineScope) {
         {
-            try {
-                val usageStatsManager = context.getSystemService(Context.USAGE_STATS_SERVICE) as? UsageStatsManager
-                val calendar = Calendar.getInstance()
-                val endTime = calendar.timeInMillis
-                calendar.set(Calendar.HOUR_OF_DAY, 0)
-                calendar.set(Calendar.MINUTE, 0)
-                calendar.set(Calendar.SECOND, 0)
-                calendar.set(Calendar.MILLISECOND, 0)
-                val startTime = calendar.timeInMillis
+            coroutineScope.launch(Dispatchers.IO) {
+                var perm = true
+                var totalFmt = "2h 15m"
+                var topName = "Digital Wellbeing"
+                var topTime = ""
+                var topList = emptyList<DailyAppUsage>()
+                var progress = 0.45f
 
-                val stats = usageStatsManager?.queryUsageStats(
-                    UsageStatsManager.INTERVAL_DAILY,
-                    startTime,
-                    endTime
-                )
+                try {
+                    val usageStatsManager = context.getSystemService(Context.USAGE_STATS_SERVICE) as? UsageStatsManager
+                    val calendar = Calendar.getInstance()
+                    val endTime = calendar.timeInMillis
+                    calendar.set(Calendar.HOUR_OF_DAY, 0)
+                    calendar.set(Calendar.MINUTE, 0)
+                    calendar.set(Calendar.SECOND, 0)
+                    calendar.set(Calendar.MILLISECOND, 0)
+                    val startTime = calendar.timeInMillis
 
-                if (stats.isNullOrEmpty() || stats.all { it.totalTimeInForeground <= 0L }) {
-                    hasUsagePermission = false
-                    totalTimeFormatted = "2h 15m"
-                    topAppName = "Tap to view screen time"
-                    topAppTime = ""
-                    usageProgress = 0.42f
-                } else {
-                    hasUsagePermission = true
-                    val totalMs = stats.sumOf { it.totalTimeInForeground }
-                    val hours = TimeUnit.MILLISECONDS.toHours(totalMs)
-                    val minutes = TimeUnit.MILLISECONDS.toMinutes(totalMs) % 60
-                    totalTimeFormatted = if (hours > 0) "${hours}h ${minutes}m" else "${minutes}m"
+                    val stats = usageStatsManager?.queryUsageStats(
+                        UsageStatsManager.INTERVAL_DAILY,
+                        startTime,
+                        endTime
+                    )
 
-                    // Progress based on user's target daily goal
-                    val targetMs = (targetHoursGoal * 60L * 60L * 1000L).coerceAtLeast(1000L)
-                    usageProgress = (totalMs.toFloat() / targetMs.toFloat()).coerceIn(0.05f, 1f)
-
-                    val pm = context.packageManager
-                    val topStats = stats
-                        .filter { it.totalTimeInForeground > 0 && it.packageName != context.packageName }
-                        .sortedByDescending { it.totalTimeInForeground }
-                        .take(3)
-
-                    if (topStats.isNotEmpty()) {
-                        val firstStat = topStats.first()
-                        val topHours = TimeUnit.MILLISECONDS.toHours(firstStat.totalTimeInForeground)
-                        val topMins = TimeUnit.MILLISECONDS.toMinutes(firstStat.totalTimeInForeground) % 60
-                        topAppTime = if (topHours > 0) "${topHours}h ${topMins}m" else "${topMins}m"
-
-                        topAppName = try {
-                            val appInfo = pm.getApplicationInfo(firstStat.packageName, 0)
-                            pm.getApplicationLabel(appInfo).toString()
-                        } catch (_: Exception) {
-                            firstStat.packageName.substringAfterLast('.')
-                        }
-
-                        topAppsList = topStats.map { stat ->
-                            val name = try {
-                                val info = pm.getApplicationInfo(stat.packageName, 0)
-                                pm.getApplicationLabel(info).toString()
-                            } catch (_: Exception) {
-                                stat.packageName.substringAfterLast('.')
-                            }
-                            val h = TimeUnit.MILLISECONDS.toHours(stat.totalTimeInForeground)
-                            val m = TimeUnit.MILLISECONDS.toMinutes(stat.totalTimeInForeground) % 60
-                            val fmt = if (h > 0) "${h}h ${m}m" else "${m}m"
-                            DailyAppUsage(stat.packageName, name, stat.totalTimeInForeground, fmt)
-                        }
+                    if (stats.isNullOrEmpty() || stats.all { it.totalTimeInForeground <= 0L }) {
+                        perm = false
+                        totalFmt = "2h 15m"
+                        topName = "Tap to view screen time"
+                        topTime = ""
+                        progress = 0.42f
                     } else {
-                        topAppName = "Screen time today"
-                        topAppTime = ""
+                        perm = true
+                        val totalMs = stats.sumOf { it.totalTimeInForeground }
+                        val hours = TimeUnit.MILLISECONDS.toHours(totalMs)
+                        val minutes = TimeUnit.MILLISECONDS.toMinutes(totalMs) % 60
+                        totalFmt = if (hours > 0) "${hours}h ${minutes}m" else "${minutes}m"
+
+                        val targetMs = (targetHoursGoal * 60L * 60L * 1000L).coerceAtLeast(1000L)
+                        progress = (totalMs.toFloat() / targetMs.toFloat()).coerceIn(0.05f, 1f)
+
+                        val pm = context.packageManager
+                        val topStats = stats
+                            .filter { it.totalTimeInForeground > 0 && it.packageName != context.packageName }
+                            .sortedByDescending { it.totalTimeInForeground }
+                            .take(3)
+
+                        if (topStats.isNotEmpty()) {
+                            val firstStat = topStats.first()
+                            val topHours = TimeUnit.MILLISECONDS.toHours(firstStat.totalTimeInForeground)
+                            val topMins = TimeUnit.MILLISECONDS.toMinutes(firstStat.totalTimeInForeground) % 60
+                            topTime = if (topHours > 0) "${topHours}h ${topMins}m" else "${topMins}m"
+
+                            topName = try {
+                                val appInfo = pm.getApplicationInfo(firstStat.packageName, 0)
+                                pm.getApplicationLabel(appInfo).toString()
+                            } catch (_: Exception) {
+                                firstStat.packageName.substringAfterLast('.')
+                            }
+
+                            topList = topStats.map { stat ->
+                                val name = try {
+                                    val info = pm.getApplicationInfo(stat.packageName, 0)
+                                    pm.getApplicationLabel(info).toString()
+                                } catch (_: Exception) {
+                                    stat.packageName.substringAfterLast('.')
+                                }
+                                val h = TimeUnit.MILLISECONDS.toHours(stat.totalTimeInForeground)
+                                val m = TimeUnit.MILLISECONDS.toMinutes(stat.totalTimeInForeground) % 60
+                                val fmt = if (h > 0) "${h}h ${m}m" else "${m}m"
+                                DailyAppUsage(stat.packageName, name, stat.totalTimeInForeground, fmt)
+                            }
+                        } else {
+                            topName = "Screen time today"
+                            topTime = ""
+                        }
                     }
+                } catch (_: Exception) {
+                    perm = false
+                    totalFmt = "2h 45m"
+                    topName = "Digital Wellbeing"
+                    topTime = ""
+                    progress = 0.55f
                 }
-            } catch (_: Exception) {
-                hasUsagePermission = false
-                totalTimeFormatted = "2h 45m"
-                topAppName = "Digital Wellbeing"
-                topAppTime = ""
-                usageProgress = 0.55f
+
+                withContext(Dispatchers.Main) {
+                    hasUsagePermission = perm
+                    totalTimeFormatted = totalFmt
+                    topAppName = topName
+                    topAppTime = topTime
+                    topAppsList = topList
+                    usageProgress = progress
+                }
             }
         }
     }
 
     LaunchedEffect(targetHoursGoal) {
-        withContext(Dispatchers.IO) {
-            fetchUsageStats()
-        }
+        fetchUsageStats()
     }
 
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {

@@ -221,7 +221,7 @@ fun LeftWidgetsScreen(
                 contentPadding = PaddingValues(top = 12.dp, bottom = 120.dp),
                 verticalArrangement = Arrangement.spacedBy(22.dp)
             ) {
-                itemsIndexed(widgets, key = { index, w -> "widget_${w.id}_$index" }) { index, item ->
+                itemsIndexed(widgets, key = { _, w -> "widget_${w.id}" }, contentType = { _, w -> w.type }) { index, item ->
                     Box(modifier = Modifier.animateItem()) {
                         LeftWidgetCardWrapper(
                             widget = item,
@@ -921,10 +921,17 @@ private fun MindfulnessWidgetBody(size: String = "4x2") {
 @Composable
 private fun ClockWidgetBody(size: String = "4x2", onOpenClock: () -> Unit = {}) {
     var currentTime by remember { mutableStateOf(Calendar.getInstance()) }
-    LaunchedEffect(Unit) {
+    LaunchedEffect(size) {
+        val showSec = (size == "4x1")
         while (true) {
             currentTime = Calendar.getInstance()
-            kotlinx.coroutines.delay(1000)
+            if (showSec) {
+                kotlinx.coroutines.delay(1000L)
+            } else {
+                val now = System.currentTimeMillis()
+                val delayMs = (60_000L - (now % 60_000L) + 50L).coerceIn(1000L, 60_000L)
+                kotlinx.coroutines.delay(delayMs)
+            }
         }
     }
     val timeFormat = remember { SimpleDateFormat("HH:mm:ss", Locale.getDefault()) }

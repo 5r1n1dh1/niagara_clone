@@ -140,19 +140,31 @@ class LauncherRepository(private val context: Context) {
                 _activeNotifications.value = liveMap
                 val currentApps = _allApps.value
                 if (currentApps.isNotEmpty()) {
+                    var changed = false
                     val updated = currentApps.map { app ->
                         val notif = liveMap[app.instanceKey] ?: if (!app.isDualApp) liveMap[app.packageName] else null
-                        if (app.notification != notif) app.copy(notification = notif) else app
+                        if (app.notification != notif) {
+                            changed = true
+                            app.copy(notification = notif)
+                        } else app
                     }
-                    _allApps.value = updated
+                    if (changed) {
+                        _allApps.value = updated
+                    }
                 }
                 val currentFavs = _favorites.value
                 if (currentFavs.isNotEmpty()) {
+                    var favChanged = false
                     val updatedFavs = currentFavs.map { app ->
                         val notif = liveMap[app.instanceKey] ?: if (!app.isDualApp) liveMap[app.packageName] else null
-                        if (app.notification != notif) app.copy(notification = notif) else app
+                        if (app.notification != notif) {
+                            favChanged = true
+                            app.copy(notification = notif)
+                        } else app
                     }
-                    _favorites.value = updatedFavs
+                    if (favChanged) {
+                        _favorites.value = updatedFavs
+                    }
                 }
             }
         }
