@@ -40,13 +40,21 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     val leftWidgets = repository.leftWidgets
     val carouselWidgets = repository.carouselWidgets
 
+    val autoWallpaperBitmap: StateFlow<android.graphics.Bitmap?> = repository.autoWallpaperBitmap
+    val isWallpaperSwitching: StateFlow<Boolean> = repository.isWallpaperSwitching
+
     private val _systemWallpaperBitmap = MutableStateFlow<ImageBitmap?>(null)
     val systemWallpaperBitmap: StateFlow<ImageBitmap?> = _systemWallpaperBitmap.asStateFlow()
+
+    fun refreshAutoWallpaperNow(overrideConfig: AutoWallpaperConfig? = null) {
+        repository.refreshAutoWallpaperNow(overrideConfig)
+    }
 
     init {
         loadSystemWallpaper()
     }
 
+    @android.annotation.SuppressLint("MissingPermission")
     fun loadSystemWallpaper() {
         viewModelScope.launch(Dispatchers.IO) {
             try {
@@ -119,7 +127,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
             }
         }
         list.take(maxSlots)
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     private val _dockPickerSlot = MutableStateFlow<Int?>(null)
     val dockPickerSlot: StateFlow<Int?> = _dockPickerSlot.asStateFlow()
@@ -169,7 +177,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         _isOnboardingForcedOpen
     ) { sett, forced ->
         forced || !sett.hasCompletedOnboarding
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     private val _isNotificationCenterOpen = MutableStateFlow(false)
     val isNotificationCenterOpen: StateFlow<Boolean> = _isNotificationCenterOpen.asStateFlow()

@@ -60,8 +60,48 @@ enum class WallpaperStyle(val displayName: String) {
     SYSTEM_DEVICE("Device Wallpaper"),
     FLUX_EMBLEM("Flux Signature Wallpaper"),
     FLUX_MINIMAL_GRADIENT("Flux Soft Gradient"),
-    SYSTEM_SOLID("Solid Dark Theme")
+    SYSTEM_SOLID("Solid Dark Theme"),
+    AUTO_ALBUM("Daily Auto Wallpaper Album")
 }
+
+enum class AutoWallpaperSource(val displayName: String, val subtitle: String, val iconEmoji: String) {
+    LOCAL_FOLDER("Local Folder", "Images from local device directory or gallery album", "📁"),
+    GIT_REPO("Git Repository", "Raw wallpaper collection from GitHub/Git repository", "🐙"),
+    GOOGLE_PHOTOS("Google Photos Album", "Shared album link from Google Photos account", "🖼️")
+}
+
+enum class AutoWallpaperInterval(val displayName: String, val hours: Int) {
+    HOURLY("Every Hour", 1),
+    EVERY_6_HOURS("Every 6 Hours", 6),
+    EVERY_12_HOURS("Every 12 Hours", 12),
+    DAILY("Daily (Every 24 Hours)", 24)
+}
+
+data class WallpaperItem(
+    val id: String,
+    val title: String,
+    val imageUrlOrPath: String,
+    val authorOrSource: String = "",
+    val sourceKind: AutoWallpaperSource = AutoWallpaperSource.GIT_REPO
+)
+
+data class AutoWallpaperConfig(
+    val isEnabled: Boolean = false,
+    val source: AutoWallpaperSource = AutoWallpaperSource.GIT_REPO,
+    val interval: AutoWallpaperInterval = AutoWallpaperInterval.DAILY,
+    val localFolderPath: String = "",
+    val localFolderUri: String = "",
+    val gitRepoUrl: String = "https://github.com/dharmx/walls",
+    val gitBranch: String = "main",
+    val gitSubfolder: String = "",
+    val googlePhotosAlbumUrl: String = "",
+    val currentWallpaperUrlOrPath: String = "",
+    val currentWallpaperTitle: String = "Emerald Abstract #04",
+    val currentWallpaperSourceInfo: String = "Git: dharmx/walls",
+    val lastSwitchTimeMs: Long = 0L,
+    val blurStrengthDp: Float = 0f,
+    val dimOpacity: Float = 0.15f
+)
 
 enum class LauncherThemePreset(val displayName: String, val primary: Color, val background: Color, val surface: Color, val accent: Color) {
     FROSTED_GLASS("Frosted Glass", Color(0xFFFFFFFF), Color(0x3B18181B), Color(0x4D27272A), Color(0xFFE4E4E7)),
@@ -217,12 +257,14 @@ data class LauncherSettings(
     val waveAlphabetHapticIntensity: Int = 2, // 1: subtle, 2: medium, 3: heavy
     val batteryOptimizationMode: Boolean = true,
     val customIconSettings: CustomIconPackSettings = CustomIconPackSettings(),
+    val autoWallpaperConfig: AutoWallpaperConfig = AutoWallpaperConfig(),
     val hasCompletedOnboarding: Boolean = false
 )
 
 enum class WidgetType(val displayName: String, val description: String, val iconEmoji: String) {
     CLOCK("Clock Widget", "Customizable digital, analog, or word clock with date", "🕒"),
     WEATHER_FORECAST("Weather & Forecast", "Current condition and hourly forecast", "⛅"),
+    NOTIFICATION_SUMMARY("Notification Digest", "Unified summary of low-priority & promotional alerts", "🔕"),
     MEDIA_PLAYER("YouTube Music", "Live playback, controls and album art", "🎵"),
     SYSTEM_WIDGET("System Widget", "Android AppWidget from installed applications", "🧩"),
     NEWS_FEED("News Highlights", "Top breaking stories & articles with photo cards", "📰"),

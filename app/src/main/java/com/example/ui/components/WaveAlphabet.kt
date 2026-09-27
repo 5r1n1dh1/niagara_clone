@@ -1,6 +1,8 @@
 package com.example.ui.components
 
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.Spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -14,12 +16,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -29,6 +30,11 @@ import kotlin.math.exp
 
 val ALPHABET_ITEMS = listOf('★') + ('A'..'Z').toList() + listOf('#')
 
+/**
+ * Niagara-style Fluid Wave Alphabet Scrollbar:
+ * - Sliding your finger along the side edge of the apps screen creates a fluid, kinetic wave animation.
+ * - Acts as an instant scroll index, jumping through your entire app drawer alphabetically in real-time.
+ */
 @Composable
 fun WaveAlphabet(
     isLeftHanded: Boolean,
@@ -42,15 +48,28 @@ fun WaveAlphabet(
     var currentTouchY by remember { mutableStateOf<Float?>(null) }
     var currentTouchX by remember { mutableStateOf<Float?>(null) }
 
-    val verticalPaddingPx = with(androidx.compose.ui.platform.LocalDensity.current) { 32.dp.toPx() }
+    val density = LocalDensity.current
+    val verticalPaddingPx = with(density) { 24.dp.toPx() }
     val itemCount = ALPHABET_ITEMS.size
     val effectiveHeight = (componentHeight - 2 * verticalPaddingPx).coerceAtLeast(1f)
     val itemHeight = effectiveHeight / itemCount
 
+    val processTouchPoint: (Float, Float) -> Unit = { x, y ->
+        currentTouchX = x
+        currentTouchY = y
+        val relativeY = (y - verticalPaddingPx).coerceIn(0f, effectiveHeight - 1f)
+        val index = (relativeY / itemHeight).toInt().coerceIn(0, itemCount - 1)
+        val letter = ALPHABET_ITEMS[index]
+        if (letter != selectedLetter) {
+            onLetterSelected(letter)
+        }
+        onLetterConfirmed(letter)
+    }
+
     Box(
         modifier = modifier
             .fillMaxHeight()
-            .width(54.dp)
+            .width(58.dp)
             .testTag("wave_alphabet")
             .onGloballyPositioned { coordinates ->
                 componentHeight = coordinates.size.height.toFloat()
@@ -59,27 +78,11 @@ fun WaveAlphabet(
             .pointerInput(componentHeight, isLeftHanded, verticalPaddingPx) {
                 detectDragGestures(
                     onDragStart = { offset ->
-                        currentTouchX = offset.x
-                        currentTouchY = offset.y
-                        val relativeY = (offset.y - verticalPaddingPx).coerceIn(0f, effectiveHeight - 1f)
-                        val index = (relativeY / itemHeight).toInt().coerceIn(0, itemCount - 1)
-                        val letter = ALPHABET_ITEMS[index]
-                        if (letter != selectedLetter) {
-                            onLetterSelected(letter)
-                            onLetterConfirmed(letter)
-                        }
+                        processTouchPoint(offset.x, offset.y)
                     },
                     onDrag = { change, _ ->
                         change.consume()
-                        currentTouchX = change.position.x
-                        currentTouchY = change.position.y
-                        val relativeY = (change.position.y - verticalPaddingPx).coerceIn(0f, effectiveHeight - 1f)
-                        val index = (relativeY / itemHeight).toInt().coerceIn(0, itemCount - 1)
-                        val letter = ALPHABET_ITEMS[index]
-                        if (letter != selectedLetter) {
-                            onLetterSelected(letter)
-                            onLetterConfirmed(letter)
-                        }
+                        processTouchPoint(change.position.x, change.position.y)
                     },
                     onDragEnd = {
                         currentTouchX = null
@@ -96,13 +99,7 @@ fun WaveAlphabet(
             .pointerInput(componentHeight, verticalPaddingPx) {
                 detectTapGestures(
                     onPress = { offset ->
-                        currentTouchX = offset.x
-                        currentTouchY = offset.y
-                        val relativeY = (offset.y - verticalPaddingPx).coerceIn(0f, effectiveHeight - 1f)
-                        val index = (relativeY / itemHeight).toInt().coerceIn(0, itemCount - 1)
-                        val letter = ALPHABET_ITEMS[index]
-                        onLetterSelected(letter)
-                        onLetterConfirmed(letter)
+                        processTouchPoint(offset.x, offset.y)
                         tryAwaitRelease()
                         currentTouchX = null
                         currentTouchY = null
@@ -115,7 +112,7 @@ fun WaveAlphabet(
         Column(
             modifier = Modifier
                 .fillMaxHeight()
-                .padding(vertical = 32.dp),
+                .padding(vertical = 24.dp),
             verticalArrangement = Arrangement.SpaceBetween,
             horizontalAlignment = if (isLeftHanded) Alignment.Start else Alignment.End
         ) {
@@ -123,27 +120,32 @@ fun WaveAlphabet(
                 val letterCenterY = verticalPaddingPx + (index + 0.5f) * itemHeight
                 val touchY = currentTouchY
 
-                // Gaussian Wave calculation for kinetic bulge
+                // Kinetic Gaussian wave calculation for smooth outward bulge
                 val distance = if (touchY != null) abs(touchY - letterCenterY) else 9999f
+                val sigma = with(density) { 48.dp.toPx() }
                 val waveInfluence = if (touchY != null) {
-                    exp(-((distance * distance) / (2f * 55f * 55f)))
+                    exp(-((distance * distance) / (2f * sigma * sigma)))
                 } else {
                     0f
                 }
 
-                // Bulge offset and font size
-                val horizontalDisplacement = waveInfluence * 20f * (if (isLeftHanded) 1f else -1f)
-                val scale = 1f + waveInfluence * 0.75f
+                // Wave Bulge offsets: pushes items inward towards screen center
+                val horizontalDisplacement = waveInfluence * 26f * (if (isLeftHanded) 1f else -1f)
+                val scale = 1f + waveInfluence * 0.85f
                 val isCurrent = selectedLetter == letter
 
                 Text(
                     text = letter.toString(),
-                    fontSize = if (letter == '★') 11.sp else 9.sp,
-                    fontWeight = if (isCurrent) FontWeight.ExtraBold else if (waveInfluence > 0.3f) FontWeight.Bold else FontWeight.Medium,
+                    fontSize = if (letter == '★') 11.sp else 9.5.sp,
+                    fontWeight = when {
+                        isCurrent -> FontWeight.ExtraBold
+                        waveInfluence > 0.35f -> FontWeight.Bold
+                        else -> FontWeight.Medium
+                    },
                     color = when {
                         isCurrent -> MaterialTheme.colorScheme.primary
                         waveInfluence > 0.4f -> MaterialTheme.colorScheme.onBackground
-                        else -> MaterialTheme.colorScheme.onBackground.copy(alpha = 0.55f)
+                        else -> MaterialTheme.colorScheme.onBackground.copy(alpha = 0.50f)
                     },
                     modifier = Modifier
                         .graphicsLayer {
@@ -156,37 +158,37 @@ fun WaveAlphabet(
             }
         }
 
-        // Floating thumb magnifier bubble: displayed with 120px gap to the left of the touched area rather than below the finger
+        // Floating Magnifier Badge: Offset from finger preview showing the selected letter
         if (selectedLetter != null && currentTouchY != null) {
             val touchY = currentTouchY ?: 0f
-            val density = androidx.compose.ui.platform.LocalDensity.current
-            val bubbleSizePx = with(density) { 38.dp.toPx() }
-            val bubbleOffsetY = (touchY - (bubbleSizePx / 2f)).coerceIn(8f, (componentHeight - bubbleSizePx - 8f).coerceAtLeast(8f))
+            val bubbleSizePx = with(density) { 42.dp.toPx() }
+            val bubbleOffsetY = (touchY - (bubbleSizePx / 2f)).coerceIn(12f, (componentHeight - bubbleSizePx - 12f).coerceAtLeast(12f))
             val touchX = currentTouchX ?: (if (isLeftHanded) 0f else componentWidth)
             val bubbleOffsetX = if (isLeftHanded) {
-                touchX + 120f
+                touchX + 110f
             } else {
-                touchX - 120f - bubbleSizePx
+                touchX - 110f - bubbleSizePx
             }
 
             Surface(
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(14.dp),
                 color = MaterialTheme.colorScheme.primary,
-                shadowElevation = 6.dp,
+                tonalElevation = 6.dp,
+                shadowElevation = 8.dp,
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     .graphicsLayer {
                         translationY = bubbleOffsetY
                         translationX = bubbleOffsetX
                     }
-                    .size(width = 38.dp, height = 38.dp)
-                    .clip(RoundedCornerShape(12.dp))
+                    .size(width = 42.dp, height = 42.dp)
+                    .clip(RoundedCornerShape(14.dp))
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Text(
                         text = selectedLetter.toString(),
                         color = MaterialTheme.colorScheme.onPrimary,
-                        fontSize = 17.sp,
+                        fontSize = 19.sp,
                         fontWeight = FontWeight.ExtraBold
                     )
                 }

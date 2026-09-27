@@ -241,6 +241,7 @@ fun CenterHomeScreen(
     weather: WeatherInfo,
     mediaPlayer: MediaPlaybackState,
     calendarEvents: List<CalendarEvent>,
+    activeNotifications: Map<String, NotificationItem> = emptyMap(),
     appWidgetHost: android.appwidget.AppWidgetHost? = null,
     appWidgetManager: android.appwidget.AppWidgetManager? = null,
     onAppClick: (AppItem) -> Unit,
@@ -368,6 +369,7 @@ fun CenterHomeScreen(
                                 weather = weather,
                                 mediaPlayer = mediaPlayer,
                                 calendarEvents = calendarEvents,
+                                activeNotifications = activeNotifications,
                                 isHeadphonesConnected = settings.isHeadphonesConnected,
                                 showSeconds = settings.showSeconds,
                                 clockColorTintHex = settings.clockColorTintHex,
@@ -386,7 +388,9 @@ fun CenterHomeScreen(
                                 onOpenClock = onOpenClock,
                                 onOpenCalendar = onOpenCalendar,
                                 onOpenCustomize = onOpenCarouselCustomize,
-                                onOpenSettings = onOpenSettings
+                                onOpenSettings = onOpenSettings,
+                                onDismissNotification = onDismissNotification,
+                                onReplyNotification = onReplyNotification
                             )
                         }
                     }

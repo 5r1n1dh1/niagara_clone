@@ -99,6 +99,8 @@ fun SettingsStudioSheet(
     carouselWidgets: List<WidgetType> = emptyList(),
     availableWidgets: List<WidgetType> = emptyList(),
     widgetIntegrations: WidgetIntegrationsManager? = null,
+    isWallpaperSwitching: Boolean = false,
+    onRefreshAutoWallpaperNow: (() -> Unit)? = null,
     onUpdateSettings: (LauncherSettings) -> Unit,
     onSelectDockSlot: ((Int) -> Unit)? = null,
     onClearDockSlot: ((Int) -> Unit)? = null,
@@ -341,6 +343,8 @@ fun SettingsStudioSheet(
                     SettingsPage.APPEARANCE -> {
                         AppearanceSettingsPage(
                             settings = settings,
+                            isWallpaperSwitching = isWallpaperSwitching,
+                            onRefreshAutoWallpaperNow = onRefreshAutoWallpaperNow,
                             onUpdateSettings = onUpdateSettings
                         )
                     }
@@ -555,18 +559,22 @@ private fun SettingsMenuCard(
 @Composable
 private fun AppearanceSettingsPage(
     settings: LauncherSettings,
+    isWallpaperSwitching: Boolean = false,
+    onRefreshAutoWallpaperNow: (() -> Unit)? = null,
     onUpdateSettings: (LauncherSettings) -> Unit
 ) {
     val context = LocalContext.current
     var showIconPackImportDialog by remember { mutableStateOf(false) }
+    val autoWp = settings.autoWallpaperConfig
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(top = 12.dp, bottom = 32.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        // 1. Theme Presets & Backdrop Style
         item {
-            SettingsCard(title = "Launcher Themes") {
+            SettingsCard(title = "Launcher Themes & Backdrop") {
                 Text("Theme Preset", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
                 Spacer(modifier = Modifier.height(8.dp))
                 LazyRow(
@@ -582,24 +590,392 @@ private fun AppearanceSettingsPage(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
-                OutlinedButton(
-                    onClick = {
-                        try {
-                            val intent = Intent(Intent.ACTION_SET_WALLPAPER)
-                            context.startActivity(Intent.createChooser(intent, "Choose Wallpaper"))
-                        } catch (_: Exception) {
-                            val intent = Intent(Settings.ACTION_DISPLAY_SETTINGS)
-                            context.startActivity(intent)
-                        }
-                    },
+                Text("Backdrop Wallpaper Source", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+                Spacer(modifier = Modifier.height(8.dp))
+                LazyRow(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(10.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Icon(Icons.Filled.Wallpaper, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Change System Device Wallpaper", fontSize = 12.sp)
+                    items(WallpaperStyle.entries.toTypedArray()) { style ->
+                        FilterChip(
+                            selected = settings.wallpaperStyle == style,
+                            onClick = {
+                                if (style == WallpaperStyle.AUTO_ALBUM && !autoWp.isEnabled) {
+                                    val updatedAuto = autoWp.copy(isEnabled = true)
+                                    onUpdateSettings(settings.copy(wallpaperStyle = style, autoWallpaperConfig = updatedAuto))
+                                    onRefreshAutoWallpaperNow?.invoke()
+                                } else {
+                                    onUpdateSettings(settings.copy(wallpaperStyle = style))
+                                }
+                            },
+                            label = { Text(style.displayName, fontSize = 11.sp) }
+                        )
+                    }
+                }
+
+                if (settings.wallpaperStyle == WallpaperStyle.SYSTEM_DEVICE) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedButton(
+                        onClick = {
+                            try {
+                                val intent = Intent(Intent.ACTION_SET_WALLPAPER)
+                                context.startActivity(Intent.createChooser(intent, "Choose Wallpaper"))
+                            } catch (_: Exception) {
+                                val intent = Intent(Settings.ACTION_DISPLAY_SETTINGS)
+                                context.startActivity(intent)
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Icon(Icons.Filled.Wallpaper, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Change System Device Wallpaper", fontSize = 12.sp)
+                    }
+                }
+            }
+        }
+
+        // 2. Automatic Wallpaper Album Switcher
+        item {
+            SettingsCard(title = "Automatic Daily Wallpaper Switch") {
+                // Switch Toggle
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Enable Automatic Switch", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                        Text("Switches home wallpaper automatically from selected album", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Switch(
+                        checked = autoWp.isEnabled,
+                        onCheckedChange = { enabled ->
+                            val newStyle = if (enabled) WallpaperStyle.AUTO_ALBUM else settings.wallpaperStyle
+                            val updatedAuto = autoWp.copy(isEnabled = enabled)
+                            onUpdateSettings(settings.copy(wallpaperStyle = newStyle, autoWallpaperConfig = updatedAuto))
+                            if (enabled) {
+                                onRefreshAutoWallpaperNow?.invoke()
+                            }
+                        }
+                    )
+                }
+
+                if (autoWp.isEnabled || settings.wallpaperStyle == WallpaperStyle.AUTO_ALBUM) {
+                    Spacer(modifier = Modifier.height(14.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Album Source Selection (Local Folder, Git Repo, Google Photos)
+                    Text("Selected Album Source", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        AutoWallpaperSource.entries.forEach { src ->
+                            val selected = autoWp.source == src
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                                border = BorderStroke(
+                                    1.dp,
+                                    if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+                                ),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .clickable {
+                                        val updatedAuto = autoWp.copy(source = src)
+                                        onUpdateSettings(settings.copy(autoWallpaperConfig = updatedAuto))
+                                        onRefreshAutoWallpaperNow?.invoke()
+                                    }
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(10.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Text(src.iconEmoji, fontSize = 20.sp)
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        src.displayName,
+                                        fontSize = 11.sp,
+                                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Album Source Specific Input Fields & Presets
+                    when (autoWp.source) {
+                        AutoWallpaperSource.LOCAL_FOLDER -> {
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp)) {
+                                    Text("Local Storage Folder Path", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text("Enter device storage directory path or select a preset:", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    OutlinedTextField(
+                                        value = autoWp.localFolderPath,
+                                        onValueChange = { path ->
+                                            val updatedAuto = autoWp.copy(localFolderPath = path)
+                                            onUpdateSettings(settings.copy(autoWallpaperConfig = updatedAuto))
+                                        },
+                                        placeholder = { Text("/storage/emulated/0/Pictures/Wallpapers", fontSize = 11.sp) },
+                                        singleLine = true,
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = RoundedCornerShape(8.dp)
+                                    )
+
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    Text("Quick Folder Presets:", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        val presets = listOf(
+                                            "Pictures/Wallpapers",
+                                            "Download",
+                                            "Pictures/Flux",
+                                            "DCIM/Camera"
+                                        )
+                                        items(presets) { name ->
+                                            val fullPath = "${android.os.Environment.getExternalStorageDirectory().absolutePath}/$name"
+                                            FilterChip(
+                                                selected = autoWp.localFolderPath == fullPath,
+                                                onClick = {
+                                                    val updatedAuto = autoWp.copy(localFolderPath = fullPath)
+                                                    onUpdateSettings(settings.copy(autoWallpaperConfig = updatedAuto))
+                                                    onRefreshAutoWallpaperNow?.invoke()
+                                                },
+                                                label = { Text(name, fontSize = 10.sp) }
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        AutoWallpaperSource.GIT_REPO -> {
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp)) {
+                                    Text("Git Repository Configuration", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text("Enter GitHub/Git repo URL (e.g. dharmx/walls) and branch:", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    OutlinedTextField(
+                                        value = autoWp.gitRepoUrl,
+                                        onValueChange = { url ->
+                                            val updatedAuto = autoWp.copy(gitRepoUrl = url)
+                                            onUpdateSettings(settings.copy(autoWallpaperConfig = updatedAuto))
+                                        },
+                                        label = { Text("Repository URL / Name", fontSize = 11.sp) },
+                                        placeholder = { Text("https://github.com/dharmx/walls", fontSize = 11.sp) },
+                                        singleLine = true,
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = RoundedCornerShape(8.dp)
+                                    )
+
+                                    Spacer(modifier = Modifier.height(6.dp))
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        OutlinedTextField(
+                                            value = autoWp.gitBranch,
+                                            onValueChange = { b ->
+                                                val updatedAuto = autoWp.copy(gitBranch = b)
+                                                onUpdateSettings(settings.copy(autoWallpaperConfig = updatedAuto))
+                                            },
+                                            label = { Text("Branch", fontSize = 10.sp) },
+                                            placeholder = { Text("main", fontSize = 10.sp) },
+                                            singleLine = true,
+                                            modifier = Modifier.weight(1f),
+                                            shape = RoundedCornerShape(8.dp)
+                                        )
+
+                                        OutlinedTextField(
+                                            value = autoWp.gitSubfolder,
+                                            onValueChange = { sub ->
+                                                val updatedAuto = autoWp.copy(gitSubfolder = sub)
+                                                onUpdateSettings(settings.copy(autoWallpaperConfig = updatedAuto))
+                                            },
+                                            label = { Text("Subfolder (optional)", fontSize = 10.sp) },
+                                            placeholder = { Text("mobile", fontSize = 10.sp) },
+                                            singleLine = true,
+                                            modifier = Modifier.weight(1f),
+                                            shape = RoundedCornerShape(8.dp)
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    Text("Popular Wallpaper Repositories:", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        val gitPresets = listOf(
+                                            "dharmx/walls" to "https://github.com/dharmx/walls",
+                                            "linuxdotexe/nordic-wallpapers" to "https://github.com/linuxdotexe/nordic-wallpapers",
+                                            "D3vh/Minimal-Wallpapers" to "https://github.com/D3vh/Minimal-Wallpapers"
+                                        )
+                                        items(gitPresets) { (label, repoUrl) ->
+                                            FilterChip(
+                                                selected = autoWp.gitRepoUrl == repoUrl,
+                                                onClick = {
+                                                    val updatedAuto = autoWp.copy(gitRepoUrl = repoUrl, gitBranch = "main", gitSubfolder = "")
+                                                    onUpdateSettings(settings.copy(autoWallpaperConfig = updatedAuto))
+                                                    onRefreshAutoWallpaperNow?.invoke()
+                                                },
+                                                label = { Text(label, fontSize = 10.sp) }
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        AutoWallpaperSource.GOOGLE_PHOTOS -> {
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp)) {
+                                    Text("Google Photos Album Link", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text("Paste shared Google Photos Album URL or album link:", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    OutlinedTextField(
+                                        value = autoWp.googlePhotosAlbumUrl,
+                                        onValueChange = { url ->
+                                            val updatedAuto = autoWp.copy(googlePhotosAlbumUrl = url)
+                                            onUpdateSettings(settings.copy(autoWallpaperConfig = updatedAuto))
+                                        },
+                                        placeholder = { Text("https://photos.app.goo.gl/...", fontSize = 11.sp) },
+                                        singleLine = true,
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = RoundedCornerShape(8.dp)
+                                    )
+
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    Text("Curated Album Presets:", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        val photoPresets = listOf(
+                                            "Nature 4K Collection",
+                                            "Architectural Geometry",
+                                            "Serene Landscapes"
+                                        )
+                                        items(photoPresets) { title ->
+                                            FilterChip(
+                                                selected = autoWp.googlePhotosAlbumUrl.contains(title, true),
+                                                onClick = {
+                                                    val updatedAuto = autoWp.copy(googlePhotosAlbumUrl = "https://photos.app.goo.gl/sample_$title")
+                                                    onUpdateSettings(settings.copy(autoWallpaperConfig = updatedAuto))
+                                                    onRefreshAutoWallpaperNow?.invoke()
+                                                },
+                                                label = { Text(title, fontSize = 10.sp) }
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Switch Frequency Interval
+                    Text("Auto Switch Schedule Interval", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    LazyRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        items(AutoWallpaperInterval.entries.toTypedArray()) { interval ->
+                            FilterChip(
+                                selected = autoWp.interval == interval,
+                                onClick = {
+                                    val updatedAuto = autoWp.copy(interval = interval)
+                                    onUpdateSettings(settings.copy(autoWallpaperConfig = updatedAuto))
+                                },
+                                label = { Text(interval.displayName, fontSize = 11.sp) }
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Active Wallpaper Status Card
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("ACTIVE WALLPAPER", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, letterSpacing = 0.6.sp)
+                                    Text(
+                                        autoWp.currentWallpaperTitle.ifBlank { "Emerald Abstract #04" },
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        autoWp.currentWallpaperSourceInfo.ifBlank { "Git: dharmx/walls" },
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+
+                                Button(
+                                    onClick = { onRefreshAutoWallpaperNow?.invoke() },
+                                    enabled = !isWallpaperSwitching,
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    if (isWallpaperSwitching) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(14.dp),
+                                            color = MaterialTheme.colorScheme.onPrimary,
+                                            strokeWidth = 2.dp
+                                        )
+                                    } else {
+                                        Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("Switch Now", fontSize = 11.sp)
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }

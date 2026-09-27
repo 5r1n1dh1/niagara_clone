@@ -40,6 +40,7 @@ fun LeftWidgetsScreen(
     weather: WeatherInfo,
     mediaPlayer: MediaPlaybackState,
     calendarEvents: List<CalendarEvent>,
+    activeNotifications: Map<String, NotificationItem> = emptyMap(),
     isHeadphonesConnected: Boolean,
     isFrostedTheme: Boolean = false,
     blurRadius: Float = 15f,
@@ -60,6 +61,8 @@ fun LeftWidgetsScreen(
     onOpenWeather: () -> Unit = {},
     onOpenClock: () -> Unit = {},
     onOpenCalendar: () -> Unit = {},
+    onDismissNotification: (packageName: String, isDualApp: Boolean) -> Unit = { _, _ -> },
+    onReplyNotification: (packageName: String, text: String, isDualApp: Boolean) -> Unit = { _, _, _ -> },
     onUpdateWidgetSize: (String, String) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier
 ) {
@@ -231,6 +234,7 @@ fun LeftWidgetsScreen(
                             weather = weather,
                             mediaPlayer = mediaPlayer,
                             calendarEvents = calendarEvents,
+                            activeNotifications = activeNotifications,
                             isHeadphonesConnected = isHeadphonesConnected,
                             blurRadius = blurRadius,
                             translucency = translucency,
@@ -249,6 +253,8 @@ fun LeftWidgetsScreen(
                             onRefreshWeather = onRefreshWeather,
                             onOpenWeather = onOpenWeather,
                             onOpenClock = onOpenClock,
+                            onDismissNotification = onDismissNotification,
+                            onReplyNotification = onReplyNotification,
                             onUpdateSize = { newSize -> onUpdateWidgetSize(item.id, newSize) }
                         )
                     }
@@ -268,6 +274,7 @@ private fun LeftWidgetCardWrapper(
     weather: WeatherInfo,
     mediaPlayer: MediaPlaybackState,
     calendarEvents: List<CalendarEvent>,
+    activeNotifications: Map<String, NotificationItem> = emptyMap(),
     isHeadphonesConnected: Boolean,
     blurRadius: Float = 15f,
     translucency: Float = 0.30f,
@@ -286,6 +293,8 @@ private fun LeftWidgetCardWrapper(
     onRefreshWeather: () -> Unit,
     onOpenWeather: () -> Unit = {},
     onOpenClock: () -> Unit = {},
+    onDismissNotification: (packageName: String, isDualApp: Boolean) -> Unit = { _, _ -> },
+    onReplyNotification: (packageName: String, text: String, isDualApp: Boolean) -> Unit = { _, _, _ -> },
     onUpdateSize: (String) -> Unit = {}
 ) {
     FrostedGlassPanel(
@@ -410,6 +419,14 @@ private fun LeftWidgetCardWrapper(
                     }
                     WidgetType.WEATHER_FORECAST -> {
                         WeatherWidgetBody(weather = weather, size = widget.heightCategory, onRefresh = onRefreshWeather, onOpenWeather = onOpenWeather)
+                    }
+                    WidgetType.NOTIFICATION_SUMMARY -> {
+                        NotificationSummaryWidget(
+                            activeNotifications = activeNotifications,
+                            size = widget.heightCategory,
+                            onDismissNotification = onDismissNotification,
+                            onReplyNotification = onReplyNotification
+                        )
                     }
                     WidgetType.NEWS_FEED -> {
                         NewsWidgetBody(size = widget.heightCategory)

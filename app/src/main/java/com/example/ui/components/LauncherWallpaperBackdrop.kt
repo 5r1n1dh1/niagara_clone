@@ -36,19 +36,34 @@ fun LauncherWallpaperBackdrop(
     themePreset: LauncherThemePreset,
     wallpaperStyle: WallpaperStyle = WallpaperStyle.SYSTEM_DEVICE,
     systemWallpaperBitmap: ImageBitmap? = null,
+    autoWallpaperBitmap: android.graphics.Bitmap? = null,
     blurRadius: Dp = 0.dp,
     backgroundBlurStrength: Float = 25f,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    var activeWallpaperBitmap by remember(systemWallpaperBitmap) { mutableStateOf(systemWallpaperBitmap) }
+    var activeWallpaperBitmap by remember(systemWallpaperBitmap, autoWallpaperBitmap, wallpaperStyle) {
+        mutableStateOf(
+            if (wallpaperStyle == WallpaperStyle.AUTO_ALBUM && autoWallpaperBitmap != null) {
+                autoWallpaperBitmap.asImageBitmap()
+            } else {
+                systemWallpaperBitmap
+            }
+        )
+    }
 
-    LaunchedEffect(systemWallpaperBitmap) {
-        if (systemWallpaperBitmap == null) {
+    LaunchedEffect(systemWallpaperBitmap, autoWallpaperBitmap, wallpaperStyle) {
+        if (wallpaperStyle == WallpaperStyle.AUTO_ALBUM && autoWallpaperBitmap != null) {
+            activeWallpaperBitmap = autoWallpaperBitmap.asImageBitmap()
+        } else if (systemWallpaperBitmap != null) {
+            activeWallpaperBitmap = systemWallpaperBitmap
+        } else if (wallpaperStyle == WallpaperStyle.SYSTEM_DEVICE) {
             withContext(Dispatchers.IO) {
                 try {
+                    @Suppress("MissingPermission")
                     val wpManager = android.app.WallpaperManager.getInstance(context)
-                    val drawable = wpManager.drawable ?: wpManager.peekDrawable()
+                    @Suppress("MissingPermission")
+                    val drawable = try { wpManager.drawable ?: wpManager.peekDrawable() } catch (_: Throwable) { null }
                     if (drawable != null) {
                         val bitmap = drawable.toBitmap(720, 1280, android.graphics.Bitmap.Config.ARGB_8888)
                         activeWallpaperBitmap = bitmap.asImageBitmap()
@@ -95,11 +110,12 @@ fun LauncherWallpaperBackdrop(
     }
 
     val isSystemWallpaper = wallpaperStyle == WallpaperStyle.SYSTEM_DEVICE
+    val isAutoWallpaper = wallpaperStyle == WallpaperStyle.AUTO_ALBUM
 
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(if (isFrosted || isSystemWallpaper) Color.Transparent else bgColor)
+            .background(if (isFrosted || isSystemWallpaper || isAutoWallpaper) Color.Transparent else bgColor)
     ) {
         // Wallpaper base layer
         Box(
@@ -108,7 +124,7 @@ fun LauncherWallpaperBackdrop(
                 .then(blurModifier)
         ) {
             val wpToUse = softwareBlurredBitmap ?: activeWallpaperBitmap ?: systemWallpaperBitmap
-            if (wpToUse != null && (isSystemWallpaper || isFrosted)) {
+            if (wpToUse != null && (isSystemWallpaper || isAutoWallpaper || isFrosted)) {
                 Image(
                     bitmap = wpToUse,
                     contentDescription = null,

@@ -37,6 +37,7 @@ fun Carousel4x2WidgetCard(
     weather: WeatherInfo,
     mediaPlayer: MediaPlaybackState,
     calendarEvents: List<CalendarEvent>,
+    activeNotifications: Map<String, NotificationItem> = emptyMap(),
     isHeadphonesConnected: Boolean,
     showSeconds: Boolean = false,
     clockColorTintHex: String = "#FFFFFF",
@@ -56,6 +57,8 @@ fun Carousel4x2WidgetCard(
     onOpenCalendar: () -> Unit,
     onOpenCustomize: () -> Unit,
     onOpenSettings: () -> Unit = {},
+    onDismissNotification: (packageName: String, isDualApp: Boolean) -> Unit = { _, _ -> },
+    onReplyNotification: (packageName: String, text: String, isDualApp: Boolean) -> Unit = { _, _, _ -> },
     modifier: Modifier = Modifier
 ) {
     FrostedGlassPanel(
@@ -96,6 +99,14 @@ fun Carousel4x2WidgetCard(
                 }
                 WidgetType.WEATHER_FORECAST -> {
                     Weather4x2Widget(weather = weather, onClick = onOpenWeather)
+                }
+                WidgetType.NOTIFICATION_SUMMARY -> {
+                    NotificationSummaryWidget(
+                        activeNotifications = activeNotifications,
+                        size = "4x2",
+                        onDismissNotification = onDismissNotification,
+                        onReplyNotification = onReplyNotification
+                    )
                 }
                 WidgetType.NEWS_FEED -> {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

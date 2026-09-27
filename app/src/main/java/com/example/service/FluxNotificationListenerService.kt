@@ -459,8 +459,12 @@ class FluxNotificationListenerService : NotificationListenerService() {
         // 4. Messaging Person (Android P+)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             try {
-                val person = extras.getParcelable(Notification.EXTRA_MESSAGING_PERSON, android.app.Person::class.java)
-                    ?: extras.get(Notification.EXTRA_MESSAGING_PERSON) as? android.app.Person
+                val person = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    extras.getParcelable(Notification.EXTRA_MESSAGING_PERSON, android.app.Person::class.java)
+                } else {
+                    @Suppress("DEPRECATION")
+                    extras.getParcelable(Notification.EXTRA_MESSAGING_PERSON) as? android.app.Person
+                }
                 person?.icon?.let { icon ->
                     extractBitmapFromObject(icon)?.let { return it }
                 }
@@ -475,8 +479,14 @@ class FluxNotificationListenerService : NotificationListenerService() {
                     val msg = messages[i]
                     if (msg is Bundle) {
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                            val person = msg.getParcelable("sender_person", android.app.Person::class.java)
-                                ?: msg.getParcelable("person", android.app.Person::class.java)
+                            val person = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                msg.getParcelable("sender_person", android.app.Person::class.java)
+                                    ?: msg.getParcelable("person", android.app.Person::class.java)
+                            } else {
+                                @Suppress("DEPRECATION")
+                                (msg.getParcelable("sender_person") as? android.app.Person)
+                                    ?: (msg.getParcelable("person") as? android.app.Person)
+                            }
                             person?.icon?.let { icon ->
                                 extractBitmapFromObject(icon)?.let { return it }
                             }

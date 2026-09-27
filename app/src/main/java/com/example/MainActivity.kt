@@ -160,6 +160,8 @@ fun NiagaraLauncherScreen(
     val dockApps by viewModel.dockApps.collectAsState()
     val userCategories by viewModel.userCategories.collectAsState()
     val systemWallpaperBitmap by viewModel.systemWallpaperBitmap.collectAsState()
+    val autoWallpaperBitmap by viewModel.autoWallpaperBitmap.collectAsState()
+    val isWallpaperSwitching by viewModel.isWallpaperSwitching.collectAsState()
 
     val context = LocalContext.current
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -407,6 +409,7 @@ fun NiagaraLauncherScreen(
             themePreset = settings.themePreset,
             wallpaperStyle = settings.wallpaperStyle,
             systemWallpaperBitmap = systemWallpaperBitmap,
+            autoWallpaperBitmap = autoWallpaperBitmap,
             blurRadius = wallpaperBlurRadius + panelBackgroundBlurRadius,
             backgroundBlurStrength = settings.frostedBlurRadius,
             modifier = Modifier.fillMaxSize()
@@ -794,6 +797,8 @@ fun NiagaraLauncherScreen(
                 carouselWidgets = carouselWidgets,
                 availableWidgets = availableWidgetTypes,
                 widgetIntegrations = viewModel.widgetIntegrations,
+                isWallpaperSwitching = isWallpaperSwitching,
+                onRefreshAutoWallpaperNow = { viewModel.refreshAutoWallpaperNow() },
                 onUpdateSettings = { viewModel.repository.updateSettings(it) },
                 onSelectDockSlot = { slotIndex -> viewModel.openDockPicker(slotIndex) },
                 onClearDockSlot = { slotIndex -> viewModel.clearDockSlot(slotIndex) },

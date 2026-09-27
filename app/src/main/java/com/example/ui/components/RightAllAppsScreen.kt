@@ -124,8 +124,8 @@ fun RightAllAppsScreen(
         }
     }
 
-    val displayAppsList = remember(allApps, filterText, activeWaveLetters) {
-        val baseList = if (filterText.isBlank()) {
+    val displayAppsList = remember(allApps, filterText) {
+        if (filterText.isBlank()) {
             allApps.filter { !it.isHidden && it.customCategory.isBlank() }
                 .sortedBy { it.label.lowercase() }
         } else {
@@ -133,25 +133,11 @@ fun RightAllAppsScreen(
             allApps.filter { !it.isHidden && (it.label.lowercase().contains(q) || it.customCategory.lowercase().contains(q)) }
                 .sortedBy { it.label.lowercase() }
         }
-
-        if (activeWaveLetters != null && filterText.isBlank()) {
-            baseList.filter { app ->
-                val initial = app.label.firstOrNull()?.uppercaseChar() ?: '#'
-                val effectiveChar = if (initial in 'A'..'Z') initial else '#'
-                if (selectedWaveLetter == '★') {
-                    effectiveChar in setOf('A', 'B') || baseList.indexOf(app) < 8
-                } else {
-                    effectiveChar in activeWaveLetters
-                }
-            }
-        } else {
-            baseList
-        }
     }
 
-    val flatList = remember(displayAppsList, folders, categorizedGroupMap, filterText, activeWaveLetters) {
+    val flatList = remember(displayAppsList, folders, categorizedGroupMap, filterText) {
         val items = mutableListOf<AppDrawerItem>()
-        if (filterText.isBlank() && activeWaveLetters == null) {
+        if (filterText.isBlank()) {
             categorizedGroupMap.keys.sorted().forEach { cat ->
                 val catApps = categorizedGroupMap[cat] ?: emptyList()
                 items.add(AppDrawerItem.CategoryCard(cat, catApps))
@@ -498,20 +484,22 @@ fun RightAllAppsScreen(
                             onLetterConfirmed = { letter ->
                                 keyboardController?.hide()
                                 focusManager.clearFocus(force = true)
-                                val targetChar = if (letter == '★') {
-                                    displayAppsList.firstOrNull()?.label?.firstOrNull()?.uppercaseChar()
-                                } else {
-                                    letter
-                                }
-                                targetChar?.let { char ->
-                                    val targetIndex = letterToHeaderIndexMap[char] ?: run {
-                                        letterToHeaderIndexMap.entries
-                                            .minByOrNull { kotlin.math.abs(it.key.code - char.code) }?.value
-                                    }
-                                    if (targetIndex != null && targetIndex in flatList.indices) {
-                                        scope.launch {
-                                            listState.scrollToItem(targetIndex)
+                                val targetIndex = when (letter) {
+                                    '★' -> 0
+                                    '#' -> (flatList.indices.lastOrNull() ?: 0)
+                                    else -> {
+                                        letterToHeaderIndexMap[letter] ?: run {
+                                            val headerLetters = letterToHeaderIndexMap.keys.toList()
+                                            if (headerLetters.isNotEmpty()) {
+                                                val closestChar = headerLetters.minByOrNull { kotlin.math.abs(it.code - letter.code) }
+                                                if (closestChar != null) letterToHeaderIndexMap[closestChar] else null
+                                            } else null
                                         }
+                                    }
+                                }
+                                if (targetIndex != null && targetIndex in flatList.indices) {
+                                    scope.launch {
+                                        listState.scrollToItem(targetIndex)
                                     }
                                 }
                             },

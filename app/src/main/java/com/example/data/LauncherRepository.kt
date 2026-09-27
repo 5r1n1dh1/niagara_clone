@@ -75,6 +75,13 @@ class LauncherRepository(private val context: Context) {
     val dockPackageNames: StateFlow<List<String>> = _dockPackageNames.asStateFlow()
 
     val widgetIntegrations = WidgetIntegrationsManager(context)
+    val autoWallpaperManager = com.example.util.AutoWallpaperManager(context)
+
+    private val _autoWallpaperBitmap = MutableStateFlow<android.graphics.Bitmap?>(null)
+    val autoWallpaperBitmap: StateFlow<android.graphics.Bitmap?> = _autoWallpaperBitmap.asStateFlow()
+
+    private val _isWallpaperSwitching = MutableStateFlow(false)
+    val isWallpaperSwitching: StateFlow<Boolean> = _isWallpaperSwitching.asStateFlow()
 
     init {
         observeLiveNotifications()
@@ -85,6 +92,51 @@ class LauncherRepository(private val context: Context) {
         loadFolders()
         refreshCalendarEvents()
         reloadApps()
+        checkAutoWallpaperSchedule()
+    }
+
+    fun refreshAutoWallpaperNow(overrideConfig: AutoWallpaperConfig? = null) {
+        val cfg = overrideConfig ?: _settings.value.autoWallpaperConfig
+        repositoryScope.launch(Dispatchers.IO) {
+            _isWallpaperSwitching.value = true
+            try {
+                val result = autoWallpaperManager.fetchNextWallpaper(cfg)
+                if (result is com.example.util.AutoWallpaperResult.Success) {
+                    _autoWallpaperBitmap.value = result.bitmap
+                    val updatedSettings = _settings.value.copy(
+                        wallpaperStyle = WallpaperStyle.AUTO_ALBUM,
+                        autoWallpaperConfig = result.config
+                    )
+                    updateSettings(updatedSettings)
+                }
+            } catch (_: Exception) {
+            } finally {
+                _isWallpaperSwitching.value = false
+            }
+        }
+    }
+
+    fun checkAutoWallpaperSchedule() {
+        val cfg = _settings.value.autoWallpaperConfig
+        if (cfg.isEnabled && autoWallpaperManager.shouldSwitchWallpaper(cfg)) {
+            refreshAutoWallpaperNow(cfg)
+        } else if (cfg.isEnabled && _autoWallpaperBitmap.value == null) {
+            val cachedFile = java.io.File(context.cacheDir, "auto_wallpapers/active_wallpaper.jpg")
+            if (cachedFile.exists() && cachedFile.length() > 0L) {
+                try {
+                    val bmp = android.graphics.BitmapFactory.decodeFile(cachedFile.absolutePath)
+                    if (bmp != null) {
+                        _autoWallpaperBitmap.value = bmp
+                    } else {
+                        refreshAutoWallpaperNow(cfg)
+                    }
+                } catch (_: Exception) {
+                    refreshAutoWallpaperNow(cfg)
+                }
+            } else {
+                refreshAutoWallpaperNow(cfg)
+            }
+        }
     }
 
     private fun registerPackageListeners() {
@@ -207,6 +259,24 @@ class LauncherRepository(private val context: Context) {
             installedPackName = installedPackName
         )
 
+        val autoWpConfig = AutoWallpaperConfig(
+            isEnabled = prefs.getBoolean("auto_wp_enabled", false),
+            source = AutoWallpaperSource.entries.getOrElse(prefs.getInt("auto_wp_source", AutoWallpaperSource.GIT_REPO.ordinal)) { AutoWallpaperSource.GIT_REPO },
+            interval = AutoWallpaperInterval.entries.getOrElse(prefs.getInt("auto_wp_interval", AutoWallpaperInterval.DAILY.ordinal)) { AutoWallpaperInterval.DAILY },
+            localFolderPath = prefs.getString("auto_wp_local_path", "") ?: "",
+            localFolderUri = prefs.getString("auto_wp_local_uri", "") ?: "",
+            gitRepoUrl = prefs.getString("auto_wp_git_url", "https://github.com/dharmx/walls") ?: "https://github.com/dharmx/walls",
+            gitBranch = prefs.getString("auto_wp_git_branch", "main") ?: "main",
+            gitSubfolder = prefs.getString("auto_wp_git_subfolder", "") ?: "",
+            googlePhotosAlbumUrl = prefs.getString("auto_wp_gphoto_url", "") ?: "",
+            currentWallpaperUrlOrPath = prefs.getString("auto_wp_current_url", "") ?: "",
+            currentWallpaperTitle = prefs.getString("auto_wp_current_title", "Emerald Abstract #04") ?: "Emerald Abstract #04",
+            currentWallpaperSourceInfo = prefs.getString("auto_wp_current_source", "Git: dharmx/walls") ?: "Git: dharmx/walls",
+            lastSwitchTimeMs = prefs.getLong("auto_wp_last_time", 0L),
+            blurStrengthDp = prefs.getFloat("auto_wp_blur", 0f),
+            dimOpacity = prefs.getFloat("auto_wp_dim", 0.15f)
+        )
+
         return LauncherSettings(
             leftHandedMode = prefs.getBoolean("left_handed_mode", false),
             hideStatusBar = prefs.getBoolean("hide_status_bar", false),
@@ -245,6 +315,7 @@ class LauncherRepository(private val context: Context) {
             dockIconScale = prefs.getFloat("dock_icon_scale", 1.0f),
             waveAlphabetHapticIntensity = prefs.getInt("wave_haptic_intensity", 2),
             customIconSettings = customIconSettings,
+            autoWallpaperConfig = autoWpConfig,
             hasCompletedOnboarding = prefs.getBoolean("has_completed_onboarding", false)
         )
     }
@@ -294,8 +365,25 @@ class LauncherRepository(private val context: Context) {
             .putFloat("custom_icon_opacity", newSettings.customIconSettings.backgroundOpacity)
             .putString("custom_installed_pack_pkg", newSettings.customIconSettings.installedPackPackageName)
             .putString("custom_installed_pack_name", newSettings.customIconSettings.installedPackName)
+            .putBoolean("auto_wp_enabled", newSettings.autoWallpaperConfig.isEnabled)
+            .putInt("auto_wp_source", newSettings.autoWallpaperConfig.source.ordinal)
+            .putInt("auto_wp_interval", newSettings.autoWallpaperConfig.interval.ordinal)
+            .putString("auto_wp_local_path", newSettings.autoWallpaperConfig.localFolderPath)
+            .putString("auto_wp_local_uri", newSettings.autoWallpaperConfig.localFolderUri)
+            .putString("auto_wp_git_url", newSettings.autoWallpaperConfig.gitRepoUrl)
+            .putString("auto_wp_git_branch", newSettings.autoWallpaperConfig.gitBranch)
+            .putString("auto_wp_git_subfolder", newSettings.autoWallpaperConfig.gitSubfolder)
+            .putString("auto_wp_gphoto_url", newSettings.autoWallpaperConfig.googlePhotosAlbumUrl)
+            .putString("auto_wp_current_url", newSettings.autoWallpaperConfig.currentWallpaperUrlOrPath)
+            .putString("auto_wp_current_title", newSettings.autoWallpaperConfig.currentWallpaperTitle)
+            .putString("auto_wp_current_source", newSettings.autoWallpaperConfig.currentWallpaperSourceInfo)
+            .putLong("auto_wp_last_time", newSettings.autoWallpaperConfig.lastSwitchTimeMs)
+            .putFloat("auto_wp_blur", newSettings.autoWallpaperConfig.blurStrengthDp)
+            .putFloat("auto_wp_dim", newSettings.autoWallpaperConfig.dimOpacity)
             .putBoolean("has_completed_onboarding", newSettings.hasCompletedOnboarding)
             .apply()
+
+        checkAutoWallpaperSchedule()
     }
 
     fun completeOnboarding() {
@@ -356,6 +444,7 @@ class LauncherRepository(private val context: Context) {
         return when (type) {
             WidgetType.MEDIA_PLAYER -> com.example.ui.components.isYouTubeMusicInstalled(context)
             WidgetType.WEATHER_FORECAST -> true
+            WidgetType.NOTIFICATION_SUMMARY -> true
             WidgetType.SYSTEM_WIDGET -> true
             WidgetType.NEWS_FEED -> true
             WidgetType.QUICK_NOTE -> true
@@ -626,22 +715,25 @@ class LauncherRepository(private val context: Context) {
         // Synchronize dock icons with real installed packages
         val savedDock = _dockPackageNames.value
         val validDock = savedDock.filter { pkg -> finalAppItems.any { it.packageName == pkg } }.toMutableList()
-        if (validDock.size < 3 && finalAppItems.isNotEmpty()) {
+        val targetSlotCount = _settings.value.dockSlotCount.coerceIn(3, 5)
+        if (validDock.size < targetSlotCount && finalAppItems.isNotEmpty()) {
             for (fav in favList) {
-                if (validDock.size >= 3) break
+                if (validDock.size >= targetSlotCount) break
                 if (!validDock.contains(fav.packageName)) {
                     validDock.add(fav.packageName)
                 }
             }
-            if (validDock.size < 3) {
+            if (validDock.size < targetSlotCount) {
                 for (app in finalAppItems) {
-                    if (validDock.size >= 3) break
+                    if (validDock.size >= targetSlotCount) break
                     if (!validDock.contains(app.packageName)) {
                         validDock.add(app.packageName)
                     }
                 }
             }
-            _dockPackageNames.value = validDock.take(3)
+            val finalized = validDock.take(targetSlotCount)
+            _dockPackageNames.value = finalized
+            saveDockPackages(finalized)
         }
     }
 
@@ -1238,6 +1330,7 @@ class LauncherRepository(private val context: Context) {
         // Default Left Page widgets (clean standard launcher widgets)
         _leftWidgets.value = listOf(
             CustomWidgetConfig("w_weather", WidgetType.WEATHER_FORECAST, "Weather & Forecast", heightCategory = "4x2"),
+            CustomWidgetConfig("w_digest", WidgetType.NOTIFICATION_SUMMARY, "Notification Digest", heightCategory = "4x2"),
             CustomWidgetConfig("w_news", WidgetType.NEWS_FEED, "Top News Highlights", heightCategory = "4x2"),
             CustomWidgetConfig(
                 id = "w_note",
@@ -1411,11 +1504,13 @@ class LauncherRepository(private val context: Context) {
         }
 
         // Default dock icons (Phone, Message, Camera)
-        _dockPackageNames.value = listOf(
+        val defaults = listOf(
             "com.google.android.dialer",
             "com.google.android.apps.messaging",
             "com.google.android.GoogleCamera"
         )
+        _dockPackageNames.value = defaults
+        saveDockPackages(defaults)
     }
 
     private fun saveDockPackages(pkgs: List<String>) {
