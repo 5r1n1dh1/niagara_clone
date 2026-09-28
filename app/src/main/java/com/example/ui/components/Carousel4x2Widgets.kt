@@ -190,7 +190,7 @@ private fun Weather4x2Widget(weather: WeatherInfo, onClick: () -> Unit) {
             )
         }
 
-        Divider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+        HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
 
         // Hourly row (4x2 layout)
         Row(
@@ -438,7 +438,7 @@ private fun DualClock4x2Widget(onOpenClock: () -> Unit = {}) {
                 Text(text = sdfDate.format(now), fontSize = 11.sp, color = MaterialTheme.colorScheme.primary)
             }
 
-            Divider(modifier = Modifier.height(40.dp).width(1.dp), color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
+            VerticalDivider(modifier = Modifier.height(40.dp).width(1.dp), color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
 
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(text = "LONDON", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)

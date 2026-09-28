@@ -117,24 +117,26 @@ class LauncherRepository(private val context: Context) {
     }
 
     fun checkAutoWallpaperSchedule() {
-        val cfg = _settings.value.autoWallpaperConfig
-        if (cfg.isEnabled && autoWallpaperManager.shouldSwitchWallpaper(cfg)) {
-            refreshAutoWallpaperNow(cfg)
-        } else if (cfg.isEnabled && _autoWallpaperBitmap.value == null) {
-            val cachedFile = java.io.File(context.cacheDir, "auto_wallpapers/active_wallpaper.jpg")
-            if (cachedFile.exists() && cachedFile.length() > 0L) {
-                try {
-                    val bmp = android.graphics.BitmapFactory.decodeFile(cachedFile.absolutePath)
-                    if (bmp != null) {
-                        _autoWallpaperBitmap.value = bmp
-                    } else {
+        repositoryScope.launch(Dispatchers.IO) {
+            val cfg = _settings.value.autoWallpaperConfig
+            if (cfg.isEnabled && autoWallpaperManager.shouldSwitchWallpaper(cfg)) {
+                refreshAutoWallpaperNow(cfg)
+            } else if (cfg.isEnabled && _autoWallpaperBitmap.value == null) {
+                val cachedFile = java.io.File(context.cacheDir, "auto_wallpapers/active_wallpaper.jpg")
+                if (cachedFile.exists() && cachedFile.length() > 0L) {
+                    try {
+                        val bmp = android.graphics.BitmapFactory.decodeFile(cachedFile.absolutePath)
+                        if (bmp != null) {
+                            _autoWallpaperBitmap.value = bmp
+                        } else {
+                            refreshAutoWallpaperNow(cfg)
+                        }
+                    } catch (_: Exception) {
                         refreshAutoWallpaperNow(cfg)
                     }
-                } catch (_: Exception) {
+                } else {
                     refreshAutoWallpaperNow(cfg)
                 }
-            } else {
-                refreshAutoWallpaperNow(cfg)
             }
         }
     }
@@ -657,14 +659,15 @@ class LauncherRepository(private val context: Context) {
         // Sort alphabetically by localized label
         installedAppItems.sortBy { it.label.lowercase(Locale.getDefault()) }
 
-        val favoritePackages = getSavedFavoritePackages()
+        val favoritePackagesList = getSavedFavoritePackages()
+        val favoritePackagesSet = favoritePackagesList.toSet()
         val hiddenPackages = getSavedHiddenPackages()
         val usageBreakerPackages = getSavedUsageBreakerPackages()
         val categoryMap = getCategoryMap()
 
         val finalAppItems = installedAppItems.map { app ->
             app.copy(
-                isFavorite = favoritePackages.contains(app.packageName),
+                isFavorite = favoritePackagesSet.contains(app.packageName),
                 isHidden = hiddenPackages.contains(app.packageName),
                 isUsageBreakerActive = usageBreakerPackages.contains(app.packageName),
                 customCategory = categoryMap[app.packageName] ?: ""
@@ -673,8 +676,15 @@ class LauncherRepository(private val context: Context) {
 
         _allApps.value = finalAppItems
 
-        // Set favorites strictly from REAL INSTALLED APPS
-        val favList = finalAppItems.filter { it.isFavorite && !it.isHidden }.toMutableList()
+        // Set favorites strictly in saved custom order (NOT alphabetically)
+        val favList = mutableListOf<AppItem>()
+        for (pkg in favoritePackagesList) {
+            val app = finalAppItems.find { it.packageName == pkg && !it.isHidden }
+            if (app != null && favList.none { it.packageName == pkg }) {
+                favList.add(app)
+            }
+        }
+
         if (favList.isEmpty() && finalAppItems.isNotEmpty()) {
             val preferredMatchers = listOf(
                 { app: AppItem -> app.packageName.contains("dialer", true) || app.packageName.contains("phone", true) || app.label.equals("Phone", true) },
@@ -700,6 +710,7 @@ class LauncherRepository(private val context: Context) {
                     }
                 }
             }
+            saveFavoritePackages(favList.map { it.packageName })
         }
 
         if (_settings.value.isHeadphonesConnected && _settings.value.audioAppAutoSurfacing) {
@@ -712,28 +723,18 @@ class LauncherRepository(private val context: Context) {
 
         _favorites.value = favList
 
-        // Synchronize dock icons with real installed packages
-        val savedDock = _dockPackageNames.value
-        val validDock = savedDock.filter { pkg -> finalAppItems.any { it.packageName == pkg } }.toMutableList()
-        val targetSlotCount = _settings.value.dockSlotCount.coerceIn(3, 5)
-        if (validDock.size < targetSlotCount && finalAppItems.isNotEmpty()) {
-            for (fav in favList) {
-                if (validDock.size >= targetSlotCount) break
-                if (!validDock.contains(fav.packageName)) {
-                    validDock.add(fav.packageName)
-                }
-            }
-            if (validDock.size < targetSlotCount) {
-                for (app in finalAppItems) {
-                    if (validDock.size >= targetSlotCount) break
-                    if (!validDock.contains(app.packageName)) {
-                        validDock.add(app.packageName)
-                    }
-                }
-            }
-            val finalized = validDock.take(targetSlotCount)
-            _dockPackageNames.value = finalized
-            saveDockPackages(finalized)
+        // Synchronize dock icons only on very first launch if dock has not yet been configured
+        val hasConfiguredDock = prefs.contains("dock_apps_json")
+        if (!hasConfiguredDock && finalAppItems.isNotEmpty()) {
+            val phone = finalAppItems.find { it.packageName.contains("dialer", true) || it.packageName.contains("phone", true) || it.label.equals("Phone", true) }?.packageName
+            val msg = finalAppItems.find { it.packageName.contains("messaging", true) || it.packageName.contains("message", true) || it.label.equals("Messages", true) }?.packageName
+            val camera = finalAppItems.find { it.packageName.contains("camera", true) || it.label.equals("Camera", true) }?.packageName
+            val browser = finalAppItems.find { it.packageName.contains("chrome", true) || it.packageName.contains("browser", true) || it.label.contains("Browser", true) }?.packageName
+
+            val initialDock = listOfNotNull(phone, msg, camera, browser).distinct().take(_settings.value.dockSlotCount.coerceIn(3, 5))
+            val finalInitial = if (initialDock.isNotEmpty()) initialDock else finalAppItems.take(3).map { it.packageName }
+            _dockPackageNames.value = finalInitial
+            saveDockPackages(finalInitial)
         }
     }
 
@@ -806,7 +807,7 @@ class LauncherRepository(private val context: Context) {
     }
 
     fun toggleFavorite(packageName: String) {
-        val currentFavs = getSavedFavoritePackages().toMutableSet()
+        val currentFavs = getSavedFavoritePackages().toMutableList()
         val isNowFav = if (currentFavs.contains(packageName)) {
             currentFavs.remove(packageName)
             false
@@ -825,14 +826,14 @@ class LauncherRepository(private val context: Context) {
             if (it.packageName == packageName) it.copy(isFavorite = isNowFav) else it
         }
         _allApps.value = updatedApps
-        val targetApp = updatedApps.find { it.packageName == packageName }
-        if (isNowFav && targetApp != null) {
-            if (!_favorites.value.any { it.packageName == packageName }) {
-                _favorites.value = (_favorites.value + targetApp).take(10)
+        val updatedFavList = mutableListOf<AppItem>()
+        for (pkg in currentFavs) {
+            val app = updatedApps.find { it.packageName == pkg }
+            if (app != null) {
+                updatedFavList.add(app)
             }
-        } else {
-            _favorites.value = _favorites.value.filter { it.packageName != packageName }
         }
+        _favorites.value = updatedFavList
     }
 
     fun reorderFavorites(fromIndex: Int, toIndex: Int) {
@@ -841,7 +842,7 @@ class LauncherRepository(private val context: Context) {
             val item = current.removeAt(fromIndex)
             current.add(toIndex, item)
             _favorites.value = current
-            saveFavoritePackages(current.map { it.packageName }.toSet())
+            saveFavoritePackages(current.map { it.packageName })
         }
     }
 
@@ -1249,12 +1250,31 @@ class LauncherRepository(private val context: Context) {
         loadFolders()
     }
 
-    private fun getSavedFavoritePackages(): Set<String> {
-        return prefs.getStringSet("favorite_packages", null)?.toSet() ?: emptySet()
+    private fun getSavedFavoritePackages(): List<String> {
+        val jsonStr = prefs.getString("favorite_packages_json", null)
+        if (jsonStr != null) {
+            try {
+                val array = JSONArray(jsonStr)
+                val list = mutableListOf<String>()
+                for (i in 0 until array.length()) {
+                    list.add(array.getString(i))
+                }
+                return list
+            } catch (_: Exception) {}
+        }
+        val legacySet = prefs.getStringSet("favorite_packages", null)
+        if (legacySet != null) {
+            return legacySet.toList()
+        }
+        return emptyList()
     }
 
-    private fun saveFavoritePackages(set: Set<String>) {
-        prefs.edit().putStringSet("favorite_packages", HashSet(set)).apply()
+    private fun saveFavoritePackages(list: Collection<String>) {
+        val array = JSONArray()
+        for (pkg in list.distinct()) {
+            array.put(pkg)
+        }
+        prefs.edit().putString("favorite_packages_json", array.toString()).apply()
     }
 
     private fun getSavedHiddenPackages(): Set<String> {
@@ -1502,15 +1522,8 @@ class LauncherRepository(private val context: Context) {
                 // fallback
             }
         }
-
-        // Default dock icons (Phone, Message, Camera)
-        val defaults = listOf(
-            "com.google.android.dialer",
-            "com.google.android.apps.messaging",
-            "com.google.android.GoogleCamera"
-        )
-        _dockPackageNames.value = defaults
-        saveDockPackages(defaults)
+        // Do not force hardcoded packages here if not yet saved;
+        // let loadInstalledAppsInternal seed real installed apps on first run.
     }
 
     private fun saveDockPackages(pkgs: List<String>) {
@@ -1544,11 +1557,18 @@ class LauncherRepository(private val context: Context) {
     }
 
     fun resetDockToDefaults() {
-        val defaults = listOf(
-            "com.google.android.dialer",
-            "com.google.android.apps.messaging",
-            "com.google.android.GoogleCamera"
-        )
+        val apps = _allApps.value
+        val phone = apps.find { it.packageName.contains("dialer", true) || it.packageName.contains("phone", true) || it.label.equals("Phone", true) }?.packageName
+        val msg = apps.find { it.packageName.contains("messaging", true) || it.packageName.contains("message", true) || it.label.equals("Messages", true) }?.packageName
+        val camera = apps.find { it.packageName.contains("camera", true) || it.label.equals("Camera", true) }?.packageName
+
+        val defaults = listOfNotNull(phone, msg, camera).distinct().ifEmpty {
+            listOf(
+                "com.google.android.dialer",
+                "com.google.android.apps.messaging",
+                "com.google.android.GoogleCamera"
+            )
+        }
         _dockPackageNames.value = defaults
         saveDockPackages(defaults)
     }

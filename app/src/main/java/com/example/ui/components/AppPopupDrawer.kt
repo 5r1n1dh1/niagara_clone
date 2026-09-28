@@ -1,3 +1,4 @@
+@file:Suppress("DEPRECATION")
 package com.example.ui.components
 
 import android.content.Context
@@ -126,6 +127,7 @@ fun AppPopupDrawer(
     onOpenApp: (() -> Unit)? = null,
     onDismiss: () -> Unit,
     onToggleFavorite: () -> Unit,
+    onOpenReorderFavorites: (() -> Unit)? = null,
     onToggleHide: () -> Unit,
     onToggleUsageBreaker: () -> Unit,
     onDisguiseApp: (String?) -> Unit,
@@ -212,6 +214,23 @@ fun AppPopupDrawer(
                         fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                }
+
+                if (app.isFavorite && onOpenReorderFavorites != null) {
+                    IconButton(
+                        onClick = {
+                            onDismiss()
+                            onOpenReorderFavorites()
+                        },
+                        modifier = Modifier.size(36.dp).testTag("app_popup_reorder_favorites_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.SwapVert,
+                            contentDescription = "Reorder Favorites",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
                 }
 
                 IconButton(
@@ -1204,7 +1223,7 @@ private fun getAppShortcuts(context: Context, app: AppItem, category: AppCategor
             launchPackageIntent(context, pkg)
         })
     } else if (lowercasePkg.contains("telegram")) {
-        result.add(CustomAppShortcutItem("tg_msg", "New Message", iconVector = Icons.Filled.Send) {
+        result.add(CustomAppShortcutItem("tg_msg", "New Message", iconVector = Icons.AutoMirrored.Filled.Send) {
             launchUriIntent(context, "tg://msg", pkg)
         })
         result.add(CustomAppShortcutItem("tg_saved", "Saved Messages", iconVector = Icons.Filled.Bookmark) {

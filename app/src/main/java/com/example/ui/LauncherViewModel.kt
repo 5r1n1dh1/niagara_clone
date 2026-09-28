@@ -101,32 +101,14 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     val dockApps: StateFlow<List<AppItem>> = combine(allApps, repository.dockPackageNames, settings) { apps, pkgs, sett ->
         val maxSlots = sett.dockSlotCount.coerceIn(3, 5)
         val list = mutableListOf<AppItem>()
-        for (pkg in pkgs) {
+        for (pkg in pkgs.take(maxSlots)) {
+            if (pkg.isBlank()) continue
             val found = apps.find { it.packageName == pkg }
             if (found != null) {
                 list.add(found)
             }
         }
-        if (list.size < maxSlots) {
-            val phoneApp = apps.find { it.packageName.contains("dialer", true) || it.packageName.contains("phone", true) || it.label.contains("Phone", true) }
-            val msgApp = apps.find { it.packageName.contains("messaging", true) || it.packageName.contains("mms", true) || it.label.contains("Message", true) }
-            val camApp = apps.find { it.packageName.contains("camera", true) || it.label.contains("Camera", true) }
-            
-            val defaults = listOfNotNull(phoneApp, msgApp, camApp)
-            for (defApp in defaults) {
-                if (list.size >= maxSlots) break
-                if (list.none { it.packageName == defApp.packageName }) {
-                    list.add(defApp)
-                }
-            }
-            for (app in apps) {
-                if (list.size >= maxSlots) break
-                if (list.none { it.packageName == app.packageName }) {
-                    list.add(app)
-                }
-            }
-        }
-        list.take(maxSlots)
+        list
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     private val _dockPickerSlot = MutableStateFlow<Int?>(null)
@@ -148,6 +130,39 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         repository.resetDockToDefaults()
         showToast("Dock reset to default apps")
         vibrateClick()
+    }
+
+    private val _isReorderFavoritesOpen = MutableStateFlow(false)
+    val isReorderFavoritesOpen: StateFlow<Boolean> = _isReorderFavoritesOpen.asStateFlow()
+
+    fun openReorderFavorites() {
+        _isReorderFavoritesOpen.value = true
+    }
+
+    fun closeReorderFavorites() {
+        _isReorderFavoritesOpen.value = false
+    }
+
+    fun reorderFavorites(fromIndex: Int, toIndex: Int) {
+        if (settings.value.isLayoutLocked) {
+            showToast("🔒 Layout is locked. Unlock to reorder favorites.")
+            return
+        }
+        repository.reorderFavorites(fromIndex, toIndex)
+        vibrateClick()
+    }
+
+    fun moveFavoriteUp(index: Int) {
+        if (index > 0) {
+            reorderFavorites(index, index - 1)
+        }
+    }
+
+    fun moveFavoriteDown(index: Int) {
+        val size = favorites.value.size
+        if (index < size - 1) {
+            reorderFavorites(index, index + 1)
+        }
     }
 
     private val _isAddWidgetOpen = MutableStateFlow(false)

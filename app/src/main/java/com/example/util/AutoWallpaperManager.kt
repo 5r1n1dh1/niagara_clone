@@ -10,23 +10,31 @@ import com.example.data.AutoWallpaperSource
 import com.example.data.WallpaperItem
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
-import okhttp3.Request
 import org.json.JSONArray
 import java.io.File
 import java.io.FileOutputStream
+import java.net.HttpURLConnection
+import java.net.URL
 import java.net.URLDecoder
-import java.util.concurrent.TimeUnit
 import java.util.regex.Pattern
 
 class AutoWallpaperManager(private val context: Context) {
 
-    private val okHttpClient by lazy {
-        OkHttpClient.Builder()
-            .connectTimeout(15, TimeUnit.SECONDS)
-            .readTimeout(20, TimeUnit.SECONDS)
-            .followRedirects(true)
-            .build()
+    private fun openHttpConnection(
+        urlString: String,
+        userAgent: String = "FluxLauncher/1.0 (Android)",
+        accept: String? = null
+    ): HttpURLConnection {
+        val url = URL(urlString)
+        return (url.openConnection() as HttpURLConnection).apply {
+            connectTimeout = 15000
+            readTimeout = 20000
+            instanceFollowRedirects = true
+            setRequestProperty("User-Agent", userAgent)
+            if (accept != null) {
+                setRequestProperty("Accept", accept)
+            }
+        }
     }
 
     private val wallpaperCacheDir by lazy {
@@ -88,20 +96,20 @@ class AutoWallpaperManager(private val context: Context) {
         val targetFile = File(wallpaperCacheDir, "active_wallpaper.jpg")
 
         if (item.imageUrlOrPath.startsWith("http://") || item.imageUrlOrPath.startsWith("https://")) {
-            val request = Request.Builder()
-                .url(item.imageUrlOrPath)
-                .header("User-Agent", "FluxLauncher/1.0 (Android)")
-                .build()
-
-            val response = okHttpClient.newCall(request).execute()
-            if (!response.isSuccessful || response.body == null) {
-                throw Exception("HTTP request failed: ${response.code}")
-            }
-
-            response.body!!.byteStream().use { input ->
-                FileOutputStream(targetFile).use { output ->
-                    input.copyTo(output)
+            val conn = openHttpConnection(item.imageUrlOrPath)
+            try {
+                val code = conn.responseCode
+                if (code !in 200..299) {
+                    throw Exception("HTTP request failed: $code")
                 }
+
+                conn.inputStream.use { input ->
+                    FileOutputStream(targetFile).use { output ->
+                        input.copyTo(output)
+                    }
+                }
+            } finally {
+                conn.disconnect()
             }
         } else if (item.imageUrlOrPath.startsWith("content://")) {
             context.contentResolver.openInputStream(Uri.parse(item.imageUrlOrPath))?.use { input ->
@@ -218,18 +226,17 @@ class AutoWallpaperManager(private val context: Context) {
             "https://api.github.com/repos/$owner/$repo/contents/$path?ref=$branch"
         }
 
-        val request = Request.Builder()
-            .url(apiUrl)
-            .header("User-Agent", "FluxLauncher/1.0 (Android)")
-            .header("Accept", "application/vnd.github.v3+json")
-            .build()
-
-        val response = okHttpClient.newCall(request).execute()
-        if (!response.isSuccessful || response.body == null) {
+        val conn = openHttpConnection(apiUrl, accept = "application/vnd.github.v3+json")
+        val jsonString = try {
+            val code = conn.responseCode
+            if (code !in 200..299) return emptyList()
+            conn.inputStream.bufferedReader().use { it.readText() }
+        } catch (_: Exception) {
             return emptyList()
+        } finally {
+            conn.disconnect()
         }
 
-        val jsonString = response.body!!.string()
         val jsonArray = JSONArray(jsonString)
         val resultList = mutableListOf<WallpaperItem>()
 
@@ -271,17 +278,19 @@ class AutoWallpaperManager(private val context: Context) {
         val albumUrl = config.googlePhotosAlbumUrl.trim()
         if (albumUrl.isBlank()) return emptyList()
 
-        val request = Request.Builder()
-            .url(albumUrl)
-            .header("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36")
-            .build()
-
-        val response = okHttpClient.newCall(request).execute()
-        if (!response.isSuccessful || response.body == null) {
+        val conn = openHttpConnection(
+            albumUrl,
+            userAgent = "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+        )
+        val html = try {
+            val code = conn.responseCode
+            if (code !in 200..299) return emptyList()
+            conn.inputStream.bufferedReader().use { it.readText() }
+        } catch (_: Exception) {
             return emptyList()
+        } finally {
+            conn.disconnect()
         }
-
-        val html = response.body!!.string()
         // Extract Google Photos high-res image URLs matching pattern https://lh3.googleusercontent.com/pw/...
         val pattern = Pattern.compile("https://lh3\\.googleusercontent\\.com/pw/[a-zA-Z0-9_\\-]+")
         val matcher = pattern.matcher(html)

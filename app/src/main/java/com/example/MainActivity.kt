@@ -57,11 +57,13 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.data.*
 import com.example.ui.LauncherViewModel
 import com.example.ui.components.*
 import com.example.ui.theme.NiagaraTheme
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -79,19 +81,25 @@ class MainActivity : ComponentActivity() {
         // Handle shortcut intent if launched via static/dynamic shortcut
         handleShortcutIntent(intent)
 
-        // Publish or refresh dynamic shortcut on app start
-        com.example.util.AppShortcutHelper.publishRecentChatShortcut(this)
+        // Publish or refresh dynamic shortcut on app start asynchronously
+        lifecycleScope.launch(Dispatchers.IO) {
+            com.example.util.AppShortcutHelper.publishRecentChatShortcut(applicationContext)
+        }
 
         setContent {
             val settings by viewModel.settings.collectAsState()
 
             LaunchedEffect(settings.hideStatusBar) {
-                val windowInsetsController = WindowCompat.getInsetsController(window, window.decorView)
-                windowInsetsController.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-                if (settings.hideStatusBar) {
-                    windowInsetsController.hide(WindowInsetsCompat.Type.statusBars())
-                } else {
-                    windowInsetsController.show(WindowInsetsCompat.Type.statusBars())
+                window.decorView.post {
+                    try {
+                        val windowInsetsController = WindowCompat.getInsetsController(window, window.decorView)
+                        windowInsetsController.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                        if (settings.hideStatusBar) {
+                            windowInsetsController.hide(WindowInsetsCompat.Type.statusBars())
+                        } else {
+                            windowInsetsController.show(WindowInsetsCompat.Type.statusBars())
+                        }
+                    } catch (_: Throwable) {}
                 }
             }
 
@@ -162,6 +170,7 @@ fun NiagaraLauncherScreen(
     val systemWallpaperBitmap by viewModel.systemWallpaperBitmap.collectAsState()
     val autoWallpaperBitmap by viewModel.autoWallpaperBitmap.collectAsState()
     val isWallpaperSwitching by viewModel.isWallpaperSwitching.collectAsState()
+    val isReorderFavoritesOpen by viewModel.isReorderFavoritesOpen.collectAsState()
 
     val context = LocalContext.current
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -207,9 +216,11 @@ fun NiagaraLauncherScreen(
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
-        try {
-            appWidgetHost.startListening()
-        } catch (_: Throwable) {}
+        if (lifecycleOwner.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)) {
+            try {
+                appWidgetHost.startListening()
+            } catch (_: Throwable) {}
+        }
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
             try {
@@ -351,7 +362,7 @@ fun NiagaraLauncherScreen(
     }
 
     val isAnyPanelOpen = isSearchOpen || isSettingsOpen || isNotificationCenterOpen ||
-        isAddWidgetOpen || (editingNoteWidget != null) ||
+        isAddWidgetOpen || (editingNoteWidget != null) || isReorderFavoritesOpen ||
         isCarouselCustomizeOpen || (activeAppForPopup != null) ||
         (dockPickerSlot != null) || isSecretLabOpen || isDebugOverlayOpen || isDiscoverOpen || (activeUsageBreakerApp != null)
 
@@ -361,6 +372,7 @@ fun NiagaraLauncherScreen(
             isSleepOverlayVisible -> viewModel.dismissSleepOverlay()
             activeAppForPopup != null -> viewModel.closeAppPopup()
             activeUsageBreakerApp != null -> viewModel.cancelUsageBreaker()
+            isReorderFavoritesOpen -> viewModel.closeReorderFavorites()
             isSearchOpen -> viewModel.closeSearch()
             isNotificationCenterOpen -> viewModel.closeNotificationCenter()
             isDiscoverOpen -> viewModel.closeDiscover()
@@ -514,6 +526,7 @@ fun NiagaraLauncherScreen(
                                 onOpenClock = { viewModel.launchIntegration(com.example.util.IntegrationCategory.CLOCK) },
                                 onOpenCalendar = { viewModel.launchIntegration(com.example.util.IntegrationCategory.CALENDAR) },
                                 onOpenCarouselCustomize = { viewModel.openCarouselCustomize() },
+                                onOpenReorderFavorites = { viewModel.openReorderFavorites() },
                                 onAddSystemWidget = launchAddSystemWidget,
                                 onOpenSettings = {
                                     keyboardController?.hide()
@@ -799,6 +812,7 @@ fun NiagaraLauncherScreen(
                 widgetIntegrations = viewModel.widgetIntegrations,
                 isWallpaperSwitching = isWallpaperSwitching,
                 onRefreshAutoWallpaperNow = { viewModel.refreshAutoWallpaperNow() },
+                onOpenReorderFavorites = { viewModel.openReorderFavorites() },
                 onUpdateSettings = { viewModel.repository.updateSettings(it) },
                 onSelectDockSlot = { slotIndex -> viewModel.openDockPicker(slotIndex) },
                 onClearDockSlot = { slotIndex -> viewModel.clearDockSlot(slotIndex) },
@@ -817,6 +831,19 @@ fun NiagaraLauncherScreen(
                 onRemoveCategory = { viewModel.removeUserCategory(it) },
                 onAssignCategory = { pkg, cat -> viewModel.setAppCategory(pkg, cat) },
                 onDismiss = { viewModel.closeSettings() }
+            )
+        }
+
+        // Reorder Favorites Sheet
+        if (isReorderFavoritesOpen) {
+            com.example.ui.components.ReorderFavoritesSheet(
+                favorites = favorites,
+                allApps = allApps,
+                settings = settings,
+                onDismiss = { viewModel.closeReorderFavorites() },
+                onMoveUp = { index -> viewModel.moveFavoriteUp(index) },
+                onMoveDown = { index -> viewModel.moveFavoriteDown(index) },
+                onToggleFavorite = { pkg -> viewModel.toggleFavorite(pkg) }
             )
         }
 
@@ -879,6 +906,7 @@ fun NiagaraLauncherScreen(
                 },
                 onDismiss = { viewModel.closeAppPopup() },
                 onToggleFavorite = { viewModel.toggleFavorite(app.packageName) },
+                onOpenReorderFavorites = { viewModel.openReorderFavorites() },
                 onToggleHide = { viewModel.toggleHideApp(app.packageName) },
                 onToggleUsageBreaker = { viewModel.toggleUsageBreaker(app.packageName) },
                 onDisguiseApp = { newName -> viewModel.repository.disguiseApp(app.packageName, newName) },

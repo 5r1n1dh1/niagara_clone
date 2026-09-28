@@ -48,11 +48,15 @@ fun FrostedGlassPanel(
             modifier = Modifier
                 .matchParentSize()
                 .graphicsLayer {
-                    val blurPx = blurRadius.toPx()
-                    if (blurPx > 0f && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                        renderEffect = RenderEffect
-                            .createBlurEffect(blurPx, blurPx, Shader.TileMode.CLAMP)
-                            .asComposeRenderEffect()
+                    val blurPx = blurRadius.toPx().coerceIn(0f, 50f)
+                    if (blurPx > 0.5f && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        try {
+                            renderEffect = RenderEffect
+                                .createBlurEffect(blurPx, blurPx, Shader.TileMode.CLAMP)
+                                .asComposeRenderEffect()
+                        } catch (_: Throwable) {
+                            renderEffect = null
+                        }
                     } else {
                         renderEffect = null
                     }

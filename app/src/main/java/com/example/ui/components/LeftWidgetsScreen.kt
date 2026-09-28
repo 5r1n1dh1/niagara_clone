@@ -1,3 +1,4 @@
+@file:Suppress("DEPRECATION")
 package com.example.ui.components
 
 import android.content.Intent
@@ -1710,6 +1711,7 @@ fun SystemAppWidgetView(
                         putInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, minHeightDpInt)
                         putInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, maxHeightDpInt)
                     }
+                    @Suppress("DEPRECATION")
                     hostView.updateAppWidgetSize(options, minWidthDpInt, minHeightDpInt, maxWidthDpInt, maxHeightDpInt)
                 } catch (_: Throwable) {}
                 hostView
@@ -1730,6 +1732,7 @@ fun SystemAppWidgetView(
                         putInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, minHeightDpInt)
                         putInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, maxHeightDpInt)
                     }
+                    @Suppress("DEPRECATION")
                     hostView.updateAppWidgetSize(options, minWidthDpInt, minHeightDpInt, maxWidthDpInt, maxHeightDpInt)
                 }
             } catch (_: Throwable) {}

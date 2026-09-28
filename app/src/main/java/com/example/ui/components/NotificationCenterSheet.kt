@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -230,7 +231,7 @@ fun NotificationCenterSheet(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
-                            imageVector = Icons.Filled.VolumeUp,
+                            imageVector = Icons.AutoMirrored.Filled.VolumeUp,
                             contentDescription = "Volume",
                             modifier = Modifier.size(20.dp),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
@@ -413,7 +414,7 @@ fun NotificationCenterSheet(
                                             }
                                         ) {
                                             Icon(
-                                                Icons.Filled.Send,
+                                                Icons.AutoMirrored.Filled.Send,
                                                 contentDescription = "Send",
                                                 tint = MaterialTheme.colorScheme.primary
                                             )
@@ -430,7 +431,7 @@ fun NotificationCenterSheet(
                                             contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
                                         ) {
                                             Icon(
-                                                Icons.Filled.Reply,
+                                                Icons.AutoMirrored.Filled.Reply,
                                                 contentDescription = null,
                                                 modifier = Modifier.size(14.dp)
                                             )

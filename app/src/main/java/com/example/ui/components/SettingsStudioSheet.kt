@@ -1,3 +1,4 @@
+@file:Suppress("DEPRECATION")
 package com.example.ui.components
 
 import android.content.Context
@@ -101,6 +102,7 @@ fun SettingsStudioSheet(
     widgetIntegrations: WidgetIntegrationsManager? = null,
     isWallpaperSwitching: Boolean = false,
     onRefreshAutoWallpaperNow: (() -> Unit)? = null,
+    onOpenReorderFavorites: (() -> Unit)? = null,
     onUpdateSettings: (LauncherSettings) -> Unit,
     onSelectDockSlot: ((Int) -> Unit)? = null,
     onClearDockSlot: ((Int) -> Unit)? = null,
@@ -345,6 +347,7 @@ fun SettingsStudioSheet(
                             settings = settings,
                             isWallpaperSwitching = isWallpaperSwitching,
                             onRefreshAutoWallpaperNow = onRefreshAutoWallpaperNow,
+                            onOpenReorderFavorites = onOpenReorderFavorites,
                             onUpdateSettings = onUpdateSettings
                         )
                     }
@@ -561,6 +564,7 @@ private fun AppearanceSettingsPage(
     settings: LauncherSettings,
     isWallpaperSwitching: Boolean = false,
     onRefreshAutoWallpaperNow: (() -> Unit)? = null,
+    onOpenReorderFavorites: (() -> Unit)? = null,
     onUpdateSettings: (LauncherSettings) -> Unit
 ) {
     val context = LocalContext.current
@@ -1075,7 +1079,53 @@ private fun AppearanceSettingsPage(
         }
 
         item {
-            SettingsCard(title = "Empty Space Above Widgets") {
+            SettingsCard(title = "Favorites Screen & Layout") {
+                if (onOpenReorderFavorites != null) {
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable { onOpenReorderFavorites() }
+                            .testTag("settings_reorder_favorites_button")
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Star,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Reorder Favorites Apps List",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = "Change rank position & custom non-alphabetical order",
+                                    fontSize = 11.5.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Icon(
+                                imageVector = Icons.Filled.ChevronRight,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(14.dp))
+                }
+
                 Text(
                     text = "Favorites Screen Top Spacing",
                     fontSize = 12.sp,

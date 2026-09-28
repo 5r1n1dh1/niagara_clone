@@ -1,3 +1,4 @@
+@file:Suppress("DEPRECATION")
 package com.example.service
 
 import android.app.Notification

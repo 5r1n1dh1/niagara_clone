@@ -133,7 +133,8 @@ object DeviceControlsManager {
 
         // Bluetooth
         val isBt = try {
-            val adapter = BluetoothAdapter.getDefaultAdapter()
+            val bm = appContext.getSystemService(Context.BLUETOOTH_SERVICE) as? android.bluetooth.BluetoothManager
+            val adapter = bm?.adapter ?: @Suppress("DEPRECATION") BluetoothAdapter.getDefaultAdapter()
             adapter?.isEnabled == true
         } catch (_: Throwable) {
             false

@@ -259,6 +259,7 @@ fun CenterHomeScreen(
     onOpenClock: () -> Unit = {},
     onOpenCalendar: () -> Unit,
     onOpenCarouselCustomize: () -> Unit,
+    onOpenReorderFavorites: () -> Unit = {},
     onAddSystemWidget: () -> Unit = {},
     onOpenSettings: () -> Unit,
     onNavigateToAllApps: () -> Unit,
@@ -485,6 +486,45 @@ fun CenterHomeScreen(
                 }
             }
         } else {
+            item(key = "center_favorites_section_header") {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "FAVORITES",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    )
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { onOpenReorderFavorites() }
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                            .testTag("home_favorites_reorder_shortcut"),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.SwapVert,
+                            contentDescription = "Reorder Favorites",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "Reorder",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+            }
             itemsIndexed(favorites.take(10), key = { _, app -> "fav_${app.uniqueKey}" }, contentType = { _, _ -> "fav_app_item" }) { _, app ->
                 Box(modifier = Modifier.animateItem()) {
                     AppListItem(
@@ -612,6 +652,63 @@ fun CenterHomeScreen(
                                     )
                                     Text(
                                         text = "Manage & reorder home screen widgets (${displayWidgets.size}/5 active)",
+                                        fontSize = 11.5.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                    modifier = Modifier.size(15.dp)
+                                )
+                            }
+                        }
+
+                        // 1.5. Reorder Favorites Screen
+                        Surface(
+                            shape = RoundedCornerShape(16.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = settings.frostedTranslucency),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(16.dp))
+                                .clickable {
+                                    showHomeEmptySpaceOptions = false
+                                    onOpenReorderFavorites()
+                                }
+                                .testTag("reorder_favorites_option_button")
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .padding(14.dp)
+                                    .fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.secondaryContainer),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Star,
+                                        contentDescription = "Reorder Favorites",
+                                        tint = MaterialTheme.colorScheme.secondary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(14.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "Reorder Favorites Screen",
+                                        fontSize = 14.5.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = "Change rank position & custom order (${favorites.size} apps)",
                                         fontSize = 11.5.sp,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
