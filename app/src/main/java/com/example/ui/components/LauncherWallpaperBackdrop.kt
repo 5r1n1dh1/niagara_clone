@@ -88,11 +88,16 @@ fun LauncherWallpaperBackdrop(
 
     LaunchedEffect(activeWallpaperBitmap, blurRadiusPx) {
         val sourceBitmap = activeWallpaperBitmap ?: systemWallpaperBitmap
-        if (sourceBitmap != null && blurRadiusPx > 0 && android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.S) {
+        if (sourceBitmap != null && blurRadiusPx > 0) {
             withContext(Dispatchers.Default) {
                 try {
                     val androidBmp = sourceBitmap.asAndroidBitmap()
-                    val blurred = fastBlurBitmap(androidBmp, blurRadiusPx)
+                    // Downscale source bitmap to 360px width for lightning-fast pre-calculated blurring and minimal memory
+                    val scaledWidth = 360
+                    val scaledHeight = (360f * androidBmp.height / androidBmp.width).toInt().coerceAtLeast(480)
+                    val scaledBmp = android.graphics.Bitmap.createScaledBitmap(androidBmp, scaledWidth, scaledHeight, true)
+                    val effectiveRadius = (blurRadiusPx * (360f / androidBmp.width)).toInt().coerceIn(1, 25)
+                    val blurred = fastBlurBitmap(scaledBmp, effectiveRadius)
                     softwareBlurredBitmap = blurred.asImageBitmap()
                 } catch (_: Exception) {
                     softwareBlurredBitmap = null
@@ -103,11 +108,8 @@ fun LauncherWallpaperBackdrop(
         }
     }
 
-    val blurModifier = if (effectiveBlur > 0.5.dp && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-        Modifier.blur(effectiveBlur)
-    } else {
-        Modifier
-    }
+    // Zero real-time GPU cost: using pre-calculated cached blurred bitmap layer
+    val blurModifier = Modifier
 
     val isSystemWallpaper = wallpaperStyle == WallpaperStyle.SYSTEM_DEVICE
     val isAutoWallpaper = wallpaperStyle == WallpaperStyle.AUTO_ALBUM

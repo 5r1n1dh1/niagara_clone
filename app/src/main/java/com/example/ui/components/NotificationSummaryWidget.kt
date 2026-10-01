@@ -68,38 +68,16 @@ fun NotificationSummaryWidget(
     var isExpanded by remember { mutableStateOf(false) }
     var showFilterSheet by remember { mutableStateOf(false) }
 
-    // Sample fallback digest notifications if live notifications are empty
-    val defaultDigestAlerts = remember {
-        listOf(
-            NotificationItem(
-                id = "sim_digest_1",
-                packageName = "com.instagram.android",
-                sender = "Instagram",
-                message = "alex_dev and 4 others liked your story",
-                timeAgo = "12m ago"
-            ),
-            NotificationItem(
-                id = "sim_digest_2",
-                packageName = "com.amazon.mShop.android.shopping",
-                sender = "Amazon Deals",
-                message = "🔥 Lightning Deal: 40% off wireless noise-canceling headphones",
-                timeAgo = "35m ago"
-            ),
-            NotificationItem(
-                id = "sim_digest_3",
-                packageName = "com.reddit.frontpage",
-                sender = "Reddit Trending",
-                message = "Trending in r/androiddev: Jetpack Compose performance best practices in 2026",
-                timeAgo = "1h ago"
-            )
-        )
-    }
-
     val liveDigestList = remember(activeNotifications) {
-        val filtered = activeNotifications.values.filter {
+        activeNotifications.values.filter {
             isLowPriorityNotification(it.packageName, it.sender, it.message)
         }
-        if (filtered.isNotEmpty()) filtered else defaultDigestAlerts
+    }
+
+    // Hide widget entirely if there are no real notifications summary to display
+    if (liveDigestList.isEmpty()) {
+        Box(modifier = Modifier.size(0.dp))
+        return
     }
 
     val displayList = remember(liveDigestList, selectedCategory) {

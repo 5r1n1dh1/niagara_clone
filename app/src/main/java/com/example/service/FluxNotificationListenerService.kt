@@ -146,17 +146,19 @@ class FluxNotificationListenerService : NotificationListenerService() {
         mediaProgressPollJob?.cancel()
         mediaProgressPollJob = serviceScope.launch {
             while (isActive) {
-                delay(500)
                 val current = _liveMediaPlayback.value
-                if (current != null && current.isPlaying && current.durationMs > 0) {
+                val isPlaying = current?.isPlaying == true
+                delay(if (isPlaying) 1000L else 3000L)
+                val latestCurrent = _liveMediaPlayback.value
+                if (latestCurrent != null && latestCurrent.isPlaying && latestCurrent.durationMs > 0) {
                     val controller = activeMediaController
                     if (controller != null) {
                         updateMediaPlaybackFromController(controller)
                     } else {
                         // Smoothly advance time
-                        val newPos = (current.positionMs + 500).coerceAtMost(current.durationMs)
-                        val newProgress = (newPos.toFloat() / current.durationMs.toFloat()).coerceIn(0f, 1f)
-                        _liveMediaPlayback.value = current.copy(
+                        val newPos = (latestCurrent.positionMs + 1000).coerceAtMost(latestCurrent.durationMs)
+                        val newProgress = (newPos.toFloat() / latestCurrent.durationMs.toFloat()).coerceIn(0f, 1f)
+                        _liveMediaPlayback.value = latestCurrent.copy(
                             positionMs = newPos,
                             progressPercent = newProgress,
                             currentTimeText = formatMs(newPos)

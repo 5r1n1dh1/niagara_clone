@@ -326,20 +326,22 @@ private fun LeftWidgetCardWrapper(
                         letterSpacing = 1.sp,
                         color = MaterialTheme.colorScheme.primary
                     )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    // Size Badge (Static indicator)
-                    Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
-                        modifier = Modifier.testTag("widget_size_badge_${widget.id}")
-                    ) {
-                        Text(
-                            text = widget.heightCategory,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                        )
+                    // Size Badge (Static indicator - visible only in edit/customize mode)
+                    if (isEditMode) {
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                            modifier = Modifier.testTag("widget_size_badge_${widget.id}")
+                        ) {
+                            Text(
+                                text = widget.heightCategory,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
                     }
                 }
 

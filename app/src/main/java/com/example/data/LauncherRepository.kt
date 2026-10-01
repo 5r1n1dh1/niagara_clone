@@ -29,59 +29,70 @@ import java.text.SimpleDateFormat
 import java.util.*
 import com.example.util.IntegrationCategory
 import com.example.util.WidgetIntegrationsManager
+import com.example.domain.*
 
-class LauncherRepository(private val context: Context) {
+class LauncherRepository(private val context: Context) : 
+    SettingsRepository, 
+    AppRepository, 
+    NotificationRepository, 
+    MediaPlaybackRepository, 
+    WidgetRepository, 
+    WallpaperRepository, 
+    FolderRepository, 
+    CategoryRepository, 
+    DockRepository, 
+    CalendarRepository {
 
     private val prefs = context.getSharedPreferences("niagara_launcher_prefs", Context.MODE_PRIVATE)
     private val repositoryScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
     private val _isAppsLoading = MutableStateFlow(true)
-    val isAppsLoading: StateFlow<Boolean> = _isAppsLoading.asStateFlow()
+    override val isAppsLoading: StateFlow<Boolean> = _isAppsLoading.asStateFlow()
 
     private val _allApps = MutableStateFlow<List<AppItem>>(emptyList())
-    val allApps: StateFlow<List<AppItem>> = _allApps.asStateFlow()
+    override val allApps: StateFlow<List<AppItem>> = _allApps.asStateFlow()
 
     private val _favorites = MutableStateFlow<List<AppItem>>(emptyList())
-    val favorites: StateFlow<List<AppItem>> = _favorites.asStateFlow()
+    override val favorites: StateFlow<List<AppItem>> = _favorites.asStateFlow()
 
     private val _folders = MutableStateFlow<List<FolderItem>>(emptyList())
-    val folders: StateFlow<List<FolderItem>> = _folders.asStateFlow()
+    override val folders: StateFlow<List<FolderItem>> = _folders.asStateFlow()
 
     private val _settings = MutableStateFlow(loadSettings())
-    val settings: StateFlow<LauncherSettings> = _settings.asStateFlow()
+    override val settings: StateFlow<LauncherSettings> = _settings.asStateFlow()
 
     private val _weather = MutableStateFlow(WeatherInfo())
     val weather: StateFlow<WeatherInfo> = _weather.asStateFlow()
 
     private val _calendarEvents = MutableStateFlow<List<CalendarEvent>>(emptyList())
-    val calendarEvents: StateFlow<List<CalendarEvent>> = _calendarEvents.asStateFlow()
+    override val calendarEvents: StateFlow<List<CalendarEvent>> = _calendarEvents.asStateFlow()
 
     private val _mediaPlayer = MutableStateFlow(MediaPlaybackState())
-    val mediaPlayer: StateFlow<MediaPlaybackState> = _mediaPlayer.asStateFlow()
+    override val mediaPlayer: StateFlow<MediaPlaybackState> = _mediaPlayer.asStateFlow()
 
     private val _activeNotifications = MutableStateFlow<Map<String, NotificationItem>>(emptyMap())
-    val activeNotifications: StateFlow<Map<String, NotificationItem>> = _activeNotifications.asStateFlow()
+    override val activeNotifications: StateFlow<Map<String, NotificationItem>> = _activeNotifications.asStateFlow()
 
     private val _allActiveNotifications = MutableStateFlow<Map<String, List<NotificationItem>>>(emptyMap())
-    val allActiveNotifications: StateFlow<Map<String, List<NotificationItem>>> = _allActiveNotifications.asStateFlow()
+    override val allActiveNotifications: StateFlow<Map<String, List<NotificationItem>>> = _allActiveNotifications.asStateFlow()
 
     private val _leftWidgets = MutableStateFlow<List<CustomWidgetConfig>>(emptyList())
-    val leftWidgets: StateFlow<List<CustomWidgetConfig>> = _leftWidgets.asStateFlow()
+    override val leftWidgets: StateFlow<List<CustomWidgetConfig>> = _leftWidgets.asStateFlow()
 
     private val _carouselWidgets = MutableStateFlow<List<WidgetType>>(emptyList())
-    val carouselWidgets: StateFlow<List<WidgetType>> = _carouselWidgets.asStateFlow()
+    override val carouselWidgets: StateFlow<List<WidgetType>> = _carouselWidgets.asStateFlow()
 
     private val _dockPackageNames = MutableStateFlow<List<String>>(emptyList())
-    val dockPackageNames: StateFlow<List<String>> = _dockPackageNames.asStateFlow()
+    override val dockPackageNames: StateFlow<List<String>> = _dockPackageNames.asStateFlow()
 
     val widgetIntegrations = WidgetIntegrationsManager(context)
     val autoWallpaperManager = com.example.util.AutoWallpaperManager(context)
 
     private val _autoWallpaperBitmap = MutableStateFlow<android.graphics.Bitmap?>(null)
-    val autoWallpaperBitmap: StateFlow<android.graphics.Bitmap?> = _autoWallpaperBitmap.asStateFlow()
+    override val autoWallpaperBitmap: StateFlow<android.graphics.Bitmap?> = _autoWallpaperBitmap.asStateFlow()
 
     private val _isWallpaperSwitching = MutableStateFlow(false)
-    val isWallpaperSwitching: StateFlow<Boolean> = _isWallpaperSwitching.asStateFlow()
+    override val isWallpaperSwitching: StateFlow<Boolean> = _isWallpaperSwitching.asStateFlow()
 
     init {
         observeLiveNotifications()
@@ -95,7 +106,7 @@ class LauncherRepository(private val context: Context) {
         checkAutoWallpaperSchedule()
     }
 
-    fun refreshAutoWallpaperNow(overrideConfig: AutoWallpaperConfig? = null) {
+    override fun refreshAutoWallpaperNow(overrideConfig: AutoWallpaperConfig?) {
         val cfg = overrideConfig ?: _settings.value.autoWallpaperConfig
         repositoryScope.launch(Dispatchers.IO) {
             _isWallpaperSwitching.value = true
@@ -322,7 +333,7 @@ class LauncherRepository(private val context: Context) {
         )
     }
 
-    fun updateSettings(newSettings: LauncherSettings) {
+    override fun updateSettings(newSettings: LauncherSettings) {
         _settings.value = newSettings
         prefs.edit()
             .putBoolean("left_handed_mode", newSettings.leftHandedMode)
@@ -442,7 +453,7 @@ class LauncherRepository(private val context: Context) {
         return list
     }
 
-    fun isWidgetAvailable(type: WidgetType): Boolean {
+    override fun isWidgetAvailable(type: WidgetType): Boolean {
         return when (type) {
             WidgetType.MEDIA_PLAYER -> com.example.ui.components.isYouTubeMusicInstalled(context)
             WidgetType.WEATHER_FORECAST -> true
@@ -456,7 +467,7 @@ class LauncherRepository(private val context: Context) {
         }
     }
 
-    fun refreshCalendarEvents() {
+    override fun refreshCalendarEvents() {
         repositoryScope.launch(Dispatchers.IO) {
             val events = readDeviceCalendarEvents()
             _calendarEvents.value = events
@@ -536,7 +547,7 @@ class LauncherRepository(private val context: Context) {
         // Active notifications are collected in real-time from FluxNotificationListenerService
     }
 
-    fun reloadApps() {
+    override fun reloadApps() {
         _isAppsLoading.value = true
         repositoryScope.launch(Dispatchers.IO) {
             try {
@@ -915,7 +926,7 @@ class LauncherRepository(private val context: Context) {
     }
 
     private val _userCategories = MutableStateFlow<List<String>>(loadUserCategories())
-    val userCategories: StateFlow<List<String>> = _userCategories.asStateFlow()
+    override val userCategories: StateFlow<List<String>> = _userCategories.asStateFlow()
 
     private fun loadUserCategories(): List<String> {
         val json = prefs.getString("user_categories_list", null)
@@ -932,7 +943,7 @@ class LauncherRepository(private val context: Context) {
         return emptyList()
     }
 
-    fun addUserCategory(categoryName: String) {
+    override fun addUserCategory(categoryName: String) {
         val trimmed = categoryName.trim()
         if (trimmed.isBlank()) return
         val current = _userCategories.value.toMutableList()
@@ -963,7 +974,7 @@ class LauncherRepository(private val context: Context) {
         }
     }
 
-    fun removeUserCategory(categoryName: String) {
+    override fun removeUserCategory(categoryName: String) {
         val current = _userCategories.value.toMutableList()
         if (current.contains(categoryName)) {
             current.remove(categoryName)
@@ -1534,7 +1545,7 @@ class LauncherRepository(private val context: Context) {
         prefs.edit().putString("dock_apps_json", arr.toString()).apply()
     }
 
-    fun setDockSlot(slotIndex: Int, packageName: String) {
+    override fun setDockSlot(slotIndex: Int, packageName: String) {
         val current = _dockPackageNames.value.toMutableList()
         while (current.size <= slotIndex) {
             current.add("")
@@ -1547,7 +1558,7 @@ class LauncherRepository(private val context: Context) {
         }
     }
 
-    fun clearDockSlot(slotIndex: Int) {
+    override fun clearDockSlot(slotIndex: Int) {
         val current = _dockPackageNames.value.toMutableList()
         if (slotIndex in current.indices) {
             current.removeAt(slotIndex)
@@ -1556,7 +1567,7 @@ class LauncherRepository(private val context: Context) {
         }
     }
 
-    fun resetDockToDefaults() {
+    override fun resetDockToDefaults() {
         val apps = _allApps.value
         val phone = apps.find { it.packageName.contains("dialer", true) || it.packageName.contains("phone", true) || it.label.equals("Phone", true) }?.packageName
         val msg = apps.find { it.packageName.contains("messaging", true) || it.packageName.contains("message", true) || it.label.equals("Messages", true) }?.packageName
