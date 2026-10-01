@@ -15,7 +15,7 @@ data class SearchUiState(
 )
 
 /**
- * Decomposed SearchViewModel managing search query, math evaluation, and filtered results adhering to Phase 3.
+ * Decomposed SearchViewModel managing debounced search query, math evaluation, and filtered results.
  */
 class SearchViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = LauncherRepository(application)
@@ -24,7 +24,7 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
     val query: StateFlow<String> = _query.asStateFlow()
 
     val uiState: StateFlow<SearchUiState> = combine(
-        _query,
+        _query.debounce(200),
         repository.allApps
     ) { q, apps ->
         val trimmed = q.trim()

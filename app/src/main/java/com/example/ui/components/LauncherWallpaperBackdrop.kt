@@ -108,8 +108,11 @@ fun LauncherWallpaperBackdrop(
         }
     }
 
-    // Zero real-time GPU cost: using pre-calculated cached blurred bitmap layer
-    val blurModifier = Modifier
+    val blurModifier = if (effectiveBlur > 0.5.dp && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+        Modifier.blur(effectiveBlur)
+    } else {
+        Modifier
+    }
 
     val isSystemWallpaper = wallpaperStyle == WallpaperStyle.SYSTEM_DEVICE
     val isAutoWallpaper = wallpaperStyle == WallpaperStyle.AUTO_ALBUM
