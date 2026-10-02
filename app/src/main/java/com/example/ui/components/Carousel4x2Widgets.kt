@@ -23,6 +23,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.*
+import com.example.data.NewsFeedState
+import com.example.data.NewsPreferencesState
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -38,6 +40,8 @@ fun Carousel4x2WidgetCard(
     mediaPlayer: MediaPlaybackState,
     calendarEvents: List<CalendarEvent>,
     activeNotifications: Map<String, NotificationItem> = emptyMap(),
+    newsState: com.example.data.NewsFeedState = com.example.data.NewsFeedState.NeedsApiKey,
+    newsPreferences: com.example.data.NewsPreferencesState = com.example.data.NewsPreferencesState(),
     isHeadphonesConnected: Boolean,
     showSeconds: Boolean = false,
     clockColorTintHex: String = "#FFFFFF",
@@ -57,6 +61,9 @@ fun Carousel4x2WidgetCard(
     onOpenCalendar: () -> Unit,
     onOpenCustomize: () -> Unit,
     onOpenSettings: () -> Unit = {},
+    onRefreshNews: () -> Unit = {},
+    onOpenNewsSetup: () -> Unit = {},
+    onOpenArticle: (String) -> Unit = {},
     onDismissNotification: (packageName: String, isDualApp: Boolean) -> Unit = { _, _ -> },
     onReplyNotification: (packageName: String, text: String, isDualApp: Boolean) -> Unit = { _, _, _ -> },
     modifier: Modifier = Modifier
@@ -109,14 +116,18 @@ fun Carousel4x2WidgetCard(
                     )
                 }
                 WidgetType.NEWS_FEED -> {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text(
-                            text = "📰 Top News Highlights",
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                    NewsWidget(
+                        state = newsState,
+                        prefs = newsPreferences,
+                        size = "4x2",
+                        blurRadius = blurRadius,
+                        translucency = translucency,
+                        glassEffect = glassEffect,
+                        isEmbeddedInCard = true,
+                        onOpenArticle = onOpenArticle,
+                        onOpenSetup = onOpenNewsSetup,
+                        onRefresh = onRefreshNews
+                    )
                 }
                 WidgetType.MEDIA_PLAYER -> {
                     YouTubeMusicFluxWidget(

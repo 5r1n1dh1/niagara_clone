@@ -27,6 +27,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.*
+import com.example.data.NewsFeedState
+import com.example.data.NewsPreferencesState
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -43,6 +45,8 @@ fun LeftWidgetsScreen(
     calendarEvents: List<CalendarEvent>,
     activeNotifications: Map<String, NotificationItem> = emptyMap(),
     isHeadphonesConnected: Boolean,
+    newsState: com.example.data.NewsFeedState = com.example.data.NewsFeedState.NeedsApiKey,
+    newsPreferences: com.example.data.NewsPreferencesState = com.example.data.NewsPreferencesState(),
     isFrostedTheme: Boolean = false,
     blurRadius: Float = 15f,
     translucency: Float = 0.30f,
@@ -62,6 +66,9 @@ fun LeftWidgetsScreen(
     onOpenWeather: () -> Unit = {},
     onOpenClock: () -> Unit = {},
     onOpenCalendar: () -> Unit = {},
+    onRefreshNews: () -> Unit = {},
+    onOpenNewsSetup: () -> Unit = {},
+    onOpenArticle: (String) -> Unit = {},
     onDismissNotification: (packageName: String, isDualApp: Boolean) -> Unit = { _, _ -> },
     onReplyNotification: (packageName: String, text: String, isDualApp: Boolean) -> Unit = { _, _, _ -> },
     onUpdateWidgetSize: (String, String) -> Unit = { _, _ -> },
@@ -237,6 +244,8 @@ fun LeftWidgetsScreen(
                             calendarEvents = calendarEvents,
                             activeNotifications = activeNotifications,
                             isHeadphonesConnected = isHeadphonesConnected,
+                            newsState = newsState,
+                            newsPreferences = newsPreferences,
                             blurRadius = blurRadius,
                             translucency = translucency,
                             glassEffect = glassEffect,
@@ -254,6 +263,9 @@ fun LeftWidgetsScreen(
                             onRefreshWeather = onRefreshWeather,
                             onOpenWeather = onOpenWeather,
                             onOpenClock = onOpenClock,
+                            onRefreshNews = onRefreshNews,
+                            onOpenNewsSetup = onOpenNewsSetup,
+                            onOpenArticle = onOpenArticle,
                             onDismissNotification = onDismissNotification,
                             onReplyNotification = onReplyNotification,
                             onUpdateSize = { newSize -> onUpdateWidgetSize(item.id, newSize) }
@@ -277,6 +289,8 @@ private fun LeftWidgetCardWrapper(
     calendarEvents: List<CalendarEvent>,
     activeNotifications: Map<String, NotificationItem> = emptyMap(),
     isHeadphonesConnected: Boolean,
+    newsState: NewsFeedState = NewsFeedState.NeedsApiKey,
+    newsPreferences: NewsPreferencesState = NewsPreferencesState(),
     blurRadius: Float = 15f,
     translucency: Float = 0.30f,
     glassEffect: Float = 0.30f,
@@ -294,6 +308,9 @@ private fun LeftWidgetCardWrapper(
     onRefreshWeather: () -> Unit,
     onOpenWeather: () -> Unit = {},
     onOpenClock: () -> Unit = {},
+    onRefreshNews: () -> Unit = {},
+    onOpenNewsSetup: () -> Unit = {},
+    onOpenArticle: (String) -> Unit = {},
     onDismissNotification: (packageName: String, isDualApp: Boolean) -> Unit = { _, _ -> },
     onReplyNotification: (packageName: String, text: String, isDualApp: Boolean) -> Unit = { _, _, _ -> },
     onUpdateSize: (String) -> Unit = {}
@@ -432,7 +449,18 @@ private fun LeftWidgetCardWrapper(
                         )
                     }
                     WidgetType.NEWS_FEED -> {
-                        NewsWidgetBody(size = widget.heightCategory)
+                        NewsWidget(
+                            state = newsState,
+                            prefs = newsPreferences,
+                            size = widget.heightCategory,
+                            blurRadius = blurRadius,
+                            translucency = translucency,
+                            glassEffect = glassEffect,
+                            isEmbeddedInCard = true,
+                            onOpenArticle = onOpenArticle,
+                            onOpenSetup = onOpenNewsSetup,
+                            onRefresh = onRefreshNews
+                        )
                     }
                     WidgetType.MEDIA_PLAYER -> {
                         YouTubeMusicFluxWidget(
@@ -1392,240 +1420,6 @@ fun EditNoteDialog(
             }
         }
     )
-}
-
-private data class NewsStory(
-    val title: String,
-    val source: String,
-    val timeAgo: String,
-    val category: String,
-    val imageUrl: String,
-    val linkUrl: String = ""
-)
-
-private val sampleNewsStories = listOf(
-    NewsStory(
-        title = "NASA's James Webb Telescope Discovers Atmospheric Water Vapor on Exoplanet",
-        source = "Space & Science Daily",
-        timeAgo = "18m ago",
-        category = "SPACE",
-        imageUrl = "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=600&q=80",
-        linkUrl = "https://news.google.com"
-    ),
-    NewsStory(
-        title = "Next-Gen Quantum Chips Achieve Record 99.9% Gate Fidelity at Room Temp",
-        source = "Tech Discovery Wire",
-        timeAgo = "42m ago",
-        category = "TECH",
-        imageUrl = "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&q=80",
-        linkUrl = "https://news.google.com"
-    ),
-    NewsStory(
-        title = "Global Clean Energy Power Grid Surpasses 2 Terawatt Milestone Target",
-        source = "World Eco Journal",
-        timeAgo = "2h ago",
-        category = "ENERGY",
-        imageUrl = "https://images.unsplash.com/photo-1497435334941-8c899ee9e8e9?w=600&q=80",
-        linkUrl = "https://news.google.com"
-    )
-)
-
-@Composable
-private fun NewsWidgetBody(size: String = "4x2") {
-    val context = LocalContext.current
-    var stories by remember { mutableStateOf(sampleNewsStories) }
-    var currentIndex by remember { mutableIntStateOf(0) }
-
-    LaunchedEffect(Unit) {
-        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            try {
-                val url = java.net.URL("https://news.google.com/rss?hl=en-US&gl=US&ceid=US:en")
-                val conn = url.openConnection() as java.net.HttpURLConnection
-                conn.connectTimeout = 4000
-                conn.readTimeout = 4000
-                val inputStream = conn.inputStream
-                val factory = org.xmlpull.v1.XmlPullParserFactory.newInstance()
-                val parser = factory.newPullParser()
-                parser.setInput(inputStream, "UTF-8")
-
-                val fetched = mutableListOf<NewsStory>()
-                var eventType = parser.eventType
-                var curTitle = ""
-                var curSource = "Google News"
-                var curPubDate = "Recent"
-                var curLink = "https://news.google.com"
-                var inItem = false
-
-                val cats = listOf("WORLD", "TECH", "BUSINESS", "SCIENCE", "TOP NEWS")
-                val imgs = listOf(
-                    "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=600&q=80",
-                    "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&q=80",
-                    "https://images.unsplash.com/photo-1497435334941-8c899ee9e8e9?w=600&q=80",
-                    "https://images.unsplash.com/photo-1504384308090-c894fdcc538d?w=600&q=80"
-                )
-
-                while (eventType != org.xmlpull.v1.XmlPullParser.END_DOCUMENT && fetched.size < 8) {
-                    val tag = parser.name
-                    when (eventType) {
-                        org.xmlpull.v1.XmlPullParser.START_TAG -> {
-                            if ("item".equals(tag, true)) {
-                                inItem = true
-                                curTitle = ""
-                                curSource = "Google News"
-                                curPubDate = "Recent"
-                                curLink = "https://news.google.com"
-                            } else if (inItem) {
-                                when (tag?.lowercase()) {
-                                    "title" -> curTitle = parser.nextText().trim()
-                                    "source" -> curSource = parser.nextText().trim()
-                                    "pubdate" -> {
-                                        val pd = parser.nextText().trim()
-                                        curPubDate = if (pd.length > 16) pd.substring(0, 16) else pd
-                                    }
-                                    "link" -> curLink = parser.nextText().trim()
-                                }
-                            }
-                        }
-                        org.xmlpull.v1.XmlPullParser.END_TAG -> {
-                            if ("item".equals(tag, true)) {
-                                inItem = false
-                                if (curTitle.isNotBlank()) {
-                                    fetched.add(
-                                        NewsStory(
-                                            title = curTitle,
-                                            source = curSource,
-                                            timeAgo = curPubDate,
-                                            category = cats[fetched.size % cats.size],
-                                            imageUrl = imgs[fetched.size % imgs.size],
-                                            linkUrl = curLink
-                                        )
-                                    )
-                                }
-                            }
-                        }
-                    }
-                    eventType = parser.next()
-                }
-                conn.disconnect()
-                if (fetched.isNotEmpty()) {
-                    stories = fetched
-                }
-            } catch (_: Exception) {}
-        }
-    }
-
-    val currentStory = stories[currentIndex % stories.size]
-
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(14.dp))
-                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.6f))
-                .clickable {
-                    try {
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(currentStory.linkUrl)).apply {
-                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                        }
-                        context.startActivity(intent)
-                    } catch (_: Exception) {}
-                }
-                .padding(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(width = 86.dp, height = 72.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-            ) {
-                coil.compose.AsyncImage(
-                    model = currentStory.imageUrl,
-                    contentDescription = currentStory.title,
-                    contentScale = androidx.compose.ui.layout.ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
-            }
-
-            Spacer(modifier = Modifier.width(10.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Surface(
-                        shape = RoundedCornerShape(4.dp),
-                        color = MaterialTheme.colorScheme.primaryContainer,
-                        modifier = Modifier.padding(end = 6.dp)
-                    ) {
-                        Text(
-                            text = currentStory.category,
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
-                        )
-                    }
-                    Text(
-                        text = "${currentStory.source} • ${currentStory.timeAgo}",
-                        fontSize = 10.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(4.dp))
-
-                Text(
-                    text = currentStory.title,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 2,
-                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                    lineHeight = 16.sp,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                stories.indices.forEach { index ->
-                    Box(
-                        modifier = Modifier
-                            .size(if (index == currentIndex) 16.dp else 6.dp, 6.dp)
-                            .clip(CircleShape)
-                            .background(
-                                if (index == currentIndex) MaterialTheme.colorScheme.primary
-                                else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
-                            )
-                    )
-                }
-            }
-
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(
-                    onClick = { currentIndex = (currentIndex - 1 + stories.size) % stories.size },
-                    modifier = Modifier.size(28.dp)
-                ) {
-                    Icon(Icons.Filled.KeyboardArrowLeft, contentDescription = "Previous story", modifier = Modifier.size(18.dp))
-                }
-                IconButton(
-                    onClick = { currentIndex = (currentIndex + 1) % stories.size },
-                    modifier = Modifier.size(28.dp)
-                ) {
-                    Icon(Icons.Filled.KeyboardArrowRight, contentDescription = "Next story", modifier = Modifier.size(18.dp))
-                }
-            }
-        }
-    }
 }
 
 @Composable

@@ -36,6 +36,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.*
+import com.example.data.NewsFeedState
+import com.example.data.NewsPreferencesState
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
@@ -263,6 +265,11 @@ fun CenterHomeScreen(
     onAddSystemWidget: () -> Unit = {},
     onOpenSettings: () -> Unit,
     onNavigateToAllApps: () -> Unit,
+    newsState: com.example.data.NewsFeedState = com.example.data.NewsFeedState.NeedsApiKey,
+    newsPreferences: com.example.data.NewsPreferencesState = com.example.data.NewsPreferencesState(),
+    onRefreshNews: () -> Unit = {},
+    onOpenNewsSetup: () -> Unit = {},
+    onOpenArticle: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -371,6 +378,11 @@ fun CenterHomeScreen(
                                 mediaPlayer = mediaPlayer,
                                 calendarEvents = calendarEvents,
                                 activeNotifications = activeNotifications,
+                                newsState = newsState,
+                                newsPreferences = newsPreferences,
+                                onRefreshNews = onRefreshNews,
+                                onOpenNewsSetup = onOpenNewsSetup,
+                                onOpenArticle = onOpenArticle,
                                 isHeadphonesConnected = settings.isHeadphonesConnected,
                                 showSeconds = settings.showSeconds,
                                 clockColorTintHex = settings.clockColorTintHex,

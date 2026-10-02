@@ -71,6 +71,24 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
 
     val widgetIntegrations = com.example.util.WidgetIntegrationsManager(application)
 
+    private val newsRepository = com.example.data.NewsRepositoryImpl(application)
+    val newsState = newsRepository.newsState
+    val newsPreferences = newsRepository.preferences
+
+    fun refreshNews(force: Boolean = false) {
+        viewModelScope.launch {
+            newsRepository.refresh(force)
+        }
+    }
+
+    fun saveNewsPreferences(state: com.example.data.NewsPreferencesState) {
+        newsRepository.savePreferences(state)
+    }
+
+    fun clearNewsApiKey() {
+        newsRepository.clearApiKey()
+    }
+
     fun launchIntegration(category: com.example.util.IntegrationCategory) {
         widgetIntegrations.launch(category)
     }
@@ -163,6 +181,18 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         if (index < size - 1) {
             reorderFavorites(index, index + 1)
         }
+    }
+
+    private val _isNewsSetupOpen = MutableStateFlow(false)
+    val isNewsSetupOpen: StateFlow<Boolean> = _isNewsSetupOpen.asStateFlow()
+
+    fun openNewsSetup() {
+        _isNewsSetupOpen.value = true
+        vibrateClick()
+    }
+
+    fun closeNewsSetup() {
+        _isNewsSetupOpen.value = false
     }
 
     private val _isAddWidgetOpen = MutableStateFlow(false)
@@ -289,6 +319,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         _isSettingsOpen.value = false
         _isNotificationCenterOpen.value = false
         _isDiscoverOpen.value = false
+        _isNewsSetupOpen.value = false
         _isAddWidgetOpen.value = false
         _editingNoteWidget.value = null
         _isCarouselCustomizeOpen.value = false

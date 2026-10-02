@@ -171,6 +171,9 @@ fun NiagaraLauncherScreen(
     val autoWallpaperBitmap by viewModel.autoWallpaperBitmap.collectAsState()
     val isWallpaperSwitching by viewModel.isWallpaperSwitching.collectAsState()
     val isReorderFavoritesOpen by viewModel.isReorderFavoritesOpen.collectAsState()
+    val newsState by viewModel.newsState.collectAsState()
+    val newsPreferences by viewModel.newsPreferences.collectAsState()
+    val isNewsSetupOpen by viewModel.isNewsSetupOpen.collectAsState()
 
     val context = LocalContext.current
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -364,7 +367,7 @@ fun NiagaraLauncherScreen(
     val isAnyPanelOpen = isSearchOpen || isSettingsOpen || isNotificationCenterOpen ||
         isAddWidgetOpen || (editingNoteWidget != null) || isReorderFavoritesOpen ||
         isCarouselCustomizeOpen || (activeAppForPopup != null) ||
-        (dockPickerSlot != null) || isSecretLabOpen || isDebugOverlayOpen || isDiscoverOpen || (activeUsageBreakerApp != null)
+        (dockPickerSlot != null) || isSecretLabOpen || isDebugOverlayOpen || isDiscoverOpen || (activeUsageBreakerApp != null) || isNewsSetupOpen
 
     // Handle system back gesture / back button defensively
     BackHandler(enabled = isAnyPanelOpen || isSleepOverlayVisible || isOnboardingOpen || pagerState.currentPage != 1) {
@@ -372,6 +375,7 @@ fun NiagaraLauncherScreen(
             isSleepOverlayVisible -> viewModel.dismissSleepOverlay()
             activeAppForPopup != null -> viewModel.closeAppPopup()
             activeUsageBreakerApp != null -> viewModel.cancelUsageBreaker()
+            isNewsSetupOpen -> viewModel.closeNewsSetup()
             isReorderFavoritesOpen -> viewModel.closeReorderFavorites()
             isSearchOpen -> viewModel.closeSearch()
             isNotificationCenterOpen -> viewModel.closeNotificationCenter()
@@ -458,6 +462,11 @@ fun NiagaraLauncherScreen(
                             // 2. Left most page houses widgets - user can customize (CRUD)
                             LeftWidgetsScreen(
                                 widgets = leftWidgets,
+                                newsState = newsState,
+                                newsPreferences = newsPreferences,
+                                onRefreshNews = { viewModel.refreshNews(force = true) },
+                                onOpenNewsSetup = { viewModel.openNewsSetup() },
+                                onOpenArticle = { url -> context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) },
                                 weather = weather,
                                 mediaPlayer = mediaPlayer,
                                 calendarEvents = calendarEvents,
@@ -496,6 +505,11 @@ fun NiagaraLauncherScreen(
                             // 4. Center page: Swipable 4x2 widgets above favorites, NO alphabet scrollbar
                             CenterHomeScreen(
                                 carouselWidgets = carouselWidgets,
+                                newsState = newsState,
+                                newsPreferences = newsPreferences,
+                                onRefreshNews = { viewModel.refreshNews(force = true) },
+                                onOpenNewsSetup = { viewModel.openNewsSetup() },
+                                onOpenArticle = { url -> context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) },
                                 favorites = favorites,
                                 isAppsLoading = isAppsLoading,
                                 settings = settings,
@@ -697,6 +711,21 @@ fun NiagaraLauncherScreen(
                 onRemoveWidget = { viewModel.removeCarouselWidget(it) },
                 onReorder = { from, to -> viewModel.reorderCarouselWidget(from, to) },
                 onDismiss = { viewModel.closeCarouselCustomize() }
+            )
+        }
+
+        // News Setup Sheet
+        if (isNewsSetupOpen) {
+            NewsWidgetSetupSheet(
+                initial = newsPreferences,
+                blurRadius = settings.frostedBlurRadius,
+                translucency = settings.frostedTranslucency,
+                glassEffect = settings.frostedGlassEffect,
+                onSave = { prefs ->
+                    viewModel.saveNewsPreferences(prefs)
+                    viewModel.closeNewsSetup()
+                },
+                onDismiss = { viewModel.closeNewsSetup() }
             )
         }
 
