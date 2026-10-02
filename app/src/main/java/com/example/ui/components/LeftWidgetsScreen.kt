@@ -4,7 +4,9 @@ package com.example.ui.components
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.os.Build
 import android.appwidget.AppWidgetManager
+import android.appwidget.AppWidgetProviderInfo
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -22,6 +24,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -29,6 +33,7 @@ import androidx.compose.ui.unit.sp
 import com.example.data.*
 import com.example.data.NewsFeedState
 import com.example.data.NewsPreferencesState
+import com.example.ui.theme.GlassStyle
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -47,10 +52,8 @@ fun LeftWidgetsScreen(
     isHeadphonesConnected: Boolean,
     newsState: com.example.data.NewsFeedState = com.example.data.NewsFeedState.NeedsApiKey,
     newsPreferences: com.example.data.NewsPreferencesState = com.example.data.NewsPreferencesState(),
-    isFrostedTheme: Boolean = false,
-    blurRadius: Float = 15f,
-    translucency: Float = 0.30f,
-    glassEffect: Float = 0.30f,
+    glass: GlassStyle = GlassStyle(),
+    cardCornerRadius: Float = 20f,
     appWidgetHost: android.appwidget.AppWidgetHost? = null,
     appWidgetManager: android.appwidget.AppWidgetManager? = null,
     onAddWidgetClick: () -> Unit,
@@ -77,11 +80,12 @@ fun LeftWidgetsScreen(
     var isEditMode by remember { mutableStateOf(false) }
     var selectedWidgetForOptions by remember { mutableStateOf<CustomWidgetConfig?>(null) }
 
+    val blurRadius = glass.blurDp
+    val translucency = glass.translucency
+    val glassEffect = glass.specular
+
     FrostedGlassBackground(
-        isFrostedTheme = isFrostedTheme,
-        blurStrength = blurRadius,
-        translucency = translucency,
-        glassEffect = glassEffect,
+        glass = glass,
         modifier = modifier.testTag("left_widgets_screen")
     ) {
         if (selectedWidgetForOptions != null) {
@@ -109,7 +113,8 @@ fun LeftWidgetsScreen(
                     onDeleteWidget(targetWidget.id)
                     selectedWidgetForOptions = null
                 },
-                onDismiss = { selectedWidgetForOptions = null }
+                onDismiss = { selectedWidgetForOptions = null },
+                glass = glass
             )
         }
         Column(
@@ -246,9 +251,8 @@ fun LeftWidgetsScreen(
                             isHeadphonesConnected = isHeadphonesConnected,
                             newsState = newsState,
                             newsPreferences = newsPreferences,
-                            blurRadius = blurRadius,
-                            translucency = translucency,
-                            glassEffect = glassEffect,
+                            glass = glass,
+                            cardCornerRadius = cardCornerRadius,
                             appWidgetHost = appWidgetHost,
                             appWidgetManager = appWidgetManager,
                             onOptionsClick = { selectedWidgetForOptions = item },
@@ -291,9 +295,8 @@ private fun LeftWidgetCardWrapper(
     isHeadphonesConnected: Boolean,
     newsState: NewsFeedState = NewsFeedState.NeedsApiKey,
     newsPreferences: NewsPreferencesState = NewsPreferencesState(),
-    blurRadius: Float = 15f,
-    translucency: Float = 0.30f,
-    glassEffect: Float = 0.30f,
+    glass: GlassStyle = GlassStyle(),
+    cardCornerRadius: Float = 20f,
     appWidgetHost: android.appwidget.AppWidgetHost? = null,
     appWidgetManager: android.appwidget.AppWidgetManager? = null,
     onOptionsClick: () -> Unit = {},
@@ -315,16 +318,29 @@ private fun LeftWidgetCardWrapper(
     onReplyNotification: (packageName: String, text: String, isDualApp: Boolean) -> Unit = { _, _, _ -> },
     onUpdateSize: (String) -> Unit = {}
 ) {
-    FrostedGlassPanel(
-        cornerRadius = 20.dp,
-        blurRadius = blurRadius.dp,
-        translucency = translucency,
-        glassEffect = glassEffect,
-        modifier = Modifier
-            .fillMaxWidth()
-            .testTag("left_widget_${widget.id}")
-    ) {
-        Column(modifier = Modifier.padding(14.dp)) {
+    if (widget.chromeMode == WidgetChromeMode.NONE || widget.type == WidgetType.SYSTEM_WIDGET) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("left_widget_chrome_none_${widget.id}")
+        ) {
+            SystemAppWidgetView(
+                appWidgetId = widget.appWidgetId,
+                heightCategory = widget.heightCategory,
+                appWidgetHost = appWidgetHost,
+                appWidgetManager = appWidgetManager,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    } else {
+        FrostedGlassPanel(
+            cornerRadius = cardCornerRadius.dp,
+            glass = glass,
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("left_widget_${widget.id}")
+        ) {
+            Column(modifier = Modifier.padding(14.dp)) {
             // Card Title Header
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -453,9 +469,6 @@ private fun LeftWidgetCardWrapper(
                             state = newsState,
                             prefs = newsPreferences,
                             size = widget.heightCategory,
-                            blurRadius = blurRadius,
-                            translucency = translucency,
-                            glassEffect = glassEffect,
                             isEmbeddedInCard = true,
                             onOpenArticle = onOpenArticle,
                             onOpenSetup = onOpenNewsSetup,
@@ -493,6 +506,7 @@ private fun LeftWidgetCardWrapper(
             }
         }
     }
+}
 }
 
 @Composable
@@ -1278,9 +1292,7 @@ fun AddWidgetDialog(
     availableWidgets: List<WidgetType> = WidgetType.entries,
     onAddWidget: (WidgetType) -> Unit,
     onDismiss: () -> Unit,
-    blurRadius: Float = 15f,
-    translucency: Float = 0.30f,
-    glassEffect: Float = 0.30f
+    glass: GlassStyle = GlassStyle()
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -1290,9 +1302,7 @@ fun AddWidgetDialog(
     ) {
         FrostedGlassPanel(
             cornerRadius = 28.dp,
-            blurRadius = blurRadius.dp,
-            translucency = translucency,
-            glassEffect = glassEffect,
+            glass = glass,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 12.dp)
@@ -1478,18 +1488,22 @@ fun SystemAppWidgetView(
         return
     }
 
-    val minHeightDpInt = targetHeight.value.toInt()
-    val minWidthDpInt = 280
-    val maxHeightDpInt = targetHeight.value.toInt()
-    val maxWidthDpInt = 380
+    val density = LocalDensity.current
+    var measuredWidthDp by remember { mutableStateOf(320) }
+    var measuredHeightDp by remember { mutableStateOf(targetHeight.value.toInt()) }
 
-    LaunchedEffect(appWidgetId, heightCategory) {
+    LaunchedEffect(appWidgetId, heightCategory, measuredWidthDp, measuredHeightDp) {
         try {
+            val minWidth = if (Build.VERSION.SDK_INT >= 24 && (info.resizeMode and AppWidgetProviderInfo.RESIZE_HORIZONTAL) == 0) measuredWidthDp else measuredWidthDp
+            val maxWidth = measuredWidthDp
+            val minHeight = if (Build.VERSION.SDK_INT >= 24 && (info.resizeMode and AppWidgetProviderInfo.RESIZE_VERTICAL) == 0) measuredHeightDp else measuredHeightDp
+            val maxHeight = measuredHeightDp
+
             val options = Bundle().apply {
-                putInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, minWidthDpInt)
-                putInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, maxWidthDpInt)
-                putInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, minHeightDpInt)
-                putInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, maxHeightDpInt)
+                putInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, minWidth)
+                putInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, maxWidth)
+                putInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, minHeight)
+                putInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, maxHeight)
             }
             appWidgetManager.updateAppWidgetOptions(appWidgetId, options)
         } catch (_: Throwable) {}
@@ -1500,16 +1514,6 @@ fun SystemAppWidgetView(
             try {
                 val hostView = appWidgetHost.createView(ctx, appWidgetId, info)
                 hostView.setAppWidget(appWidgetId, info)
-                try {
-                    val options = Bundle().apply {
-                        putInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, minWidthDpInt)
-                        putInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, maxWidthDpInt)
-                        putInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, minHeightDpInt)
-                        putInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, maxHeightDpInt)
-                    }
-                    @Suppress("DEPRECATION")
-                    hostView.updateAppWidgetSize(options, minWidthDpInt, minHeightDpInt, maxWidthDpInt, maxHeightDpInt)
-                } catch (_: Throwable) {}
                 hostView
             } catch (e: Throwable) {
                 android.widget.TextView(ctx).apply {
@@ -1518,24 +1522,25 @@ fun SystemAppWidgetView(
                 }
             }
         },
-        update = { view ->
+        update = { _ -> },
+        onRelease = { view ->
             try {
-                val hostView = view as? android.appwidget.AppWidgetHostView
-                if (hostView != null) {
-                    val options = Bundle().apply {
-                        putInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, minWidthDpInt)
-                        putInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, maxWidthDpInt)
-                        putInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, minHeightDpInt)
-                        putInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, maxHeightDpInt)
-                    }
-                    @Suppress("DEPRECATION")
-                    hostView.updateAppWidgetSize(options, minWidthDpInt, minHeightDpInt, maxWidthDpInt, maxHeightDpInt)
+                (view as? android.appwidget.AppWidgetHostView)?.let { host ->
+                    host.removeAllViews()
                 }
             } catch (_: Throwable) {}
         },
         modifier = modifier
             .fillMaxWidth()
             .height(targetHeight)
+            .onSizeChanged { size ->
+                if (size.width > 0 && size.height > 0) {
+                    with(density) {
+                        measuredWidthDp = size.width.toDp().value.toInt().coerceAtLeast(50)
+                        measuredHeightDp = size.height.toDp().value.toInt().coerceAtLeast(50)
+                    }
+                }
+            }
     )
 }
 
@@ -1553,9 +1558,7 @@ fun WidgetResizeAndOptionsSheet(
     onMoveDown: () -> Unit,
     onDelete: () -> Unit,
     onDismiss: () -> Unit,
-    blurRadius: Float = 15f,
-    translucency: Float = 0.30f,
-    glassEffect: Float = 0.30f
+    glass: GlassStyle = GlassStyle()
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -1566,9 +1569,7 @@ fun WidgetResizeAndOptionsSheet(
     ) {
         FrostedGlassPanel(
             cornerRadius = 28.dp,
-            blurRadius = blurRadius.dp,
-            translucency = translucency,
-            glassEffect = glassEffect,
+            glass = glass,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 12.dp)

@@ -175,6 +175,15 @@ fun NiagaraLauncherScreen(
     val newsPreferences by viewModel.newsPreferences.collectAsState()
     val isNewsSetupOpen by viewModel.isNewsSetupOpen.collectAsState()
 
+    val glass = remember(settings.frostedTranslucency, settings.frostedBlurRadius, settings.frostedGlassEffect, settings.themePreset) {
+        com.example.ui.theme.GlassStyle.create(
+            translucency = settings.frostedTranslucency,
+            blurDp = settings.frostedBlurRadius,
+            specular = settings.frostedGlassEffect,
+            preset = settings.themePreset
+        )
+    }
+
     val context = LocalContext.current
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
@@ -212,6 +221,8 @@ fun NiagaraLauncherScreen(
                 try {
                     appWidgetHost.startListening()
                 } catch (_: Throwable) {}
+            } else if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                viewModel.loadSystemWallpaper()
             } else if (event == androidx.lifecycle.Lifecycle.Event.ON_STOP) {
                 try {
                     appWidgetHost.stopListening()
@@ -408,13 +419,18 @@ fun NiagaraLauncherScreen(
         Modifier
     }
 
+    val doubleTapToSleepEnabled = settings.doubleTapToSleep
+    val triggerSleepState = rememberUpdatedState { viewModel.triggerDoubleTapSleep() }
+
     Box(
         modifier = modifier
             .fillMaxSize()
-            .pointerInput(settings.doubleTapToSleep) {
+            .pointerInput(Unit) {
                 detectTapGestures(
                     onDoubleTap = {
-                        viewModel.triggerDoubleTapSleep()
+                        if (doubleTapToSleepEnabled) {
+                            triggerSleepState.value()
+                        }
                     }
                 )
             }
@@ -447,13 +463,14 @@ fun NiagaraLauncherScreen(
                 val pageOffset = ((pagerState.currentPage - page) + pagerState.currentPageOffsetFraction)
                 val pageScale = (1f - 0.04f * kotlin.math.abs(pageOffset)).coerceIn(0.92f, 1f)
                 val pageAlpha = (1f - 0.25f * kotlin.math.abs(pageOffset)).coerceIn(0.65f, 1f)
+                val isSwiping = kotlin.math.abs(pageOffset) > 0.001f
 
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
                         .graphicsLayer {
-                            scaleX = pageScale
-                            scaleY = pageScale
+                            scaleX = if (isSwiping) pageScale else 1f
+                            scaleY = if (isSwiping) pageScale else 1f
                             alpha = pageAlpha
                         }
                 ) {
@@ -471,10 +488,8 @@ fun NiagaraLauncherScreen(
                                 mediaPlayer = mediaPlayer,
                                 calendarEvents = calendarEvents,
                                 isHeadphonesConnected = settings.isHeadphonesConnected,
-                                isFrostedTheme = settings.themePreset == LauncherThemePreset.FROSTED_GLASS,
-                                blurRadius = settings.frostedBlurRadius,
-                                translucency = settings.frostedTranslucency,
-                                glassEffect = settings.frostedGlassEffect,
+                                glass = glass,
+                                cardCornerRadius = settings.cardCornerRadius,
                                 appWidgetHost = appWidgetHost,
                                 appWidgetManager = appWidgetManager,
                                 onAddWidgetClick = { viewModel.openAddWidgetDialog() },
@@ -647,10 +662,8 @@ fun NiagaraLauncherScreen(
                 blurBackground = settings.dockBlurBackground,
                 slotCount = settings.dockSlotCount,
                 iconScale = settings.dockIconScale,
-                isFrostedTheme = settings.themePreset == LauncherThemePreset.FROSTED_GLASS,
-                blurRadius = settings.frostedBlurRadius,
-                translucency = settings.frostedTranslucency,
-                glassEffect = settings.frostedGlassEffect,
+                cardCornerRadius = settings.cardCornerRadius,
+                glass = glass,
                 onAppClick = { viewModel.launchApp(it) },
                 onAppLongClick = { slotIndex -> viewModel.openDockPicker(slotIndex) },
                 modifier = Modifier.align(Alignment.BottomCenter)
@@ -668,9 +681,7 @@ fun NiagaraLauncherScreen(
                 slotIndex = slotIndex,
                 allApps = allApps,
                 iconPackType = settings.iconPackType,
-                blurRadius = settings.frostedBlurRadius,
-                translucency = settings.frostedTranslucency,
-                glassEffect = settings.frostedGlassEffect,
+                glass = glass,
                 onSelectApp = { app -> viewModel.selectDockApp(slotIndex, app) },
                 onDismiss = { viewModel.closeDockPicker() }
             )
@@ -680,9 +691,7 @@ fun NiagaraLauncherScreen(
         if (isAddWidgetOpen) {
             AddWidgetDialog(
                 availableWidgets = availableWidgetTypes,
-                blurRadius = settings.frostedBlurRadius,
-                translucency = settings.frostedTranslucency,
-                glassEffect = settings.frostedGlassEffect,
+                glass = glass,
                 onAddWidget = { type -> viewModel.addLeftWidget(type) },
                 onDismiss = { viewModel.closeAddWidgetDialog() }
             )
@@ -704,9 +713,7 @@ fun NiagaraLauncherScreen(
             CarouselCustomizeDialog(
                 currentWidgets = carouselWidgets,
                 availableWidgets = availableWidgetTypes,
-                blurRadius = settings.frostedBlurRadius,
-                translucency = settings.frostedTranslucency,
-                glassEffect = settings.frostedGlassEffect,
+                glass = glass,
                 onAddWidget = { viewModel.addCarouselWidget(it) },
                 onRemoveWidget = { viewModel.removeCarouselWidget(it) },
                 onReorder = { from, to -> viewModel.reorderCarouselWidget(from, to) },
@@ -718,9 +725,7 @@ fun NiagaraLauncherScreen(
         if (isNewsSetupOpen) {
             NewsWidgetSetupSheet(
                 initial = newsPreferences,
-                blurRadius = settings.frostedBlurRadius,
-                translucency = settings.frostedTranslucency,
-                glassEffect = settings.frostedGlassEffect,
+                glass = glass,
                 onSave = { prefs ->
                     viewModel.saveNewsPreferences(prefs)
                     viewModel.closeNewsSetup()
@@ -736,9 +741,7 @@ fun NiagaraLauncherScreen(
                 mathResult = mathResult,
                 filteredApps = searchFilteredApps,
                 iconPackType = settings.iconPackType,
-                blurRadius = settings.frostedBlurRadius,
-                translucency = settings.frostedTranslucency,
-                glassEffect = settings.frostedGlassEffect,
+                glass = glass,
                 onQueryChange = { viewModel.onSearchQueryChange(it) },
                 onAppClick = { app ->
                     viewModel.closeSearch()
@@ -751,9 +754,7 @@ fun NiagaraLauncherScreen(
         // Google Discover Sheet
         if (isDiscoverOpen) {
             GoogleDiscoverSheet(
-                blurRadius = settings.frostedBlurRadius,
-                translucency = settings.frostedTranslucency,
-                glassEffect = settings.frostedGlassEffect,
+                glass = glass,
                 onDismiss = { viewModel.closeDiscover() }
             )
         }
@@ -761,9 +762,7 @@ fun NiagaraLauncherScreen(
         // System App Widget Picker Sheet
         if (isSystemWidgetPickerOpen) {
             SystemWidgetPickerSheet(
-                blurRadius = settings.frostedBlurRadius,
-                translucency = settings.frostedTranslucency,
-                glassEffect = settings.frostedGlassEffect,
+                glass = glass,
                 onSelectWidget = { providerInfo, heightCat ->
                     isSystemWidgetPickerOpen = false
                     try {
@@ -816,9 +815,7 @@ fun NiagaraLauncherScreen(
         if (isNotificationCenterOpen) {
             NotificationCenterSheet(
                 notifications = activeNotifications,
-                blurRadius = settings.frostedBlurRadius,
-                translucency = settings.frostedTranslucency,
-                glassEffect = settings.frostedGlassEffect,
+                glass = glass,
                 onDismissNotification = { pkg -> viewModel.dismissNotification(pkg) },
                 onReplyNotification = { pkg, text -> viewModel.replyToNotification(pkg, text) },
                 onClearAll = { viewModel.clearAllNotifications() },
@@ -940,9 +937,7 @@ fun NiagaraLauncherScreen(
                 onToggleUsageBreaker = { viewModel.toggleUsageBreaker(app.packageName) },
                 onDisguiseApp = { newName -> viewModel.repository.disguiseApp(app.packageName, newName) },
                 onAssignCategory = { cat -> viewModel.setAppCategory(app.packageName, cat) },
-                blurRadius = settings.frostedBlurRadius,
-                translucency = settings.frostedTranslucency,
-                glassEffect = settings.frostedGlassEffect
+                glass = glass
             )
         }
 

@@ -56,12 +56,12 @@ enum class ClockStyle(val displayName: String) {
     COMPACT("Inline Minimal")
 }
 
-enum class WallpaperStyle(val displayName: String) {
-    SYSTEM_DEVICE("Device Wallpaper"),
-    FLUX_EMBLEM("Flux Signature Wallpaper"),
-    FLUX_MINIMAL_GRADIENT("Flux Soft Gradient"),
-    SYSTEM_SOLID("Solid Dark Theme"),
-    AUTO_ALBUM("Daily Auto Wallpaper Album")
+enum class WallpaperStyle(val displayName: String, val usesDeviceOrAutoBitmap: Boolean) {
+    SYSTEM_DEVICE("Device Wallpaper", true),
+    FLUX_EMBLEM("Flux Signature Wallpaper", false),
+    FLUX_MINIMAL_GRADIENT("Flux Soft Gradient", false),
+    SOLID_DARK("Solid Dark Theme", false),
+    AUTO_ALBUM("Daily Auto Wallpaper Album", true)
 }
 
 enum class AutoWallpaperSource(val displayName: String, val subtitle: String, val iconEmoji: String) {
@@ -227,7 +227,7 @@ data class LauncherSettings(
     val clockColorTintHex: String = "#FFFFFF",
     val iconPackType: IconPackType = IconPackType.DEFAULT_APP,
     val themePreset: LauncherThemePreset = LauncherThemePreset.FLUX_EMERALD,
-    val wallpaperStyle: WallpaperStyle = WallpaperStyle.FLUX_EMBLEM,
+    val wallpaperStyle: WallpaperStyle = WallpaperStyle.SYSTEM_DEVICE,
     val customFont: AppFontFamily = AppFontFamily.MODERN_SANS,
     val fontScale: Float = 1.0f,
     val hapticFeedback: Boolean = true,
@@ -245,6 +245,7 @@ data class LauncherSettings(
     val frostedTranslucency: Float = 0.30f,
     val frostedBlurRadius: Float = 15f,
     val frostedGlassEffect: Float = 0.30f,
+    val cardCornerRadius: Float = 20f,
     val showAppNotificationBadges: Boolean = true,
     val compactAppRowSpacing: Boolean = false,
     val favoritesTopSpacing: FavoritesTopSpacing = FavoritesTopSpacing.LOW,
@@ -273,6 +274,11 @@ enum class WidgetType(val displayName: String, val description: String, val icon
     DUAL_CLOCK("World Time", "Local time & secondary timezone", "🌍")
 }
 
+enum class WidgetChromeMode {
+    LAUNCHER,
+    NONE
+}
+
 data class CustomWidgetConfig(
     val id: String,
     val type: WidgetType,
@@ -280,7 +286,8 @@ data class CustomWidgetConfig(
     val content: String = "",
     val isEnabled: Boolean = true,
     val heightCategory: String = "4x2", // "4x1", "4x2", "4x3", "4x4"
-    val appWidgetId: Int = -1
+    val appWidgetId: Int = -1,
+    val chromeMode: WidgetChromeMode = if (type == WidgetType.SYSTEM_WIDGET) WidgetChromeMode.NONE else WidgetChromeMode.LAUNCHER
 )
 
 data class NewsStory(

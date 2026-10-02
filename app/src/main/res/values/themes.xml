@@ -3,5 +3,6 @@
     <style name="Theme.MyApplication" parent="android:Theme.DeviceDefault.NoActionBar">
         <item name="android:windowShowWallpaper">true</item>
         <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:forceDarkAllowed">false</item>
     </style>
 </resources>

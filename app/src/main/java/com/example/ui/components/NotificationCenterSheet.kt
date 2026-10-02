@@ -30,6 +30,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.NotificationItem
+import com.example.ui.theme.GlassStyle
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -41,9 +42,7 @@ import java.util.*
 @Composable
 fun NotificationCenterSheet(
     notifications: Map<String, NotificationItem>,
-    blurRadius: Float = 15f,
-    translucency: Float = 0.30f,
-    glassEffect: Float = 0.30f,
+    glass: GlassStyle = GlassStyle(),
     onDismissNotification: (String) -> Unit,
     onReplyNotification: (packageName: String, text: String) -> Unit,
     onClearAll: () -> Unit,
@@ -52,6 +51,9 @@ fun NotificationCenterSheet(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val blurRadius = glass.blurDp
+    val translucency = glass.translucency
+    val glassEffect = glass.specular
     var isWifiOn by remember { mutableStateOf(true) }
     var isBluetoothOn by remember { mutableStateOf(true) }
     var isTorchOn by remember { mutableStateOf(false) }
@@ -78,9 +80,7 @@ fun NotificationCenterSheet(
     ) {
         FrostedGlassPanel(
             cornerRadius = 28.dp,
-            blurRadius = blurRadius.dp,
-            translucency = translucency,
-            glassEffect = glassEffect,
+            glass = glass,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 12.dp)

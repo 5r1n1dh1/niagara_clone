@@ -10,7 +10,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -20,96 +22,114 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.example.ui.theme.GlassStyle
 
 /**
- * Reusable Frosted Glass Container Panel
- *
- * CRITICAL FIX: The background blur & specular tint is rendered on a separate
- * background layer Box (`.matchParentSize()`). This ensures the backdrop underneath
- * is blurred, while foreground `content()` (text, icons, buttons) is rendered completely sharp and unblurred!
+ * Reusable Frosted Glass Container Panel conforming to GlassStyle with high-end aesthetic finish and zero halo edge bleed.
  */
 @Composable
 fun FrostedGlassPanel(
     modifier: Modifier = Modifier,
     cornerRadius: Dp = 20.dp,
-    blurRadius: Dp = 15.dp,
-    translucency: Float = 0.30f,
-    glassEffect: Float = 0.30f,
-    borderWidth: Dp = 0.75.dp,
+    glass: GlassStyle = GlassStyle(),
+    blurRadius: Dp = glass.blurDp.dp,
+    translucency: Float = glass.translucency,
+    glassEffect: Float = glass.specular,
+    borderWidth: Dp = 1.dp,
     shape: Shape = RoundedCornerShape(cornerRadius),
     content: @Composable BoxScope.() -> Unit
 ) {
+    val effectiveGlass = remember(glass, blurRadius, translucency, glassEffect) {
+        if (blurRadius.value != glass.blurDp || translucency != glass.translucency || glassEffect != glass.specular) {
+            glass.copy(
+                blurDp = blurRadius.value,
+                translucency = translucency,
+                specular = glassEffect
+            )
+        } else {
+            glass
+        }
+    }
+
     Box(
-        modifier = modifier,
+        modifier = modifier.clip(shape),
         propagateMinConstraints = true
     ) {
-        // 1. Background Blur & Specular Tint Layer (Only this layer is blurred)
-        Box(
-            modifier = Modifier
-                .matchParentSize()
-                .graphicsLayer {
-                    val blurPx = blurRadius.toPx().coerceIn(0f, 50f)
-                    if (blurPx > 0.5f && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                        try {
-                            renderEffect = RenderEffect
-                                .createBlurEffect(blurPx, blurPx, Shader.TileMode.CLAMP)
-                                .asComposeRenderEffect()
-                        } catch (_: Throwable) {
+        if (effectiveGlass.enabled) {
+            // 1. Background Blur & Specular Tint Layer (Hardware-accelerated GPU blur for battery efficiency, clipped to shape)
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .graphicsLayer {
+                        val blurPx = effectiveGlass.blurDp.dp.toPx().coerceIn(0f, 50f)
+                        if (blurPx > 0.5f && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                            try {
+                                renderEffect = RenderEffect
+                                    .createBlurEffect(blurPx, blurPx, Shader.TileMode.CLAMP)
+                                    .asComposeRenderEffect()
+                            } catch (_: Throwable) {
+                                renderEffect = null
+                            }
+                        } else {
                             renderEffect = null
                         }
-                    } else {
-                        renderEffect = null
+                        this.shape = shape
+                        this.clip = true
                     }
-                    clip = true
-                    this.shape = shape
-                }
-                .drawWithCache {
-                    val strokePx = borderWidth.toPx()
+                    .drawWithCache {
+                        val strokePx = borderWidth.toPx()
 
-                    // High-contrast dark base scrim to guarantee text readability on light or dark wallpapers
-                    val baseScrimBrush = Brush.verticalGradient(
-                        colors = listOf(
-                            Color(0xFF0F172A).copy(alpha = (translucency * 0.75f + 0.25f).coerceIn(0.20f, 0.90f)),
-                            Color(0xFF020617).copy(alpha = (translucency * 0.85f + 0.30f).coerceIn(0.25f, 0.95f))
-                        )
-                    )
-
-                    val specularBrush = Brush.linearGradient(
-                        colors = listOf(
-                            Color.White.copy(alpha = (glassEffect * 0.35f + 0.08f).coerceIn(0.05f, 0.75f)),
-                            Color.Transparent,
-                            Color.White.copy(alpha = (glassEffect * 0.15f).coerceIn(0.0f, 0.30f))
-                        )
-                    )
-
-                    val borderBrush = Brush.linearGradient(
-                        colors = listOf(
-                            Color.White.copy(alpha = 0.45f),
-                            Color.White.copy(alpha = 0.18f)
-                        )
-                    )
-
-                    onDrawBehind {
-                        // Draw dark high-contrast base scrim
-                        drawRect(brush = baseScrimBrush)
-
-                        // Draw glass specular highlight
-                        if (glassEffect > 0f) {
-                            drawRect(brush = specularBrush)
-                        }
-
-                        // Draw subtle white stroke border
-                        if (strokePx > 0f) {
-                            drawRect(
-                                brush = borderBrush,
-                                style = Stroke(width = strokePx)
+                        // Refined multi-stop glass scrim for organic depth
+                        val baseScrimBrush = Brush.verticalGradient(
+                            colors = listOf(
+                                Color(0xFF1E293B).copy(alpha = (effectiveGlass.translucency * 0.70f + 0.15f).coerceIn(0.15f, 0.85f)),
+                                Color(0xFF0F172A).copy(alpha = (effectiveGlass.translucency * 0.80f + 0.20f).coerceIn(0.20f, 0.90f)),
+                                Color(0xFF070B14).copy(alpha = (effectiveGlass.translucency * 0.90f + 0.25f).coerceIn(0.25f, 0.95f))
                             )
+                        )
+
+                        // Elegant diagonal specular light reflection
+                        val specularBrush = Brush.linearGradient(
+                            colors = listOf(
+                                Color.White.copy(alpha = (effectiveGlass.specular * 0.45f + 0.12f).coerceIn(0.08f, 0.80f)),
+                                Color.Transparent,
+                                Color.White.copy(alpha = (effectiveGlass.specular * 0.18f).coerceIn(0.01f, 0.35f))
+                            )
+                        )
+
+                        // Crisp dual-tone glass refraction border
+                        val borderBrush = Brush.linearGradient(
+                            colors = listOf(
+                                Color.White.copy(alpha = 0.65f),
+                                Color.White.copy(alpha = 0.22f),
+                                Color.White.copy(alpha = 0.08f)
+                            )
+                        )
+
+                        onDrawBehind {
+                            drawRect(brush = baseScrimBrush)
+                            if (effectiveGlass.specular > 0f) {
+                                drawRect(brush = specularBrush)
+                            }
+                            if (strokePx > 0f) {
+                                drawRect(
+                                    brush = borderBrush,
+                                    style = Stroke(width = strokePx)
+                                )
+                            }
                         }
                     }
-                }
-        )
+            )
+        } else {
+            // Non-frosted fallback surface
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f), shape)
+            )
+        }
 
-        // 2. Foreground Content Layer (Unblurred & Sharp)
+        // 2. Foreground Content Layer
         Box(
             modifier = Modifier,
             content = content
@@ -118,52 +138,37 @@ fun FrostedGlassPanel(
 }
 
 /**
- * Backward-compatible Frosted Glass Card component
- */
-@Composable
-fun FrostedGlassCard(
-    modifier: Modifier = Modifier,
-    shape: Shape = RoundedCornerShape(20.dp),
-    isFrostedTheme: Boolean = true,
-    blurRadius: Dp = 15.dp,
-    translucency: Float = 0.30f,
-    glassEffect: Float = 0.30f,
-    content: @Composable BoxScope.() -> Unit
-) {
-    FrostedGlassPanel(
-        modifier = modifier,
-        cornerRadius = 20.dp,
-        blurRadius = blurRadius,
-        translucency = translucency,
-        glassEffect = glassEffect,
-        shape = shape,
-        content = content
-    )
-}
-
-/**
  * Fullscreen Frosted Glass Screen Backdrop
  */
 @Composable
 fun FrostedGlassBackground(
     modifier: Modifier = Modifier,
-    isFrostedTheme: Boolean = true,
-    blurStrength: Float = 15f,
-    translucency: Float = 0.30f,
-    glassEffect: Float = 0.30f,
+    glass: GlassStyle = GlassStyle(),
+    isFrostedTheme: Boolean = glass.enabled,
+    blurStrength: Float = glass.blurDp,
+    translucency: Float = glass.translucency,
+    glassEffect: Float = glass.specular,
     content: @Composable BoxScope.() -> Unit
 ) {
-    Box(modifier = modifier.fillMaxSize()) {
-        val baseAlpha = translucency.coerceIn(0.05f, 0.95f)
-        val effectiveBlur = blurStrength.coerceAtLeast(0f).dp
+    val effectiveGlass = remember(glass, isFrostedTheme, blurStrength, translucency, glassEffect) {
+        if (!isFrostedTheme || blurStrength != glass.blurDp || translucency != glass.translucency || glassEffect != glass.specular) {
+            glass.copy(
+                enabled = isFrostedTheme,
+                blurDp = blurStrength,
+                translucency = translucency,
+                specular = glassEffect
+            )
+        } else {
+            glass
+        }
+    }
 
-        if (isFrostedTheme) {
+    Box(modifier = modifier.fillMaxSize()) {
+        if (effectiveGlass.enabled) {
             FrostedGlassPanel(
                 modifier = Modifier.fillMaxSize(),
                 cornerRadius = 0.dp,
-                blurRadius = effectiveBlur,
-                translucency = baseAlpha,
-                glassEffect = glassEffect,
+                glass = effectiveGlass,
                 borderWidth = 0.dp,
                 shape = RoundedCornerShape(0.dp)
             ) {

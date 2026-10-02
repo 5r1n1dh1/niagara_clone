@@ -44,16 +44,15 @@ fun FixedDock(
     showLabels: Boolean = false,
     blurBackground: Boolean = true,
     iconScale: Float = 1.0f,
-    isFrostedTheme: Boolean = false,
-    blurRadius: Float = 15f,
-    translucency: Float = 0.30f,
-    glassEffect: Float = 0.30f,
+    cardCornerRadius: Float = 28f,
+    glass: com.example.ui.theme.GlassStyle = com.example.ui.theme.GlassStyle(),
     onAppClick: (AppItem) -> Unit,
     onAppLongClick: (Int) -> Unit, // Slot index 0..(slotCount-1)
     modifier: Modifier = Modifier
 ) {
     val maxSlots = slotCount.coerceIn(3, 5)
     val displayApps = dockApps.take(maxSlots)
+    val effectiveGlass = if (blurBackground) glass else glass.copy(enabled = false)
 
     Box(
         modifier = modifier
@@ -64,10 +63,8 @@ fun FixedDock(
         contentAlignment = Alignment.Center
     ) {
         FrostedGlassPanel(
-            cornerRadius = 28.dp,
-            blurRadius = if (blurBackground) blurRadius.dp else 0.dp,
-            translucency = if (blurBackground) translucency else 0.15f,
-            glassEffect = if (blurBackground) glassEffect else 0f,
+            cornerRadius = cardCornerRadius.dp,
+            glass = effectiveGlass,
             modifier = Modifier
                 .wrapContentWidth()
                 .height(if (showLabels) (76 * iconScale).dp else (64 * iconScale).dp)
@@ -174,9 +171,7 @@ fun DockAppPickerDialog(
     iconPackType: IconPackType,
     onSelectApp: (AppItem) -> Unit,
     onDismiss: () -> Unit,
-    blurRadius: Float = 15f,
-    translucency: Float = 0.30f,
-    glassEffect: Float = 0.30f
+    glass: com.example.ui.theme.GlassStyle = com.example.ui.theme.GlassStyle()
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -186,9 +181,7 @@ fun DockAppPickerDialog(
     ) {
         FrostedGlassPanel(
             cornerRadius = 28.dp,
-            blurRadius = blurRadius.dp,
-            translucency = translucency,
-            glassEffect = glassEffect,
+            glass = glass,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 12.dp)

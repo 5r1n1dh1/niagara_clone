@@ -40,6 +40,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import com.example.ui.theme.GlassStyle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -132,9 +133,7 @@ fun AppPopupDrawer(
     onToggleUsageBreaker: () -> Unit,
     onDisguiseApp: (String?) -> Unit,
     onAssignCategory: ((String) -> Unit)? = null,
-    blurRadius: Float = 15f,
-    translucency: Float = 0.30f,
-    glassEffect: Float = 0.30f,
+    glass: GlassStyle = GlassStyle(),
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -175,9 +174,7 @@ fun AppPopupDrawer(
     ) {
         FrostedGlassPanel(
             cornerRadius = 28.dp,
-            blurRadius = blurRadius.dp,
-            translucency = translucency,
-            glassEffect = glassEffect,
+            glass = glass,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 12.dp)

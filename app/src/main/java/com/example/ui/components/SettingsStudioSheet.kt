@@ -39,6 +39,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.ui.theme.GlassStyle
 import com.example.data.*
 import com.example.service.FluxAccessibilityService
 import com.example.service.FluxNotificationListenerService
@@ -145,11 +146,17 @@ fun SettingsStudioSheet(
     val isNotificationAccessGranted = remember(context) { FluxNotificationListenerService.isNotificationAccessGranted(context) }
     val isAccessibilityGranted = remember(context) { FluxAccessibilityService.isServiceRunning() }
 
+    val glass = remember(settings.frostedTranslucency, settings.frostedBlurRadius, settings.frostedGlassEffect, settings.themePreset) {
+        GlassStyle.create(
+            translucency = settings.frostedTranslucency,
+            blurDp = settings.frostedBlurRadius,
+            specular = settings.frostedGlassEffect,
+            preset = settings.themePreset
+        )
+    }
+
     FrostedGlassBackground(
-        isFrostedTheme = true,
-        blurStrength = settings.frostedBlurRadius,
-        translucency = settings.frostedTranslucency,
-        glassEffect = settings.frostedGlassEffect,
+        glass = glass,
         modifier = modifier
             .fillMaxSize()
             .statusBarsPadding()
@@ -597,6 +604,7 @@ private fun AppearanceSettingsPage(
                 Spacer(modifier = Modifier.height(14.dp))
 
                 Text("Backdrop Wallpaper Source", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+                Text("Active Source: ${settings.wallpaperStyle.displayName}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(modifier = Modifier.height(8.dp))
                 LazyRow(
                     modifier = Modifier.fillMaxWidth(),
@@ -1023,6 +1031,21 @@ private fun AppearanceSettingsPage(
                     value = settings.frostedGlassEffect,
                     onValueChange = { onUpdateSettings(settings.copy(frostedGlassEffect = it)) },
                     valueRange = 0f..1f
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("Card Corner Radius", fontSize = 12.sp)
+                    Text("${settings.cardCornerRadius.toInt()} dp", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
+                Slider(
+                    value = settings.cardCornerRadius,
+                    onValueChange = { onUpdateSettings(settings.copy(cardCornerRadius = it)) },
+                    valueRange = 0f..40f
                 )
             }
         }

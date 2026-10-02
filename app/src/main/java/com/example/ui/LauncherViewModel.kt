@@ -59,12 +59,14 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val wpManager = WallpaperManager.getInstance(getApplication())
-                val drawable = wpManager.drawable
+                val drawable = try { wpManager.drawable ?: wpManager.peekDrawable() } catch (_: Throwable) { null }
                 if (drawable != null) {
-                    val bitmap = drawable.toBitmap(720, 1280, android.graphics.Bitmap.Config.ARGB_8888)
+                    val config = if (drawable.opacity == android.graphics.PixelFormat.OPAQUE) android.graphics.Bitmap.Config.RGB_565 else android.graphics.Bitmap.Config.ARGB_8888
+                    val bitmap = drawable.toBitmap(720, 1280, config)
                     _systemWallpaperBitmap.value = bitmap.asImageBitmap()
                 }
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                android.util.Log.e("LauncherViewModel", "Failed to load system wallpaper", e)
             }
         }
     }

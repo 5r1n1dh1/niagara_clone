@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.sp
 import com.example.data.*
 import com.example.data.NewsFeedState
 import com.example.data.NewsPreferencesState
+import com.example.ui.theme.GlassStyle
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -144,8 +145,10 @@ fun Carousel4x2WidgetCard(
                 WidgetType.SYSTEM_WIDGET -> {
                     SystemAppWidgetView(
                         appWidgetId = -1,
+                        heightCategory = "4x2",
                         appWidgetHost = appWidgetHost,
-                        appWidgetManager = appWidgetManager
+                        appWidgetManager = appWidgetManager,
+                        modifier = Modifier.fillMaxWidth()
                     )
                 }
                 WidgetType.QUICK_NOTE -> {
@@ -613,9 +616,7 @@ fun CarouselCustomizeDialog(
     onRemoveWidget: (WidgetType) -> Unit,
     onReorder: (from: Int, to: Int) -> Unit,
     onDismiss: () -> Unit,
-    blurRadius: Float = 15f,
-    translucency: Float = 0.30f,
-    glassEffect: Float = 0.30f
+    glass: GlassStyle = GlassStyle()
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -625,9 +626,7 @@ fun CarouselCustomizeDialog(
     ) {
         FrostedGlassPanel(
             cornerRadius = 28.dp,
-            blurRadius = blurRadius.dp,
-            translucency = translucency,
-            glassEffect = glassEffect,
+            glass = glass,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 12.dp)

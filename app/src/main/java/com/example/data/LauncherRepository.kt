@@ -302,7 +302,11 @@ class LauncherRepository(private val context: Context) :
             clockColorTintHex = prefs.getString("clock_tint_hex", "#FFFFFF") ?: "#FFFFFF",
             iconPackType = IconPackType.entries.getOrElse(prefs.getInt("icon_pack", 0)) { IconPackType.MATERIAL },
             themePreset = LauncherThemePreset.entries.getOrElse(prefs.getInt("theme_preset", LauncherThemePreset.FLUX_EMERALD.ordinal)) { LauncherThemePreset.FLUX_EMERALD },
-            wallpaperStyle = WallpaperStyle.entries.getOrElse(prefs.getInt("wallpaper_style", WallpaperStyle.FLUX_EMBLEM.ordinal)) { WallpaperStyle.FLUX_EMBLEM },
+            wallpaperStyle = if (prefs.contains("wallpaper_style")) {
+                WallpaperStyle.entries.getOrElse(prefs.getInt("wallpaper_style", WallpaperStyle.SYSTEM_DEVICE.ordinal)) { WallpaperStyle.SYSTEM_DEVICE }
+            } else {
+                WallpaperStyle.SYSTEM_DEVICE
+            },
             customFont = AppFontFamily.entries.getOrElse(prefs.getInt("custom_font", 0)) { AppFontFamily.MODERN_SANS },
             fontScale = prefs.getFloat("font_scale", 1.0f),
             hapticFeedback = prefs.getBoolean("haptic_feedback", true),
@@ -318,6 +322,7 @@ class LauncherRepository(private val context: Context) :
             frostedTranslucency = prefs.getFloat("frosted_translucency", 0.30f),
             frostedBlurRadius = prefs.getFloat("frosted_blur_radius", 15f),
             frostedGlassEffect = prefs.getFloat("frosted_glass_effect", 0.30f),
+            cardCornerRadius = prefs.getFloat("card_corner_radius", 20f),
             showAppNotificationBadges = prefs.getBoolean("app_notif_badges", true),
             compactAppRowSpacing = prefs.getBoolean("compact_row_spacing", false),
             favoritesTopSpacing = FavoritesTopSpacing.entries.getOrElse(prefs.getInt("fav_top_spacing", FavoritesTopSpacing.LOW.ordinal)) { FavoritesTopSpacing.LOW },
@@ -363,6 +368,7 @@ class LauncherRepository(private val context: Context) :
             .putFloat("frosted_translucency", newSettings.frostedTranslucency)
             .putFloat("frosted_blur_radius", newSettings.frostedBlurRadius)
             .putFloat("frosted_glass_effect", newSettings.frostedGlassEffect)
+            .putFloat("card_corner_radius", newSettings.cardCornerRadius)
             .putBoolean("app_notif_badges", newSettings.showAppNotificationBadges)
             .putBoolean("compact_row_spacing", newSettings.compactAppRowSpacing)
             .putInt("fav_top_spacing", newSettings.favoritesTopSpacing.ordinal)

@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.AppItem
 import com.example.data.IconPackType
+import com.example.ui.theme.GlassStyle
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -44,9 +45,7 @@ fun UnifiedSearchSheet(
     onQueryChange: (String) -> Unit,
     onAppClick: (AppItem) -> Unit,
     onDismiss: () -> Unit,
-    blurRadius: Float = 15f,
-    translucency: Float = 0.30f,
-    glassEffect: Float = 0.30f,
+    glass: GlassStyle = GlassStyle(),
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -74,9 +73,7 @@ fun UnifiedSearchSheet(
     ) {
         FrostedGlassPanel(
             cornerRadius = 28.dp,
-            blurRadius = blurRadius.dp,
-            translucency = translucency,
-            glassEffect = glassEffect,
+            glass = glass,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 12.dp)

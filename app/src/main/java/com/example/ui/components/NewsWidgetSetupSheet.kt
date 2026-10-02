@@ -22,14 +22,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.NewsPreferencesState
 import com.example.domain.RemoteConfig
+import com.example.ui.theme.GlassStyle
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NewsWidgetSetupSheet(
     initial: NewsPreferencesState,
-    blurRadius: Float,
-    translucency: Float,
-    glassEffect: Float,
+    glass: GlassStyle = GlassStyle(),
     onSave: (NewsPreferencesState) -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -49,9 +48,7 @@ fun NewsWidgetSetupSheet(
     ) {
         FrostedGlassPanel(
             cornerRadius = 28.dp,
-            blurRadius = blurRadius.dp,
-            translucency = translucency,
-            glassEffect = glassEffect,
+            glass = glass,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 12.dp)

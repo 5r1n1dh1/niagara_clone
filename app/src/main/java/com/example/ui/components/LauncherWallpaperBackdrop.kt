@@ -85,6 +85,7 @@ fun LauncherWallpaperBackdrop(
     val blurRadiusPx = effectiveBlur.value.toInt().coerceIn(0, 50)
 
     var softwareBlurredBitmap by remember(activeWallpaperBitmap, blurRadiusPx) { mutableStateOf<ImageBitmap?>(null) }
+    var wallpaperLuminance by remember(activeWallpaperBitmap, systemWallpaperBitmap) { mutableStateOf(0.45f) }
 
     LaunchedEffect(activeWallpaperBitmap, blurRadiusPx) {
         val sourceBitmap = activeWallpaperBitmap ?: systemWallpaperBitmap
@@ -108,6 +109,32 @@ fun LauncherWallpaperBackdrop(
         }
     }
 
+    LaunchedEffect(activeWallpaperBitmap, systemWallpaperBitmap) {
+        val src = activeWallpaperBitmap ?: systemWallpaperBitmap
+        if (src != null) {
+            withContext(Dispatchers.Default) {
+                try {
+                    val bmp = src.asAndroidBitmap()
+                    val smallBmp = android.graphics.Bitmap.createScaledBitmap(bmp, 32, 32, true)
+                    var totalLuma = 0f
+                    val pixelCount = 32 * 32
+                    val pixels = IntArray(pixelCount)
+                    smallBmp.getPixels(pixels, 0, 32, 0, 0, 32, 32)
+                    for (pixel in pixels) {
+                        val red = android.graphics.Color.red(pixel) / 255f
+                        val green = android.graphics.Color.green(pixel) / 255f
+                        val blue = android.graphics.Color.blue(pixel) / 255f
+                        val luma = 0.299f * red + 0.587f * green + 0.114f * blue
+                        totalLuma += luma
+                    }
+                    wallpaperLuminance = (totalLuma / pixelCount).coerceIn(0f, 1f)
+                } catch (_: Exception) {
+                    wallpaperLuminance = 0.45f
+                }
+            }
+        }
+    }
+
     val blurModifier = if (effectiveBlur > 0.5.dp && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
         Modifier.blur(effectiveBlur)
     } else {
@@ -116,11 +143,12 @@ fun LauncherWallpaperBackdrop(
 
     val isSystemWallpaper = wallpaperStyle == WallpaperStyle.SYSTEM_DEVICE
     val isAutoWallpaper = wallpaperStyle == WallpaperStyle.AUTO_ALBUM
+    val usesBitmap = wallpaperStyle.usesDeviceOrAutoBitmap
 
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(if (isFrosted || isSystemWallpaper || isAutoWallpaper) Color.Transparent else bgColor)
+            .background(if (usesBitmap) Color.Transparent else bgColor)
     ) {
         // Wallpaper base layer
         Box(
@@ -129,7 +157,7 @@ fun LauncherWallpaperBackdrop(
                 .then(blurModifier)
         ) {
             val wpToUse = softwareBlurredBitmap ?: activeWallpaperBitmap ?: systemWallpaperBitmap
-            if (wpToUse != null && (isSystemWallpaper || isAutoWallpaper || isFrosted)) {
+            if (wpToUse != null && usesBitmap) {
                 Image(
                     bitmap = wpToUse,
                     contentDescription = null,
@@ -137,18 +165,8 @@ fun LauncherWallpaperBackdrop(
                     modifier = Modifier.fillMaxSize()
                 )
             } else if (isSystemWallpaper && wpToUse == null) {
-                // High quality fallback gradient matching theme while system wallpaper resolves
-                Canvas(modifier = Modifier.fillMaxSize()) {
-                    drawRect(
-                        brush = Brush.verticalGradient(
-                            colors = listOf(
-                                bgColor,
-                                surfaceColor,
-                                bgColor
-                            )
-                        )
-                    )
-                }
+                // Let system window wallpaper show through natively via windowShowWallpaper
+                Box(modifier = Modifier.fillMaxSize())
             } else if (wallpaperStyle == WallpaperStyle.FLUX_MINIMAL_GRADIENT) {
                 Canvas(modifier = Modifier.fillMaxSize()) {
                     drawRect(
@@ -161,7 +179,7 @@ fun LauncherWallpaperBackdrop(
                         )
                     )
                 }
-            } else if (wallpaperStyle == WallpaperStyle.SYSTEM_SOLID) {
+            } else if (wallpaperStyle == WallpaperStyle.SOLID_DARK) {
                 Box(modifier = Modifier.fillMaxSize().background(bgColor))
             } else {
                 Canvas(modifier = Modifier.fillMaxSize()) {
@@ -228,35 +246,39 @@ fun LauncherWallpaperBackdrop(
             }
         }
 
-        // Translucent Frosted Glass neutral scrim overlay
-        if (isFrosted) {
+        // Translucent Theme Scrim Overlay
+        if (usesBitmap) {
+            val baseScrimAlpha = if (isFrosted) 0.60f else 0.22f
+            val dynamicScrimAlpha = (baseScrimAlpha * (0.6f + wallpaperLuminance * 0.8f)).coerceIn(0.15f, 0.85f)
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(
                         Brush.verticalGradient(
                             listOf(
-                                Color(0x3B18181B),
-                                Color(0x4D27272A),
-                                Color(0x6618181B)
+                                surfaceColor.copy(alpha = dynamicScrimAlpha * 0.8f),
+                                bgColor.copy(alpha = dynamicScrimAlpha),
+                                surfaceColor.copy(alpha = dynamicScrimAlpha * 1.2f)
                             )
                         )
                     )
             )
-            // Specular frost rim
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.linearGradient(
-                            listOf(
-                                Color.White.copy(alpha = 0.08f),
-                                Color.Transparent,
-                                Color.White.copy(alpha = 0.04f)
+            if (isFrosted) {
+                // Specular frost rim
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.linearGradient(
+                                listOf(
+                                    Color.White.copy(alpha = 0.08f),
+                                    Color.Transparent,
+                                    Color.White.copy(alpha = 0.04f)
+                                )
                             )
                         )
-                    )
-            )
+                )
+            }
         }
     }
 }
