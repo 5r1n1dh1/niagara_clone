@@ -34,6 +34,7 @@ fun NewsWidgetSetupSheet(
 ) {
     var apiKey by remember { mutableStateOf(initial.apiKey) }
     var selectedLanguage by remember { mutableStateOf(initial.language) }
+    var selectedCountry by remember { mutableStateOf(initial.country) }
     var selectedCategories by remember { mutableStateOf(initial.categories) }
     var keywords by remember { mutableStateOf(initial.keywords) }
     var pageSize by remember { mutableIntStateOf(initial.pageSize) }
@@ -127,6 +128,37 @@ fun NewsWidgetSetupSheet(
 
                     item {
                         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(text = "Country Source", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+                            val countries = mapOf("" to "Global", "us" to "US", "gb" to "UK", "ca" to "Canada", "au" to "Australia", "in" to "India", "de" to "Germany", "fr" to "France")
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                countries.entries.take(4).forEach { (code, label) ->
+                                    FilterChip(
+                                        selected = selectedCountry == code,
+                                        onClick = { selectedCountry = code },
+                                        label = { Text(label, fontSize = 11.sp) }
+                                    )
+                                }
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                countries.entries.drop(4).forEach { (code, label) ->
+                                    FilterChip(
+                                        selected = selectedCountry == code,
+                                        onClick = { selectedCountry = code },
+                                        label = { Text(label, fontSize = 11.sp) }
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    item {
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             Text(text = "Categories", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
                             val popularCategories = listOf("general", "technology", "business", "science", "sports", "entertainment")
                             popularCategories.forEach { cat ->
@@ -173,6 +205,7 @@ fun NewsWidgetSetupSheet(
                                 apiKey = apiKey,
                                 configured = apiKey.isNotBlank(),
                                 language = selectedLanguage,
+                                country = selectedCountry,
                                 categories = selectedCategories,
                                 keywords = keywords,
                                 pageSize = pageSize

@@ -232,7 +232,8 @@ fun LeftWidgetsScreen(
         } else {
             LazyColumn(
                 modifier = Modifier
-                    .fillMaxSize()
+                    .fillMaxWidth()
+                    .weight(1f)
                     .padding(horizontal = 16.dp),
                 contentPadding = PaddingValues(top = 12.dp, bottom = 120.dp),
                 verticalArrangement = Arrangement.spacedBy(22.dp)

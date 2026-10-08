@@ -223,7 +223,7 @@ private fun StoryList(stories: List<NewsStory>, size: String, onOpenArticle: (St
 
 @Composable
 private fun StoryRow(story: NewsStory, size: String, index: Int, onOpenArticle: (String) -> Unit) {
-    val maxLines = if (size == "4x1") 2 else 1
+    val maxLines = if (size == "4x1") 1 else 2
     val timeAgo = formatTimeAgo(story.publishedAtEpochMillis)
 
     Row(
@@ -231,16 +231,16 @@ private fun StoryRow(story: NewsStory, size: String, index: Int, onOpenArticle: 
             .fillMaxWidth()
             .clip(RoundedCornerShape(8.dp))
             .clickable { onOpenArticle(story.url) }
-            .padding(vertical = 4.dp)
+            .padding(vertical = 6.dp)
             .testTag("news_widget_row_$index"),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+        verticalAlignment = Alignment.Top,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         if (!story.imageUrl.isNullOrBlank() && size != "4x1") {
             Box(
                 modifier = Modifier
-                    .size(48.dp)
-                    .clip(RoundedCornerShape(6.dp))
+                    .size(56.dp)
+                    .clip(RoundedCornerShape(8.dp))
                     .background(MaterialTheme.colorScheme.surfaceVariant)
             ) {
                 AsyncImage(
@@ -252,16 +252,37 @@ private fun StoryRow(story: NewsStory, size: String, index: Int, onOpenArticle: 
             }
         }
 
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
             Text(
                 text = story.title,
                 style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium,
+                fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = maxLines,
                 overflow = TextOverflow.Ellipsis
             )
+            if (story.description.isNotBlank() && size != "4x1") {
+                Text(
+                    text = story.description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                Surface(
+                    shape = RoundedCornerShape(4.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f)
+                ) {
+                    Text(
+                        text = story.category.uppercase(),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontSize = 9.sp,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                    )
+                }
                 Text(
                     text = story.publisher,
                     style = MaterialTheme.typography.labelSmall,
