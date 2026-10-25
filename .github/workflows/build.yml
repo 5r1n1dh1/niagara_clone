@@ -101,6 +101,19 @@ jobs:
           set -o pipefail
           ./gradlew assembleRelease --no-daemon --stacktrace 2>&1 | tee -a gradle-build.log
 
+      - name: Zip Release APK
+        run: |
+          APK_FILE=$(find app/build/outputs/apk/release/ -name "*.apk" | head -n 1)
+          echo "APK_FILE=$APK_FILE"
+          zip "${APK_FILE}.zip" "$APK_FILE"
+          echo "ZIPPED_APK=${APK_FILE}.zip" >> $GITHUB_ENV
+
+      - name: Unzip Release APK
+        run: |
+          unzip -o "${ZIPPED_APK}" -d app/build/outputs/apk/release/unzipped/
+          echo "Unzipped APK contents:"
+          ls -la app/build/outputs/apk/release/unzipped/
+
       - name: Upload Release APK Artifact
         uses: actions/upload-artifact@v4
         with:
