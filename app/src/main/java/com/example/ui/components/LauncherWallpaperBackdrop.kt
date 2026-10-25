@@ -82,7 +82,7 @@ fun LauncherWallpaperBackdrop(
     val baseBlur = if (isFrosted) backgroundBlurStrength.dp else (backgroundBlurStrength * 0.4f).dp
     val effectiveBlur = baseBlur + blurRadius
 
-    val blurRadiusPx = effectiveBlur.value.toInt().coerceIn(0, 50)
+    val blurRadiusPx = (effectiveBlur.value.toInt() / 2 * 2).coerceIn(0, 50)
 
     var softwareBlurredBitmap by remember(activeWallpaperBitmap, blurRadiusPx) { mutableStateOf<ImageBitmap?>(null) }
     var wallpaperLuminance by remember(activeWallpaperBitmap, systemWallpaperBitmap) { mutableStateOf(0.45f) }
@@ -135,7 +135,7 @@ fun LauncherWallpaperBackdrop(
         }
     }
 
-    val blurModifier = if (effectiveBlur > 0.5.dp && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+    val blurModifier = if (effectiveBlur > 0.5.dp && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S && softwareBlurredBitmap == null) {
         Modifier.blur(effectiveBlur)
     } else {
         Modifier
@@ -291,14 +291,15 @@ private fun fastBlurBitmap(sentBitmap: android.graphics.Bitmap, radius: Int): an
     val scale = 0.35f
     val width = (sentBitmap.width * scale).toInt().coerceAtLeast(1)
     val height = (sentBitmap.height * scale).toInt().coerceAtLeast(1)
-    val input = android.graphics.Bitmap.createScaledBitmap(sentBitmap, width, height, true)
-    val output = android.graphics.Bitmap.createBitmap(input.width, input.height, android.graphics.Bitmap.Config.ARGB_8888)
-    val canvas = android.graphics.Canvas(output)
+    val inputBmp = android.graphics.Bitmap.createScaledBitmap(sentBitmap, width, height, true)
+    val outputBmp = android.graphics.Bitmap.createBitmap(inputBmp.width, inputBmp.height, android.graphics.Bitmap.Config.ARGB_8888)
+    val canvas = android.graphics.Canvas(outputBmp)
     val paint = android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG)
-    canvas.drawBitmap(input, 0f, 0f, paint)
+    canvas.drawBitmap(inputBmp, 0f, 0f, paint)
 
-    stackBlurInPlace(output, radius.coerceIn(1, 25))
-    return output
+    stackBlurInPlace(outputBmp, radius.coerceIn(1, 25))
+    inputBmp.recycle()
+    return outputBmp
 }
 
 private fun stackBlurInPlace(bitmap: android.graphics.Bitmap, radius: Int) {
