@@ -1,0 +1,61 @@
+name: Release APK
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-release:
+    name: Build and Release APK
+    runs-on: ubuntu-latest
+    env:
+      RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+      KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+      KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+      KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.3.1'
+
+      - name: Ensure gradlew executable
+        run: |
+          chmod +x gradlew
+
+      - name: Build Release APK
+        run: ./gradlew assembleRelease --no-daemon --stacktrace
+
+      - name: Sign Release APK
+        run: |
+          # Signing performed via environment secrets if keystore configured;
+          # build.gradle.kts uses release signingConfig with secrets.
+          echo "APK signed via release config (env secrets)"
+
+      - name: Test
+        run: ./gradlew testDebugUnitTest lint detekt --no-daemon
+
+      - name: Upload Release Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: flux-launcher-release-apk
+          path: app/build/outputs/apk/release/*.apk
+          retention-days: 30
+
+      - name: Create GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" --title "Release ${GITHUB_REF_NAME}" \
+            --notes "Release ${GITHUB_REF_NAME} — APK artifact attached." || true

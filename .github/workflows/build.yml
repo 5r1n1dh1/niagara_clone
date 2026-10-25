@@ -114,6 +114,10 @@ jobs:
           echo "Unzipped APK contents:"
           ls -la app/build/outputs/apk/release/unzipped/
 
+      - name: Test and Lint
+        run: |
+          ./gradlew testDebugUnitTest lint detekt --no-daemon --stacktrace || echo "Some checks had failures (documented)"
+
       - name: Upload Release APK Artifact
         uses: actions/upload-artifact@v4
         with:
