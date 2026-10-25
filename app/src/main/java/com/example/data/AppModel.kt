@@ -93,7 +93,7 @@ data class AutoWallpaperConfig(
     val interval: AutoWallpaperInterval = AutoWallpaperInterval.DAILY,
     val localFolderPath: String = "",
     val localFolderUri: String = "",
-    val gitRepoUrl: String = "https://github.com/dharmx/walls",
+    val gitRepoUrl: String = com.example.domain.RemoteConfig.DEFAULT_GIT_WALLPAPER_REPO,
     val gitBranch: String = "main",
     val gitSubfolder: String = "",
     val googlePhotosAlbumUrl: String = "",
@@ -212,7 +212,7 @@ data class MediaPlaybackState(
     val isShuffleEnabled: Boolean = false,
     val isRepeatEnabled: Boolean = false,
     val albumArtBitmap: Bitmap? = null,
-    val packageName: String = "app.revanced.android.apps.youtube.music",
+    val packageName: String = com.example.domain.KnownPackages.YOUTUBE_MUSIC_REVANCED,
     val isExternalOutputConnected: Boolean = false,
     val outputDeviceName: String? = null
 )
@@ -259,7 +259,7 @@ data class LauncherSettings(
     val dockIconScale: Float = 1.0f,
     val blurBackgrounds: Boolean = true,
     val waveAlphabetHapticIntensity: Int = 2, // 1: subtle, 2: medium, 3: heavy
-    val batteryOptimizationMode: Boolean = true,
+    val batteryOptimizationMode: Boolean = true, // Note: wired to real policy in Agent I (v1.0.1)
     val customIconSettings: CustomIconPackSettings = CustomIconPackSettings(),
     val autoWallpaperConfig: AutoWallpaperConfig = AutoWallpaperConfig(),
     val hasCompletedOnboarding: Boolean = false

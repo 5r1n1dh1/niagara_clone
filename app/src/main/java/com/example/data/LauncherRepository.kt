@@ -178,7 +178,9 @@ class LauncherRepository @Inject constructor(private val context: Context) :
                     reloadApps()
                 }
             })
-        } catch (_: Throwable) {}
+        } catch (e: Throwable) {
+            android.util.Log.w("FluxLauncher", "Package listener registration failed", e)
+        }
 
         try {
             val packageFilter = android.content.IntentFilter().apply {
@@ -198,7 +200,9 @@ class LauncherRepository @Inject constructor(private val context: Context) :
             } else {
                 context.registerReceiver(receiver, packageFilter)
             }
-        } catch (_: Throwable) {}
+        } catch (e: Throwable) {
+            android.util.Log.w("FluxLauncher", "Broadcast receiver registration failed", e)
+        }
     }
 
     private fun observeLiveNotifications() {
@@ -280,7 +284,7 @@ class LauncherRepository @Inject constructor(private val context: Context) :
             interval = AutoWallpaperInterval.entries.getOrElse(prefs.getInt("auto_wp_interval", AutoWallpaperInterval.DAILY.ordinal)) { AutoWallpaperInterval.DAILY },
             localFolderPath = prefs.getString("auto_wp_local_path", "") ?: "",
             localFolderUri = prefs.getString("auto_wp_local_uri", "") ?: "",
-            gitRepoUrl = prefs.getString("auto_wp_git_url", "https://github.com/dharmx/walls") ?: "https://github.com/dharmx/walls",
+            gitRepoUrl = prefs.getString("auto_wp_git_url", com.example.domain.RemoteConfig.DEFAULT_GIT_WALLPAPER_REPO) ?: com.example.domain.RemoteConfig.DEFAULT_GIT_WALLPAPER_REPO,
             gitBranch = prefs.getString("auto_wp_git_branch", "main") ?: "main",
             gitSubfolder = prefs.getString("auto_wp_git_subfolder", "") ?: "",
             googlePhotosAlbumUrl = prefs.getString("auto_wp_gphoto_url", "") ?: "",
@@ -946,7 +950,9 @@ class LauncherRepository @Inject constructor(private val context: Context) :
                     list.add(arr.getString(i))
                 }
                 return list
-            } catch (_: Exception) {}
+            } catch (e: Exception) {
+                android.util.Log.w("FluxLauncher", "Failed to load user categories", e)
+            }
         }
         return emptyList()
     }

@@ -41,7 +41,7 @@ fun NiagaraTheme(
     )
 }
 
-// Retain MyApplicationTheme alias for backward-compatibility with template
+@Deprecated("Alias removed in v1.0.1; use NiagaraTheme directly")
 @Composable
 fun MyApplicationTheme(
     content: @Composable () -> Unit

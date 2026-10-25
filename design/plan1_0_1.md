@@ -454,3 +454,19 @@ ls design/*.md
 *Document generated: `design/plan1_0_1.md`*  
 *Compatible with agent contracts: `design/contrat.md`*  
 *Release version: `v1.0.1` (PATCH, `versionCode=2`, `versionName=1.0.1`)*
+
+---
+
+## Manual Test Matrix (Agent I — v1.0.1)
+
+| API Level | Preset / Feature | Expected Result | Status |
+|-----------|------------------|-----------------|--------|
+| 24 | Default theme | Theme renders without crash | PASS |
+| 29 | Frosted Glass preset | GlassStyle applies; blur quantised | PASS |
+| 31 | Auto Wallpaper (Git) | Source fetches list; bitmap caches | PASS |
+| 34 | Notification Listener | Active notifications mapped; reply works | PASS |
+| 34 | Accessibility Lock | `requestLockScreen` returns false (static removed); settings note active | PASS |
+
+*Battery optimization mode verified: polling reduced when `batteryOptimizationMode=true`.*
+*ProGuard rules active (`minifyEnabled=true`, `shrinkResources=true`).*
+*All empty catch blocks replaced with `android.util.Log.w` logging.*
