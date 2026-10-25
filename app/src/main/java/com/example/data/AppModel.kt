@@ -4,6 +4,8 @@ import android.graphics.Bitmap
 import android.graphics.drawable.Drawable
 import androidx.compose.ui.graphics.Color
 
+import kotlinx.serialization.Serializable
+
 enum class IconPackType(val displayName: String) {
     DEFAULT_APP("Default System Icons"),
     MATERIAL("Material Modern"),
@@ -215,6 +217,7 @@ data class MediaPlaybackState(
     val outputDeviceName: String? = null
 )
 
+@Serializable
 data class LauncherSettings(
     val leftHandedMode: Boolean = false,
     val hideStatusBar: Boolean = false,

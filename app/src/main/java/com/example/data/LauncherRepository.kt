@@ -31,7 +31,9 @@ import com.example.util.IntegrationCategory
 import com.example.util.WidgetIntegrationsManager
 import com.example.domain.*
 
-class LauncherRepository(private val context: Context) : 
+import javax.inject.Inject
+
+class LauncherRepository @Inject constructor(private val context: Context) : 
     SettingsRepository, 
     AppRepository, 
     NotificationRepository, 

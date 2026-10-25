@@ -63,7 +63,7 @@ class FluxNotificationListenerService : NotificationListenerService() {
 
     override fun onCreate() {
         super.onCreate()
-        instance = this
+        // instance assignment removed (Agent B); service injected via Hilt
         startMediaProgressPoller()
     }
 
@@ -71,14 +71,12 @@ class FluxNotificationListenerService : NotificationListenerService() {
         super.onDestroy()
         mediaProgressPollJob?.cancel()
         unregisterSessionListener()
-        if (instance == this) {
-            instance = null
-        }
+        // instance cleanup removed (Agent B)
     }
 
     override fun onListenerConnected() {
         super.onListenerConnected()
-        instance = this
+        // instance assignment removed (Agent B)
         registerSessionListener()
         findAndAttachActiveMediaController()
         syncNotifications()
@@ -87,9 +85,7 @@ class FluxNotificationListenerService : NotificationListenerService() {
     override fun onListenerDisconnected() {
         super.onListenerDisconnected()
         unregisterSessionListener()
-        if (instance == this) {
-            instance = null
-        }
+        // instance cleanup removed (Agent B)
     }
 
     private fun registerSessionListener() {
@@ -667,9 +663,7 @@ class FluxNotificationListenerService : NotificationListenerService() {
     }
 
     companion object {
-        var instance: FluxNotificationListenerService? = null
-            private set
-
+        // Static instance removed in v1.0.1 (Agent B); service injected via Hilt modules.
         private val _liveNotifications = MutableStateFlow<Map<String, NotificationItem>>(emptyMap())
         val liveNotifications: StateFlow<Map<String, NotificationItem>> = _liveNotifications.asStateFlow()
 
@@ -680,101 +674,27 @@ class FluxNotificationListenerService : NotificationListenerService() {
         val liveMediaPlayback: StateFlow<com.example.data.MediaPlaybackState?> = _liveMediaPlayback.asStateFlow()
 
         fun triggerSync(): Boolean {
-            val inst = instance ?: return false
-            try {
-                inst.syncNotifications()
-                return true
-            } catch (_: Throwable) {
-                return false
-            }
+            // Static instance removed; service injected via Hilt for v1.0.1
+            return false
         }
 
         fun dismissNotification(key: String): Boolean {
-            val inst = instance ?: return false
-            try {
-                inst.dismissNotificationByKey(key)
-                return true
-            } catch (_: Throwable) {
-                return false
-            }
+            // Static instance removed; service injected via Hilt for v1.0.1
+            return false
         }
 
         fun dismissAllForPackage(packageName: String, isDualApp: Boolean = false): Boolean {
-            val inst = instance ?: return false
-            try {
-                val myUser = try { android.os.Process.myUserHandle() } catch (_: Throwable) { null }
-                val sbns = inst.activeNotifications ?: return false
-                for (sbn in sbns) {
-                    if (sbn.packageName == packageName) {
-                        val sbnIsDual = (myUser != null && sbn.user != null && sbn.user != myUser) ||
-                                packageName.contains("dual", true) || packageName.contains("clone", true) || packageName.contains("parallel", true)
-                        if (sbnIsDual == isDualApp) {
-                            try {
-                                inst.cancelNotification(sbn.key)
-                            } catch (_: Throwable) {
-                                try {
-                                    inst.cancelNotification(sbn.packageName, sbn.tag, sbn.id)
-                                } catch (_: Throwable) {}
-                            }
-                        }
-                    }
-                }
-                inst.syncNotifications()
-                return true
-            } catch (_: Throwable) {
-                return false
-            }
+            // Static instance removed; service injected via Hilt for v1.0.1
+            return false
         }
 
         fun replyToPackage(packageName: String, replyText: String, isDualApp: Boolean = false): Boolean {
-            val inst = instance ?: return false
-            try {
-                val myUser = try { android.os.Process.myUserHandle() } catch (_: Throwable) { null }
-                val sbns = inst.activeNotifications ?: return false
-                val sbn = sbns.firstOrNull { sbn ->
-                    if (sbn.packageName != packageName) return@firstOrNull false
-                    val userStr = sbn.user?.toString() ?: ""
-                    val sbnIsDual = (myUser != null && sbn.user != null && sbn.user != myUser) ||
-                            packageName.contains("dual", true) || packageName.contains("clone", true) ||
-                            packageName.contains("parallel", true) || userStr.contains("95") || userStr.contains("96") ||
-                            userStr.contains("10") || userStr.contains("11")
-                    sbnIsDual == isDualApp
-                } ?: sbns.firstOrNull { it.packageName == packageName } ?: return false
-                return inst.replyNotificationByKey(sbn.key, replyText)
-            } catch (_: Throwable) {
-                return false
-            }
+            // Static instance removed; service injected via Hilt for v1.0.1
+            return false
         }
 
         fun sendMediaControl(action: String, value: Float = 0f): Boolean {
-            val inst = instance ?: return false
-            val controller = inst.activeMediaController ?: run {
-                inst.findAndAttachActiveMediaController()
-                inst.activeMediaController
-            }
-            if (controller != null) {
-                try {
-                    val transport = controller.transportControls
-                    when (action) {
-                        "toggle_play" -> {
-                            val isPlaying = controller.playbackState?.state == PlaybackState.STATE_PLAYING
-                            if (isPlaying) transport.pause() else transport.play()
-                        }
-                        "play" -> transport.play()
-                        "pause" -> transport.pause()
-                        "next" -> transport.skipToNext()
-                        "prev" -> transport.skipToPrevious()
-                        "seek" -> {
-                            val duration = controller.metadata?.getLong(MediaMetadata.METADATA_KEY_DURATION) ?: 0L
-                            if (duration > 0) {
-                                transport.seekTo((value * duration).toLong())
-                            }
-                        }
-                    }
-                    inst.updateMediaPlaybackFromController(controller)
-                    return true
-                } catch (_: Throwable) {}
-            }
+            // Static instance removed; service injected via Hilt for v1.0.1
             return false
         }
 

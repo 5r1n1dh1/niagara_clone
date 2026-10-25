@@ -23,9 +23,15 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
-class LauncherViewModel(application: Application) : AndroidViewModel(application) {
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 
-    val repository = LauncherRepository(application)
+@HiltViewModel
+class LauncherViewModel @Inject constructor(
+    application: Application,
+    private val repository: LauncherRepository,
+    private val settingsRepo: SettingsRepositoryImpl
+) : AndroidViewModel(application) {
 
     val isAppsLoading = repository.isAppsLoading
     val allApps = repository.allApps

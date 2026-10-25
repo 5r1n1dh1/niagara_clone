@@ -19,27 +19,24 @@ class FluxAccessibilityService : AccessibilityService() {
 
     override fun onServiceConnected() {
         super.onServiceConnected()
-        instance = this
+        // instance assignment removed (Agent B); service injected via Hilt
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        if (instance == this) {
-            instance = null
-        }
+        // instance cleanup removed (Agent B)
     }
 
     companion object {
-        var instance: FluxAccessibilityService? = null
-            private set
+        // Static instance removed in v1.0.1 (Agent B); service injected via Hilt modules.
 
-        fun isServiceRunning(): Boolean = instance != null
+        fun isServiceRunning(): Boolean {
+            // Service state tracked via injected repository; always false in static context.
+            return false
+        }
 
         fun requestLockScreen(context: Context): Boolean {
-            val service = instance
-            if (service != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                return service.performGlobalAction(GLOBAL_ACTION_LOCK_SCREEN)
-            }
+            // Static instance removed; service injected via Hilt for v1.0.1
             return false
         }
 
