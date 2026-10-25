@@ -6,13 +6,15 @@ import androidx.lifecycle.viewModelScope
 import com.example.data.LauncherRepository
 import com.example.data.LauncherSettings
 import com.example.ui.state.SettingsUiState
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
+import javax.inject.Inject
 
-/**
- * Decomposed SettingsViewModel managing settings UI state adhering to Phase 3.
- */
-class SettingsViewModel(application: Application) : AndroidViewModel(application) {
-    private val repository = LauncherRepository(application)
+@HiltViewModel
+class SettingsViewModel @Inject constructor(
+    application: Application,
+    private val repository: LauncherRepository
+) : AndroidViewModel(application) {
 
     val uiState: StateFlow<SettingsUiState> = repository.settings.map { settings ->
         SettingsUiState(settings = settings)
@@ -23,6 +25,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     )
 
     fun updateSettings(newSettings: LauncherSettings) {
-        repository.updateSettings(newSettings)
+        val current = repository.settings.value
+        if (current != newSettings) {
+            repository.updateSettings(newSettings)
+        }
     }
 }

@@ -4,28 +4,27 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.AppItem
+import com.example.data.AppRepository
 import com.example.data.LauncherRepository
+import com.example.ui.state.SearchUiState
 import com.example.util.MathEvaluator
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
+import javax.inject.Inject
 
-data class SearchUiState(
-    val query: String = "",
-    val filteredApps: List<AppItem> = emptyList(),
-    val mathResult: String = ""
-)
-
-/**
- * Decomposed SearchViewModel managing debounced search query, math evaluation, and filtered results.
- */
-class SearchViewModel(application: Application) : AndroidViewModel(application) {
-    private val repository = LauncherRepository(application)
+@HiltViewModel
+class SearchViewModel @Inject constructor(
+    application: Application,
+    private val appRepo: AppRepository,
+    private val categoryRepo: com.example.domain.CategoryRepository
+) : AndroidViewModel(application) {
 
     private val _query = MutableStateFlow("")
     val query: StateFlow<String> = _query.asStateFlow()
 
     val uiState: StateFlow<SearchUiState> = combine(
         _query.debounce(200),
-        repository.allApps
+        appRepo.allApps
     ) { q, apps ->
         val trimmed = q.trim()
         val filtered = if (trimmed.isBlank()) {

@@ -5,14 +5,15 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.LauncherRepository
 import com.example.ui.state.HomeUiState
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
+import javax.inject.Inject
 
-/**
- * Decomposed HomeViewModel adhering to Phase 3 & Phase 5 refactoring guidelines.
- */
-class HomeViewModel(application: Application) : AndroidViewModel(application) {
-
-    val repository = LauncherRepository(application)
+@HiltViewModel
+class HomeViewModel @Inject constructor(
+    application: Application,
+    private val repository: LauncherRepository
+) : AndroidViewModel(application) {
 
     val uiState: StateFlow<HomeUiState> = combine(
         repository.favorites,

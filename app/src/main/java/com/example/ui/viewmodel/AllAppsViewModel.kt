@@ -5,13 +5,15 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.LauncherRepository
 import com.example.ui.state.AllAppsUiState
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
+import javax.inject.Inject
 
-/**
- * Decomposed AllAppsViewModel adhering to Phase 3 & Phase 5 refactoring guidelines.
- */
-class AllAppsViewModel(application: Application) : AndroidViewModel(application) {
-    val repository = LauncherRepository(application)
+@HiltViewModel
+class AllAppsViewModel @Inject constructor(
+    application: Application,
+    private val repository: LauncherRepository
+) : AndroidViewModel(application) {
 
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()

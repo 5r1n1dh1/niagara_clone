@@ -9,9 +9,9 @@ import android.content.Intent
 import android.content.pm.LauncherApps
 import android.net.Uri
 import android.os.UserManager
-import android.os.VibrationEffect
-import android.os.Vibrator
-import android.widget.Toast
+
+
+
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.core.content.ContextCompat
@@ -26,6 +26,7 @@ import kotlinx.coroutines.launch
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 
+@Deprecated("Decomposed into feature ViewModels; use Home/AllApps/Widgets/Settings/Search/Notification ViewModels")
 @HiltViewModel
 class LauncherViewModel @Inject constructor(
     application: Application,
@@ -143,19 +144,17 @@ class LauncherViewModel @Inject constructor(
     fun setDockSlot(slotIndex: Int, packageName: String) {
         repository.setDockSlot(slotIndex, packageName)
         _dockPickerSlot.value = null
-        showToast("Dock updated")
-        vibrateClick()
+
     }
 
     fun clearDockSlot(slotIndex: Int) {
         repository.clearDockSlot(slotIndex)
-        vibrateClick()
+
     }
 
     fun resetDockToDefaults() {
         repository.resetDockToDefaults()
-        showToast("Dock reset to default apps")
-        vibrateClick()
+
     }
 
     private val _isReorderFavoritesOpen = MutableStateFlow(false)
@@ -171,11 +170,10 @@ class LauncherViewModel @Inject constructor(
 
     fun reorderFavorites(fromIndex: Int, toIndex: Int) {
         if (settings.value.isLayoutLocked) {
-            showToast("🔒 Layout is locked. Unlock to reorder favorites.")
             return
         }
         repository.reorderFavorites(fromIndex, toIndex)
-        vibrateClick()
+
     }
 
     fun moveFavoriteUp(index: Int) {
@@ -196,7 +194,7 @@ class LauncherViewModel @Inject constructor(
 
     fun openNewsSetup() {
         _isNewsSetupOpen.value = true
-        vibrateClick()
+
     }
 
     fun closeNewsSetup() {
@@ -256,10 +254,6 @@ class LauncherViewModel @Inject constructor(
     private val _waveSelectedLetter = MutableStateFlow<Char?>(null)
     val waveSelectedLetter: StateFlow<Char?> = _waveSelectedLetter.asStateFlow()
 
-    val mathResult: StateFlow<String?> = _searchQuery.map { query ->
-        evaluateSimpleMath(query.trim())
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
-
     val searchFilteredApps: StateFlow<List<AppItem>> = combine(allApps, _searchQuery) { apps, query ->
         if (query.isBlank() || query.startsWith("/")) {
             apps.filter { !it.isHidden }
@@ -276,29 +270,25 @@ class LauncherViewModel @Inject constructor(
         when (query.trim().lowercase()) {
             "/shrug" -> {
                 _searchQuery.value = "¯\\_(ツ)_/¯"
-                showToast("Secret executed: Shrug appended")
-                vibrateClick()
+        
             }
             "/reset" -> {
                 repository.resetToDefaults()
                 _searchQuery.value = ""
                 _isSearchOpen.value = false
-                showToast("Launcher flags reset to factory defaults")
-                vibrateClick()
+        
             }
             "/debug" -> {
                 _isDebugOverlayOpen.value = true
                 _searchQuery.value = ""
                 _isSearchOpen.value = false
-                showToast("Debug metrics enabled")
-                vibrateClick()
+        
             }
             "/secret" -> {
                 _isSecretLabOpen.value = true
                 _searchQuery.value = ""
                 _isSearchOpen.value = false
-                showToast("Niagara Developer Laboratory unlocked")
-                vibrateClick()
+        
             }
         }
     }
@@ -306,7 +296,7 @@ class LauncherViewModel @Inject constructor(
     fun openSearch() {
         _searchQuery.value = ""
         _isSearchOpen.value = true
-        vibrateClick()
+
     }
 
     fun closeSearch() {
@@ -342,7 +332,7 @@ class LauncherViewModel @Inject constructor(
 
     fun openDiscover() {
         _isDiscoverOpen.value = true
-        vibrateClick()
+
     }
 
     fun closeDiscover() {
@@ -351,7 +341,7 @@ class LauncherViewModel @Inject constructor(
 
     fun openSettings() {
         _isSettingsOpen.value = true
-        vibrateClick()
+
     }
 
     fun closeSettings() {
@@ -359,7 +349,7 @@ class LauncherViewModel @Inject constructor(
     }
 
     fun openNotificationCenter() {
-        vibrateClick()
+
         val opened = triggerSystemNotificationShade()
         if (!opened) {
             _isNotificationCenterOpen.value = true
@@ -395,8 +385,7 @@ class LauncherViewModel @Inject constructor(
 
     fun clearAllNotifications() {
         repository.clearAllNotifications()
-        showToast("Notifications cleared")
-        vibrateClick()
+
     }
 
     fun closeSecretLab() {
@@ -409,14 +398,14 @@ class LauncherViewModel @Inject constructor(
 
     fun setWaveSelectedLetter(letter: Char?) {
         if (_waveSelectedLetter.value != letter && letter != null) {
-            vibrateTick()
+    
         }
         _waveSelectedLetter.value = letter
     }
 
     fun openAppPopup(app: AppItem) {
         _activeAppForPopup.value = app
-        vibrateClick()
+
     }
 
     fun closeAppPopup() {
@@ -425,7 +414,7 @@ class LauncherViewModel @Inject constructor(
 
     fun openFolderPopup(folder: FolderItem) {
         _activeFolderPopup.value = folder
-        vibrateClick()
+
     }
 
     fun closeFolderPopup() {
@@ -436,7 +425,7 @@ class LauncherViewModel @Inject constructor(
         if (app.isUsageBreakerActive) {
             // Trigger Mindful Pause
             _activeUsageBreakerApp.value = app
-            vibrateClick()
+    
             return
         }
         executeAppLaunch(app)
@@ -504,21 +493,18 @@ class LauncherViewModel @Inject constructor(
                 intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
                 context.startActivity(intent)
             } else {
-                showToast("Could not launch ${app.label}")
             }
         } catch (e: Exception) {
-            showToast("Failed to launch ${app.label}")
         }
     }
 
     fun triggerDoubleTapSleep() {
         if (settings.value.doubleTapToSleep) {
-            vibrateTick()
+    
             val locked = com.example.service.FluxAccessibilityService.requestLockScreen(getApplication())
             if (!locked) {
                 // If accessibility service is not yet enabled, show visual sleep screen and toast
                 _isSleepOverlayVisible.value = true
-                showToast("Tip: Enable Accessibility for Flux to turn off the physical screen")
             }
         }
     }
@@ -536,8 +522,7 @@ class LauncherViewModel @Inject constructor(
         repository.toggleFavorite(packageName)
         val app = allApps.value.find { it.packageName == packageName }
         val name = app?.disguisedName ?: app?.label ?: "App"
-        showToast(if (wasFav) "Removed $name from favorites" else "Added $name to favorites ⭐")
-        vibrateClick()
+
         _activeAppForPopup.value?.let { current ->
             if (current.packageName == packageName) {
                 _activeAppForPopup.value = current.copy(isFavorite = !wasFav)
@@ -547,71 +532,65 @@ class LauncherViewModel @Inject constructor(
 
     fun toggleHideApp(packageName: String) {
         repository.toggleHideApp(packageName)
-        vibrateClick()
+
     }
 
     fun toggleUsageBreaker(packageName: String) {
         repository.toggleUsageBreaker(packageName)
-        vibrateClick()
+
     }
 
     fun replyToNotification(packageName: String, text: String, key: String? = null, isDualApp: Boolean = false) {
         repository.replyToNotification(packageName, text, key, isDualApp)
-        showToast("Reply sent: \"$text\"")
-        vibrateClick()
+
     }
 
     fun dismissNotification(packageName: String, key: String? = null, isDualApp: Boolean = false) {
         repository.dismissNotification(packageName, key, isDualApp)
-        showToast("Notification dismissed")
     }
 
     fun simulateNotification(packageName: String, sender: String, message: String) {
         repository.simulateIncomingNotification(packageName, sender, message)
-        showToast("Incoming notification simulated")
     }
 
     fun toggleMediaPlayPause() {
         repository.togglePlayPauseMedia()
-        vibrateTick()
+
     }
 
     fun skipMediaNext() {
         repository.skipNextMedia()
-        vibrateTick()
+
     }
 
     fun skipMediaPrev() {
         repository.skipPreviousMedia()
-        vibrateTick()
+
     }
 
     fun seekMedia(percent: Float) {
         repository.seekMedia(percent)
-        vibrateTick()
+
     }
 
     fun toggleShuffleMedia() {
         repository.toggleShuffleMedia()
-        vibrateTick()
+
     }
 
     fun toggleHeadphonesConnected() {
         val next = !settings.value.isHeadphonesConnected
         repository.setHeadphonesConnected(next)
         val msg = if (next) "Headphones connected! Audio apps surfaced." else "Headphones disconnected."
-        showToast(msg)
-        vibrateClick()
+
     }
 
-    fun showToast(msg: String) {
-        Toast.makeText(getApplication(), msg, Toast.LENGTH_SHORT).show()
     }
 
     // Dock slot picker
     fun openDockPicker(slotIndex: Int) {
         _dockPickerSlot.value = slotIndex
-        vibrateClick()
+
     }
 
     fun closeDockPicker() {
@@ -621,8 +600,7 @@ class LauncherViewModel @Inject constructor(
     fun selectDockApp(slotIndex: Int, app: AppItem) {
         repository.setDockSlot(slotIndex, app.packageName)
         _dockPickerSlot.value = null
-        showToast("Updated dock slot with ${app.label}")
-        vibrateClick()
+
     }
 
     // Left screen widget CRUD
@@ -630,24 +608,21 @@ class LauncherViewModel @Inject constructor(
         val current = settings.value.isLayoutLocked
         val newLocked = !current
         repository.updateSettings(settings.value.copy(isLayoutLocked = newLocked))
-        showToast(if (newLocked) "🔒 Home & Widget layouts locked" else "🔓 Layout unlocked")
-        vibrateClick()
+
     }
 
     fun setLayoutLocked(locked: Boolean) {
         repository.updateSettings(settings.value.copy(isLayoutLocked = locked))
-        showToast(if (locked) "🔒 Home & Widget layouts locked" else "🔓 Layout unlocked")
-        vibrateClick()
+
     }
 
     fun openAddWidgetDialog() {
         if (settings.value.isLayoutLocked) {
-            showToast("🔒 Layout is locked. Unlock to add widgets.")
-            vibrateClick()
+    
             return
         }
         _isAddWidgetOpen.value = true
-        vibrateClick()
+
     }
 
     fun closeAddWidgetDialog() {
@@ -656,63 +631,54 @@ class LauncherViewModel @Inject constructor(
 
     fun addLeftWidget(type: WidgetType) {
         if (settings.value.isLayoutLocked) {
-            showToast("🔒 Layout is locked. Unlock to modify widgets.")
             return
         }
         repository.addLeftWidget(type)
         _isAddWidgetOpen.value = false
-        showToast("Added ${type.displayName} widget")
-        vibrateClick()
+
     }
 
     fun addLeftSystemWidget(appWidgetId: Int, label: String = "System Widget", heightCategory: String = "4x2") {
         if (settings.value.isLayoutLocked) {
-            showToast("🔒 Layout is locked. Unlock to modify widgets.")
             return
         }
         repository.addLeftSystemWidget(appWidgetId, label, heightCategory)
         _isAddWidgetOpen.value = false
-        showToast("Added $label")
-        vibrateClick()
+
     }
 
     fun deleteLeftWidget(id: String) {
         if (settings.value.isLayoutLocked) {
-            showToast("🔒 Layout is locked. Unlock to remove widgets.")
             return
         }
         repository.deleteLeftWidget(id)
-        showToast("Widget removed")
-        vibrateClick()
+
     }
 
     fun updateLeftWidget(id: String, title: String, content: String) {
         repository.updateLeftWidget(id, title, content)
-        showToast("Widget updated")
-        vibrateClick()
+
     }
 
     fun updateLeftWidgetSize(id: String, newSize: String) {
         if (settings.value.isLayoutLocked) {
-            showToast("🔒 Layout is locked. Unlock to resize widgets.")
             return
         }
         repository.updateLeftWidget(id, newHeightCategory = newSize)
-        vibrateClick()
+
     }
 
     fun reorderLeftWidget(fromIndex: Int, toIndex: Int) {
         if (settings.value.isLayoutLocked) {
-            showToast("🔒 Layout is locked. Unlock to reorder widgets.")
             return
         }
         repository.reorderLeftWidgets(fromIndex, toIndex)
-        vibrateTick()
+
     }
 
     fun openEditNoteWidget(widget: CustomWidgetConfig) {
         _editingNoteWidget.value = widget
-        vibrateClick()
+
     }
 
     fun closeEditNoteWidget() {
@@ -722,12 +688,11 @@ class LauncherViewModel @Inject constructor(
     // Center carousel widgets
     fun openCarouselCustomize() {
         if (settings.value.isLayoutLocked) {
-            showToast("🔒 Layout is locked. Unlock to customize carousel.")
-            vibrateClick()
+    
             return
         }
         _isCarouselCustomizeOpen.value = true
-        vibrateClick()
+
     }
 
     fun closeCarouselCustomize() {
@@ -736,50 +701,43 @@ class LauncherViewModel @Inject constructor(
 
     fun addCarouselWidget(type: WidgetType) {
         if (settings.value.isLayoutLocked) {
-            showToast("🔒 Layout is locked. Unlock to modify carousel.")
             return
         }
         if (carouselWidgets.value.size >= 5) {
-            showToast("Maximum 5 widgets in carousel")
             return
         }
         repository.addCarouselWidget(type)
-        showToast("Added to top carousel")
-        vibrateClick()
+
     }
 
     fun removeCarouselWidget(type: WidgetType) {
         if (settings.value.isLayoutLocked) {
-            showToast("🔒 Layout is locked. Unlock to modify carousel.")
             return
         }
         if (carouselWidgets.value.size <= 1) {
-            showToast("Carousel needs at least 1 widget")
             return
         }
         repository.removeCarouselWidget(type)
-        showToast("Removed from carousel")
-        vibrateClick()
+
     }
 
     fun reorderCarouselWidget(fromIndex: Int, toIndex: Int) {
         if (settings.value.isLayoutLocked) {
-            showToast("🔒 Layout is locked. Unlock to reorder carousel.")
             return
         }
         repository.reorderCarouselWidgets(fromIndex, toIndex)
-        vibrateTick()
+
     }
 
     fun openSetupGuide() {
         _isOnboardingForcedOpen.value = true
-        vibrateClick()
+
     }
 
     fun closeSetupGuide() {
         _isOnboardingForcedOpen.value = false
         repository.completeOnboarding()
-        vibrateClick()
+
     }
 
     fun completeSetupGuide(
@@ -808,95 +766,7 @@ class LauncherViewModel @Inject constructor(
             )
         )
         _isOnboardingForcedOpen.value = false
-        showToast("Welcome to Flux Launcher! Setup complete ✨")
-        vibrateClick()
-    }
-
-    private fun vibrateClick() {
-        if (!settings.value.hapticFeedback) return
-        val vibrator = ContextCompat.getSystemService(getApplication(), Vibrator::class.java) ?: return
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-            vibrator.vibrate(VibrationEffect.createOneShot(20, VibrationEffect.DEFAULT_AMPLITUDE))
-        } else {
-            @Suppress("DEPRECATION")
-            vibrator.vibrate(20)
-        }
-    }
-
-    private fun vibrateTick() {
-        if (!settings.value.hapticFeedback) return
-        val vibrator = ContextCompat.getSystemService(getApplication(), Vibrator::class.java) ?: return
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-            vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK))
-        } else {
-            @Suppress("DEPRECATION")
-            vibrator.vibrate(10)
-        }
-    }
-
-    private fun evaluateSimpleMath(input: String): String? = MathEvaluator.evaluate(input)
-}
-
-object MathEvaluator {
-    fun evaluate(input: String): String? {
-        if (input.length < 2) return null
-        try {
-            if (input.contains("% of", ignoreCase = true)) {
-                val parts = input.split("% of", "% OF", ignoreCase = true)
-                if (parts.size == 2) {
-                    val p = parts[0].trim().toDoubleOrNull()
-                    val total = parts[1].trim().toDoubleOrNull()
-                    if (p != null && total != null) {
-                        val res = (p / 100.0) * total
-                        return formatResult(res)
-                    }
-                }
-            }
-
-            if (input.startsWith("sqrt(", ignoreCase = true) && input.endsWith(")")) {
-                val inside = input.substring(5, input.length - 1).trim().toDoubleOrNull()
-                if (inside != null && inside >= 0) {
-                    return formatResult(kotlin.math.sqrt(inside))
-                }
-            }
-
-            val sanitized = input.replace("x", "*", ignoreCase = true).replace(" ", "")
-            val ops = listOf('+', '-', '*', '/')
-            var foundOp: Char? = null
-            for (ch in sanitized) {
-                if (ch in ops) {
-                    foundOp = ch
-                    break
-                }
-            }
-            if (foundOp != null) {
-                val idx = sanitized.indexOf(foundOp)
-                if (idx > 0 && idx < sanitized.length - 1) {
-                    val left = sanitized.substring(0, idx).toDoubleOrNull()
-                    val right = sanitized.substring(idx + 1).toDoubleOrNull()
-                    if (left != null && right != null) {
-                        val res = when (foundOp) {
-                            '+' -> left + right
-                            '-' -> left - right
-                            '*' -> left * right
-                            '/' -> if (right != 0.0) left / right else null
-                            else -> null
-                        }
-                        if (res != null) return formatResult(res)
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            return null
-        }
-        return null
-    }
-
-    private fun formatResult(value: Double): String {
-        return if (value % 1.0 == 0.0) {
-            value.toLong().toString()
-        } else {
-            String.format(java.util.Locale.US, "%.2f", value)
-        }
     }
 }
+
+

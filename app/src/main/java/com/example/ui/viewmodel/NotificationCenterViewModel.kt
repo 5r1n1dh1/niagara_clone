@@ -5,28 +5,29 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.LauncherRepository
 import com.example.data.NotificationItem
+import com.example.ui.state.NotificationUiState
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
+import javax.inject.Inject
 
-data class NotificationCenterUiState(
-    val notifications: Map<String, NotificationItem> = emptyMap(),
-    val allNotifications: Map<String, List<NotificationItem>> = emptyMap()
-)
+@HiltViewModel
+class NotificationCenterViewModel @Inject constructor(
+    application: Application,
+    private val repository: LauncherRepository
+) : AndroidViewModel(application) {
 
-/**
- * Decomposed NotificationCenterViewModel adhering to Phase 3.
- */
-class NotificationCenterViewModel(application: Application) : AndroidViewModel(application) {
-    private val repository = LauncherRepository(application)
-
-    val uiState: StateFlow<NotificationCenterUiState> = combine(
+    val uiState: StateFlow<NotificationUiState> = combine(
         repository.activeNotifications,
         repository.allActiveNotifications
     ) { active, all ->
-        NotificationCenterUiState(notifications = active, allNotifications = all)
+        NotificationUiState.Content(
+            notifications = active,
+            allNotifications = all
+        )
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
-        initialValue = NotificationCenterUiState()
+        initialValue = NotificationUiState.Loading
     )
 
     fun dismissNotification(packageName: String, key: String? = null, isDualApp: Boolean = false) {

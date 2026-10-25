@@ -13,6 +13,7 @@ import com.example.data.LauncherThemePreset
 fun NiagaraTheme(
     preset: LauncherThemePreset = LauncherThemePreset.FLUX_EMERALD,
     fontFamily: AppFontFamily = AppFontFamily.MODERN_SANS,
+    glass: GlassStyle = GlassStyleFactory.default(),
     content: @Composable () -> Unit
 ) {
     val colorScheme = darkColorScheme(

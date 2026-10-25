@@ -51,3 +51,18 @@ data class SettingsUiState(
     val isStudioOpen: Boolean = false,
     val selectedTab: Int = 0
 )
+
+sealed interface NotificationUiState {
+    data object Loading : NotificationUiState
+    data class Content(
+        val notifications: Map<String, NotificationItem> = emptyMap(),
+        val allNotifications: Map<String, List<NotificationItem>> = emptyMap()
+    ) : NotificationUiState
+    data class Error(val message: String) : NotificationUiState
+}
+
+data class SearchUiState(
+    val query: String = "",
+    val filteredApps: List<AppItem> = emptyList(),
+    val mathResult: String = ""
+)
