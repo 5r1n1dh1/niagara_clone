@@ -23,7 +23,7 @@ class SearchViewModel @Inject constructor(
     val query: StateFlow<String> = _query.asStateFlow()
 
     val uiState: StateFlow<SearchUiState> = combine(
-        _query.debounce(200),
+        _query.debounce(300), // Agent G: 300ms debounce for performance
         appRepo.allApps
     ) { q, apps ->
         val trimmed = q.trim()

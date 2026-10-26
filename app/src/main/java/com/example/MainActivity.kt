@@ -74,6 +74,9 @@ class MainActivity : ComponentActivity() {
 
     private val viewModel: LauncherViewModel by viewModels()
 
+    // StrictMode reference: disk/network/leak detection enabled in FluxApplication for debug builds.
+    // See FluxApplication.kt for full StrictMode policy.
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()

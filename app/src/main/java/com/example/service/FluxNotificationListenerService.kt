@@ -22,6 +22,8 @@ import android.provider.Settings
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import androidx.core.app.NotificationManagerCompat
+import androidx.datastore.preferences.preferencesDataStore
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import com.example.data.NotificationItem
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -32,6 +34,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -138,13 +141,29 @@ class FluxNotificationListenerService : NotificationListenerService() {
         } catch (_: Throwable) {}
     }
 
+    private fun isBatteryOptimizationEnabled(): Boolean {
+        return try {
+            runBlocking {
+                val Context.settingsStore by preferencesDataStore("flux_launcher_settings")
+                val prefs = context.settingsStore.data.first()
+                prefs[booleanPreferencesKey("batteryOptimizationMode")] ?: true
+            }
+        } catch (_: Throwable) { true }
+    }
+
     private fun startMediaProgressPoller() {
         mediaProgressPollJob?.cancel()
         mediaProgressPollJob = serviceScope.launch {
             while (isActive) {
                 val current = _liveMediaPlayback.value
                 val isPlaying = current?.isPlaying == true
-                delay(if (isPlaying) 1000L else 3000L)
+                val batteryOptimized = isBatteryOptimizationEnabled()
+                val pollDelay = if (batteryOptimized) {
+                    if (isPlaying) 3000L else 10000L
+                } else {
+                    if (isPlaying) 1000L else 3000L
+                }
+                delay(pollDelay)
                 val latestCurrent = _liveMediaPlayback.value
                 if (latestCurrent != null && latestCurrent.isPlaying && latestCurrent.durationMs > 0) {
                     val controller = activeMediaController

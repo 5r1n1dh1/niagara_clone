@@ -28,6 +28,8 @@ import com.example.data.NewsPreferencesState
 import com.example.ui.theme.GlassStyle
 import java.text.SimpleDateFormat
 import java.util.*
+import kotlinx.coroutines.flow.collect
+import com.example.util.TickerFlow
 
 /**
  * 4x2 Aspect-Ratio Standard Widget Card for the Center Home Screen Carousel
@@ -484,15 +486,10 @@ private fun Clock4x2Widget(
 ) {
     var currentTime by remember { mutableStateOf(Calendar.getInstance()) }
     LaunchedEffect(showSeconds) {
-        while (true) {
+        val intervalMs = if (showSeconds) 1000L else 60000L
+        TickerFlow.start(intervalMs)
+        TickerFlow.tick.collect {
             currentTime = Calendar.getInstance()
-            if (showSeconds) {
-                kotlinx.coroutines.delay(1000L)
-            } else {
-                val now = System.currentTimeMillis()
-                val delayMs = (60_000L - (now % 60_000L) + 50L).coerceIn(1000L, 60_000L)
-                kotlinx.coroutines.delay(delayMs)
-            }
         }
     }
     val timeFormat = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }

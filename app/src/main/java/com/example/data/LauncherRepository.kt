@@ -47,6 +47,7 @@ class LauncherRepository @Inject constructor(private val context: Context) :
 
     private val prefs = context.getSharedPreferences("niagara_launcher_prefs", Context.MODE_PRIVATE)
     private val repositoryScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+    private var reloadDebounceJob: kotlinx.coroutines.Job? = null
 
     private val _isAppsLoading = MutableStateFlow(true)
     override val isAppsLoading: StateFlow<Boolean> = _isAppsLoading.asStateFlow()
@@ -154,28 +155,36 @@ class LauncherRepository @Inject constructor(private val context: Context) :
         }
     }
 
+    private fun debouncedReloadApps() {
+        reloadDebounceJob?.cancel()
+        reloadDebounceJob = repositoryScope.launch {
+            kotlinx.coroutines.delay(300L)
+            reloadApps()
+        }
+    }
+
     private fun registerPackageListeners() {
         try {
             val launcherApps = context.getSystemService(Context.LAUNCHER_APPS_SERVICE) as? LauncherApps
             launcherApps?.registerCallback(object : LauncherApps.Callback() {
                 override fun onPackageAdded(packageName: String, user: android.os.UserHandle) {
-                    reloadApps()
+                    debouncedReloadApps()
                 }
 
                 override fun onPackageChanged(packageName: String, user: android.os.UserHandle) {
-                    reloadApps()
+                    debouncedReloadApps()
                 }
 
                 override fun onPackageRemoved(packageName: String, user: android.os.UserHandle) {
-                    reloadApps()
+                    debouncedReloadApps()
                 }
 
                 override fun onPackagesAvailable(packageNames: Array<out String>, user: android.os.UserHandle, replacing: Boolean) {
-                    reloadApps()
+                    debouncedReloadApps()
                 }
 
                 override fun onPackagesUnavailable(packageNames: Array<out String>, user: android.os.UserHandle, replacing: Boolean) {
-                    reloadApps()
+                    debouncedReloadApps()
                 }
             })
         } catch (e: Throwable) {
@@ -192,7 +201,7 @@ class LauncherRepository @Inject constructor(private val context: Context) :
             }
             val receiver = object : android.content.BroadcastReceiver() {
                 override fun onReceive(context: Context?, intent: Intent?) {
-                    reloadApps()
+                    debouncedReloadApps()
                 }
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {

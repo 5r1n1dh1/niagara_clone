@@ -18,6 +18,7 @@ class FluxApplication : Application() {
                     .detectDiskReads()
                     .detectDiskWrites()
                     .detectNetwork()
+                    .detectCustomSlowCalls()
                     .penaltyLog()
                     .build()
             )

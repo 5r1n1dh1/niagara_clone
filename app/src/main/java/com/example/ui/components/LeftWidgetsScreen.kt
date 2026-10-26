@@ -36,6 +36,8 @@ import com.example.data.NewsPreferencesState
 import com.example.ui.theme.GlassStyle
 import java.text.SimpleDateFormat
 import java.util.*
+import kotlinx.coroutines.flow.collect
+import com.example.util.TickerFlow
 
 /**
  * Left-most Page: Houses user-customizable widgets with full CRUD
@@ -986,15 +988,10 @@ private fun ClockWidgetBody(size: String = "4x2", onOpenClock: () -> Unit = {}) 
     var currentTime by remember { mutableStateOf(Calendar.getInstance()) }
     LaunchedEffect(size) {
         val showSec = (size == "4x1")
-        while (true) {
+        val intervalMs = if (showSec) 1000L else 60000L
+        TickerFlow.start(intervalMs)
+        TickerFlow.tick.collect {
             currentTime = Calendar.getInstance()
-            if (showSec) {
-                kotlinx.coroutines.delay(1000L)
-            } else {
-                val now = System.currentTimeMillis()
-                val delayMs = (60_000L - (now % 60_000L) + 50L).coerceIn(1000L, 60_000L)
-                kotlinx.coroutines.delay(delayMs)
-            }
         }
     }
     val timeFormat = remember { SimpleDateFormat("HH:mm:ss", Locale.getDefault()) }

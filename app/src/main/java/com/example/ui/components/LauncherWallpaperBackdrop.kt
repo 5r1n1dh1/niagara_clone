@@ -99,6 +99,7 @@ fun LauncherWallpaperBackdrop(
                     val scaledBmp = android.graphics.Bitmap.createScaledBitmap(androidBmp, scaledWidth, scaledHeight, true)
                     val effectiveRadius = (blurRadiusPx * (360f / androidBmp.width)).toInt().coerceIn(1, 25)
                     val blurred = fastBlurBitmap(scaledBmp, effectiveRadius)
+                    scaledBmp.recycle()
                     softwareBlurredBitmap = blurred.asImageBitmap()
                 } catch (_: Exception) {
                     softwareBlurredBitmap = null
@@ -128,6 +129,7 @@ fun LauncherWallpaperBackdrop(
                         totalLuma += luma
                     }
                     wallpaperLuminance = (totalLuma / pixelCount).coerceIn(0f, 1f)
+                    smallBmp.recycle()
                 } catch (_: Exception) {
                     wallpaperLuminance = 0.45f
                 }

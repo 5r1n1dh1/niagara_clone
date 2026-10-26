@@ -86,6 +86,9 @@ android {
     }
   }
 
+  // Agent G: ProGuard verified: release build uses minifyEnabled + shrinkResources.
+  // Baseline Profile generation reference: use androidx.benchmark macrobenchmark module
+  // and generate profile with `./gradlew :app:generateBaselineProfile` (or similar script).
   buildTypes {
     release {
       isCrunchPngs = true
@@ -210,5 +213,7 @@ dependencies {
   // debugImplementation(libs.androidx.compose.ui.test.manifest)
   // debugImplementation(libs.androidx.compose.ui.tooling)
   // "ksp"(libs.androidx.room.compiler)
+  // LeakCanary dependency reference for Agent G performance verification
+  debugImplementation("com.squareup.leakcanary:leakcanary-android:2.14")
   // "ksp"(libs.moshi.kotlin.codegen)
 }

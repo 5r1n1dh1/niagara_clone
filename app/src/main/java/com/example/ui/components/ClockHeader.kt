@@ -25,7 +25,9 @@ import androidx.compose.ui.unit.sp
 import com.example.data.CalendarEvent
 import com.example.data.ClockStyle
 import com.example.data.WeatherInfo
+import com.example.util.TickerFlow
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collect
 import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.math.cos
@@ -60,15 +62,10 @@ fun ClockHeader(
     val totalScale = fontScale * clockScale
 
     LaunchedEffect(showSeconds) {
-        while (true) {
+        val intervalMs = if (showSeconds) 1000L else 60000L
+        TickerFlow.start(intervalMs)
+        TickerFlow.tick.collect {
             currentTime = Calendar.getInstance()
-            if (showSeconds) {
-                delay(1000L)
-            } else {
-                val now = System.currentTimeMillis()
-                val delayMs = (60_000L - (now % 60_000L) + 50L).coerceIn(1000L, 60_000L)
-                delay(delayMs)
-            }
         }
     }
 

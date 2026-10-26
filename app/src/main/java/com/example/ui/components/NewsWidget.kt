@@ -182,17 +182,28 @@ fun NewsWidget(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        val message = when (val err = state.error) {
-                            is NewsError.Offline -> "No internet connection"
-                            is NewsError.InvalidKey -> "API key rejected"
-                            is NewsError.QuotaExceeded -> "Daily quota exhausted"
-                            is NewsError.BadRequest -> err.msg
-                            is NewsError.Server -> "Server error (${err.code})"
-                            is NewsError.Unknown -> err.msg
+                        val (message, actionLabel, action) = when (val err = state.error) {
+                            is NewsError.Offline -> Triple("No internet connection", "Retry", { onRefresh() })
+                            is NewsError.InvalidKey -> Triple("API key rejected", "Re-enter key", { onOpenSetup() })
+                            is NewsError.QuotaExceeded -> Triple(
+                                "Daily quota reached. Resets in ${err.retryAfterSeconds / 60}m",
+                                "Fix preferences",
+                                { onOpenSetup() }
+                            )
+                            is NewsError.BadRequest -> Triple(err.msg, "Fix preferences", { onOpenSetup() })
+                            is NewsError.Server -> Triple("Server error (${err.code})", "Retry", { onRefresh() })
+                            is NewsError.Unknown -> Triple(err.msg, "Retry", { onRefresh() })
                         }
                         Text(text = message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.SemiBold)
-                        Button(onClick = onOpenSetup, shape = RoundedCornerShape(8.dp)) {
-                            Text("Configure API Key")
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(onClick = action, shape = RoundedCornerShape(8.dp)) {
+                                Text(actionLabel)
+                            }
+                            if (state.error is NewsError.QuotaExceeded) {
+                                TextButton(onClick = { /* open upgrade URL if available */ }) {
+                                    Text("Upgrade")
+                                }
+                            }
                         }
                     }
                 }
