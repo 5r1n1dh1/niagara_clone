@@ -62,6 +62,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.data.*
 import com.example.ui.LauncherViewModel
 import com.example.ui.components.*
+import com.example.ui.viewmodel.SearchViewModel
 import com.example.ui.theme.NiagaraTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -73,6 +74,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private val viewModel: LauncherViewModel by viewModels()
+    private val searchViewModel: SearchViewModel by viewModels()
 
     // StrictMode reference: disk/network/leak detection enabled in FluxApplication for debug builds.
     // See FluxApplication.kt for full StrictMode policy.
@@ -114,7 +116,8 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = Color.Transparent
                 ) {
-                    NiagaraLauncherScreen(viewModel = viewModel)
+                    val searchState by searchViewModel.uiState.collectAsState()
+                    NiagaraLauncherScreen(viewModel = viewModel, mathResult = searchState.mathResult)
                 }
             }
         }
@@ -162,6 +165,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun NiagaraLauncherScreen(
     viewModel: LauncherViewModel,
+    mathResult: String = "",
     modifier: Modifier = Modifier
 ) {
     val settings by viewModel.settings.collectAsState()
@@ -324,8 +328,6 @@ fun NiagaraLauncherScreen(
     val waveSelectedLetter by viewModel.waveSelectedLetter.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
     val searchFilteredApps by viewModel.searchFilteredApps.collectAsState()
-    val mathResult by viewModel.mathResult.collectAsState()
-
     val isAddWidgetOpen by viewModel.isAddWidgetOpen.collectAsState()
     val editingNoteWidget by viewModel.editingNoteWidget.collectAsState()
     val isCarouselCustomizeOpen by viewModel.isCarouselCustomizeOpen.collectAsState()

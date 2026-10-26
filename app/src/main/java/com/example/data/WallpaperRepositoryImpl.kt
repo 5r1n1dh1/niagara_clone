@@ -3,6 +3,7 @@ package com.example.data
 import android.content.Context
 import android.graphics.Bitmap
 import kotlinx.coroutines.flow.StateFlow
+import com.example.domain.WallpaperRepository
 
 /**
  * WallpaperRepository implementation — Agent C split.

@@ -1042,7 +1042,7 @@ class LauncherRepository @Inject constructor(private val context: Context) :
     fun replyToNotification(packageName: String, replyText: String, key: String? = null, isDualApp: Boolean = false) {
         try {
             if (key != null) {
-                com.example.service.FluxNotificationListenerService.instance?.replyNotificationByKey(key, replyText)
+                com.example.service.FluxNotificationListenerService.replyNotificationByKey(key, replyText)
             } else {
                 com.example.service.FluxNotificationListenerService.replyToPackage(packageName, replyText, isDualApp)
             }
@@ -1088,7 +1088,7 @@ class LauncherRepository @Inject constructor(private val context: Context) :
 
     fun clearAllNotifications() {
         try {
-            com.example.service.FluxNotificationListenerService.instance?.cancelAllNotifications()
+            com.example.service.FluxNotificationListenerService.cancelAllNotifications()
         } catch (_: Throwable) {}
         if (_activeNotifications.value.isNotEmpty()) {
             _activeNotifications.value = emptyMap()

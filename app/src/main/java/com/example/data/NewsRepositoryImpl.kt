@@ -3,9 +3,15 @@ package com.example.data
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+
 import com.example.domain.NewsRepository
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -14,6 +20,8 @@ import kotlinx.coroutines.sync.withLock
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+
+val Context.settingsStore: DataStore<Preferences> by preferencesDataStore(name = "flux_launcher_settings")
 
 class NewsRepositoryImpl(private val context: Context) : NewsRepository {
     private val preferencesWrapper = NewsPreferences(context)
@@ -222,9 +230,8 @@ class NewsRepositoryImpl(private val context: Context) : NewsRepository {
     private fun isBatteryOptimizationEnabled(): Boolean {
         return try {
             runBlocking {
-                val Context.settingsStore by preferencesDataStore("flux_launcher_settings")
                 val prefs = context.settingsStore.data.first()
-                prefs[androidx.datastore.preferences.core.booleanPreferencesKey("batteryOptimizationMode")] ?: true
+                prefs[booleanPreferencesKey("batteryOptimizationMode")] ?: true
             }
         } catch (_: Throwable) { true }
     }

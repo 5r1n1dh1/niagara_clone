@@ -1,6 +1,7 @@
 package com.example.data
 
 import kotlinx.coroutines.flow.StateFlow
+import com.example.domain.FolderRepository
 
 /**
  * FolderRepository implementation — Agent C split.

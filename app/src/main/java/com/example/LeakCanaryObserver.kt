@@ -1,21 +1,27 @@
 package com.example
 
 import android.app.Application
-import leakcanary.LeakCanary
 
 /**
  * Minimal LeakCanary observer/config reference for Agent G.
- * Enables leak detection in debug builds to confirm no Activity/Context/Service leaks.
+ * LeakCanary is configured via dependency and detects leaks automatically
+ * when present in debug builds. This file avoids a hard dependency so the
+ * release build compiles even when the LeakCanary artifact is absent.
  */
 object LeakCanaryObserver {
     fun install(app: Application) {
         // Minimal observer reference: LeakCanary is configured via dependency
         // and will detect leaks automatically when present in debug builds.
         // See build.gradle.kts for dependency reference.
-        if (LeakCanary.isInAnalyzerProcess(app)) {
-            return
+        try {
+            val isInAnalyzerProcess = Class.forName("leakcanary.LeakCanary")
+                .getDeclaredMethod("isInAnalyzerProcess", Application::class.java)
+            val result = isInAnalyzerProcess.invoke(null, app) as? Boolean
+            if (result == true) {
+                return
+            }
+        } catch (_: Throwable) {
+            // LeakCanary dependency not present; skip observer installation.
         }
-        // Default installation (if LeakCanary dependency is included):
-        // LeakCanary.config = LeakCanary.config.copy(dumpHeapWhenDebugging = true)
     }
 }

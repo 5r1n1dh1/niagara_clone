@@ -329,7 +329,7 @@ private fun StepApiKey(
             singleLine = true,
             visualTransformation = if (showPassword) VisualTransformation { text ->
                 androidx.compose.ui.text.input.TransformedText(
-                    text.text,
+                    androidx.compose.ui.text.AnnotatedString(text.text),
                     object : androidx.compose.ui.text.input.OffsetMapping {
                         override fun originalToTransformed(offset: Int): Int = offset
                         override fun transformedToOriginal(offset: Int): Int = offset
@@ -382,6 +382,7 @@ private fun StepApiKey(
 }
 
 @Composable
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 private fun StepLanguageRegion(
     selectedLanguage: String,
     selectedCountry: String,
@@ -429,6 +430,7 @@ private fun StepLanguageRegion(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 private fun StepCategories(
     selectedCategories: Set<String>,

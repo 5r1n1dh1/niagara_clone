@@ -30,7 +30,7 @@ import javax.inject.Inject
 @HiltViewModel
 class LauncherViewModel @Inject constructor(
     application: Application,
-    private val repository: LauncherRepository,
+    internal val repository: LauncherRepository,
     private val settingsRepo: SettingsRepositoryImpl
 ) : AndroidViewModel(application) {
 
@@ -582,9 +582,6 @@ class LauncherViewModel @Inject constructor(
         val next = !settings.value.isHeadphonesConnected
         repository.setHeadphonesConnected(next)
         val msg = if (next) "Headphones connected! Audio apps surfaced." else "Headphones disconnected."
-
-    }
-
     }
 
     // Dock slot picker
@@ -738,6 +735,12 @@ class LauncherViewModel @Inject constructor(
         _isOnboardingForcedOpen.value = false
         repository.completeOnboarding()
 
+    }
+
+    fun showToast(message: String) {
+        try {
+            android.widget.Toast.makeText(getApplication(), message, android.widget.Toast.LENGTH_SHORT).show()
+        } catch (_: Throwable) {}
     }
 
     fun completeSetupGuide(

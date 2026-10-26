@@ -4,10 +4,11 @@ import java.util.Properties
 
 plugins {
   alias(libs.plugins.android.application)
+  alias(libs.plugins.hilt.android)
+  alias(libs.plugins.google.devtools.ksp)
   alias(libs.plugins.kotlin.compose)
   alias(libs.plugins.roborazzi)
   alias(libs.plugins.secrets)
-  alias(libs.plugins.hilt.android)
   alias(libs.plugins.kotlinx.serialization)
 }
 
@@ -189,6 +190,7 @@ dependencies {
   implementation(libs.kotlinx.coroutines.android)
   implementation(libs.kotlinx.coroutines.core)
   implementation(libs.hilt.android)
+  implementation(libs.dagger)
   ksp(libs.hilt.compiler)
   implementation(libs.kotlinx.serialization.json)
   // implementation(libs.logging.interceptor)

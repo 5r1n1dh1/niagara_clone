@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.graphics.drawable.Drawable
 import androidx.compose.ui.graphics.Color
 
+import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 
 enum class IconPackType(val displayName: String) {
@@ -260,7 +261,9 @@ data class LauncherSettings(
     val blurBackgrounds: Boolean = true,
     val waveAlphabetHapticIntensity: Int = 2, // 1: subtle, 2: medium, 3: heavy
     val batteryOptimizationMode: Boolean = true, // Note: wired to real policy in Agent I (v1.0.1)
+    @Contextual
     val customIconSettings: CustomIconPackSettings = CustomIconPackSettings(),
+    @Contextual
     val autoWallpaperConfig: AutoWallpaperConfig = AutoWallpaperConfig(),
     val hasCompletedOnboarding: Boolean = false
 )

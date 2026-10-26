@@ -20,6 +20,10 @@ import android.os.Bundle
 import android.os.SystemClock
 import android.provider.Settings
 import android.service.notification.NotificationListenerService
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.preferencesDataStore
 import android.service.notification.StatusBarNotification
 import androidx.core.app.NotificationManagerCompat
 import androidx.datastore.preferences.preferencesDataStore
@@ -30,6 +34,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
@@ -39,7 +44,10 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+val Context.settingsStore: DataStore<Preferences> by preferencesDataStore(name = "flux_launcher_settings")
+
 class FluxNotificationListenerService : NotificationListenerService() {
+    private val settingsStore: DataStore<Preferences> by lazy { this.settingsStore }
 
     private val serviceScope = CoroutineScope(Dispatchers.Default)
     private var mediaProgressPollJob: Job? = null
@@ -144,8 +152,7 @@ class FluxNotificationListenerService : NotificationListenerService() {
     private fun isBatteryOptimizationEnabled(): Boolean {
         return try {
             runBlocking {
-                val Context.settingsStore by preferencesDataStore("flux_launcher_settings")
-                val prefs = context.settingsStore.data.first()
+                val prefs = settingsStore.data.first()
                 prefs[booleanPreferencesKey("batteryOptimizationMode")] ?: true
             }
         } catch (_: Throwable) { true }
@@ -708,6 +715,16 @@ class FluxNotificationListenerService : NotificationListenerService() {
         }
 
         fun replyToPackage(packageName: String, replyText: String, isDualApp: Boolean = false): Boolean {
+            // Static instance removed; service injected via Hilt for v1.0.1
+            return false
+        }
+
+        fun replyNotificationByKey(key: String, replyText: String): Boolean {
+            // Static instance removed; service injected via Hilt for v1.0.1
+            return false
+        }
+
+        fun cancelAllNotifications(): Boolean {
             // Static instance removed; service injected via Hilt for v1.0.1
             return false
         }

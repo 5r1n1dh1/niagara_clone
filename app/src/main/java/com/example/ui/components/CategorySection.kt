@@ -16,7 +16,16 @@ fun CategorySection(
     Column(modifier = modifier.fillMaxWidth()) {
         Text(text = title, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
         apps.forEach { app ->
-            AppListItem(app = app, iconPackType = com.example.data.IconPackType.MATERIAL)
+            AppListItem(
+                app = app,
+                iconPackType = com.example.data.IconPackType.MATERIAL,
+                isLeftHanded = false,
+                fontScale = 1f,
+                onAppClick = {},
+                onAppLongClick = {},
+                onReplyNotification = {},
+                onDismissNotification = {}
+            )
         }
     }
 }

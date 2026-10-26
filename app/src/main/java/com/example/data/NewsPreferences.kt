@@ -18,7 +18,7 @@ class NewsPreferences(context: Context) {
         val configured = booleanPreferencesKey("configured").let { prefs[it] } ?: false
         val language = stringPreferencesKey("language").let { prefs[it] } ?: "en"
         val country = stringPreferencesKey("country").let { prefs[it] } ?: ""
-        val rawCategories = prefs[setPreferencesKey("categories")]?.toSet() ?: setOf("general")
+        val rawCategories = prefs[stringSetPreferencesKey("categories")]?.toSet() ?: setOf("general")
         val sanitizedCategories = rawCategories.filter { it in RemoteConfig.CURRENTS_CATEGORIES }.toSet().ifEmpty { setOf("general") }
         val keywords = stringPreferencesKey("keywords").let { prefs[it] } ?: ""
         val query = stringPreferencesKey("query").let { prefs[it] } ?: ""
@@ -59,7 +59,7 @@ class NewsPreferences(context: Context) {
                 mutablePrefs[booleanPreferencesKey("configured")] = state.configured
                 mutablePrefs[stringPreferencesKey("language")] = state.language
                 mutablePrefs[stringPreferencesKey("country")] = state.country
-                mutablePrefs[setPreferencesKey("categories")] = state.categories
+                mutablePrefs[stringSetPreferencesKey("categories")] = state.categories
                 mutablePrefs[stringPreferencesKey("keywords")] = state.keywords
                 mutablePrefs[stringPreferencesKey("query")] = state.query
                 mutablePrefs[booleanPreferencesKey("use_date_window")] = state.useDateWindow

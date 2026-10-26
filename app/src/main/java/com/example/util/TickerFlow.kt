@@ -30,8 +30,8 @@ object TickerFlow {
     }
 
     /** Convenience per-second ticker for visible-clock updates. */
-    val perSecondTicker: Flow<Long> = tick.asStateFlow()
+    val perSecondTicker: Flow<Long> = tick
 
     /** Convenience per-minute ticker for non-second-visible clocks. */
-    val perMinuteTicker: Flow<Long> = tick.asStateFlow()
+    val perMinuteTicker: Flow<Long> = tick
 }
