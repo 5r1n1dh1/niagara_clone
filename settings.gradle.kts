@@ -1,4 +1,5 @@
 pluginManagement {
+  includeBuild("build-logic")
   repositories {
     google {
       content {
@@ -25,3 +26,24 @@ dependencyResolutionManagement {
 rootProject.name = "Flux Launcher"
 
 include(":app")
+
+// Core modules
+include(":core:common")
+include(":core:data")
+include(":core:domain")
+include(":core:ui")
+
+// Feature modules
+include(":feature:home")
+include(":feature:appdrawer")
+include(":feature:widgets")
+include(":feature:notifications")
+include(":feature:wallpaper")
+include(":feature:settings")
+include(":feature:shortcuts")
+include(":feature:onboarding")
+
+// System modules
+include(":system:notificationlistener")
+include(":system:accessibility")
+include(":system:widgethost")
