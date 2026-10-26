@@ -301,7 +301,7 @@ data class NewsStory(
     val publisher: String,
     val imageUrl: String?,
     val category: String,
-    val publishedAtEpochMillis: Long
+    val publishedAtEpochMillis: Long?
 )
 
 sealed interface NewsFeedState {
@@ -341,5 +341,7 @@ data class NewsPreferencesState(
 )
 
 data class NewsCategory(val code: String, val label: String)
+
+class NewsApiException(val code: Int, val newsError: NewsError) : Exception(newsError.toString())
 
 

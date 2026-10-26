@@ -45,6 +45,10 @@ fun clearIconBitmapCache() {
     try {
         iconBitmapCache.evictAll()
     } catch (_: Throwable) {}
+    try {
+        val context = android.app.Application.getProcessName()
+        // Defer to repository-level cleanup for news cache
+    } catch (_: Throwable) {}
 }
 
 @Composable

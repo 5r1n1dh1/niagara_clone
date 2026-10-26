@@ -109,7 +109,8 @@ fun NewsWidget(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 12.dp),
+                            .padding(vertical = 12.dp)
+                            .testTag("news_widget_state"),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
@@ -135,19 +136,31 @@ fun NewsWidget(
                     }
                 }
                 is NewsFeedState.Loading -> {
-                    if (state.cached.isNotEmpty()) {
-                        StoryList(stories = state.cached, size = size, onOpenArticle = onOpenArticle)
-                    } else {
-                        Box(modifier = Modifier.fillMaxWidth().height(100.dp), contentAlignment = Alignment.Center) {
-                            CircularProgressIndicator(modifier = Modifier.size(28.dp))
+                    Column(
+                        modifier = Modifier.testTag("news_widget_state"),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        if (state.cached.isNotEmpty()) {
+                            LinearProgressIndicator(
+                                modifier = Modifier.fillMaxWidth().height(2.dp),
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                        if (state.cached.isNotEmpty()) {
+                            StoryList(stories = state.cached, size = size, onOpenArticle = onOpenArticle)
+                        } else {
+                            Box(modifier = Modifier.fillMaxWidth().height(100.dp), contentAlignment = Alignment.Center) {
+                                CircularProgressIndicator(modifier = Modifier.size(28.dp))
+                                Text(text = "Fetching headlines…", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 36.dp))
+                            }
                         }
                     }
                 }
                 is NewsFeedState.Ready -> {
                     if (state.stories.isEmpty()) {
-                        EmptyStateMessage(onOpenSetup)
+                        EmptyStateMessage(onOpenSetup, modifier = Modifier.testTag("news_widget_state"))
                     } else {
-                        StoryList(stories = state.stories, size = size, onOpenArticle = onOpenArticle)
+                        StoryList(stories = state.stories, size = size, onOpenArticle = onOpenArticle, modifier = Modifier.testTag("news_widget_state"))
                     }
                 }
                 is NewsFeedState.Stale -> {
@@ -202,7 +215,7 @@ fun NewsWidget(
 }
 
 @Composable
-private fun StoryList(stories: List<NewsStory>, size: String, onOpenArticle: (String) -> Unit) {
+private fun StoryList(stories: List<NewsStory>, size: String, onOpenArticle: (String) -> Unit, modifier: Modifier = Modifier) {
     val maxItems = when (size) {
         "4x1" -> 1
         "4x2" -> 2
@@ -211,7 +224,7 @@ private fun StoryList(stories: List<NewsStory>, size: String, onOpenArticle: (St
     }
     val visibleStories = stories.take(maxItems)
 
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         visibleStories.forEachIndexed { index, story ->
             StoryRow(story = story, size = size, index = index, onOpenArticle = onOpenArticle)
             if (index < visibleStories.size - 1) {
@@ -301,8 +314,8 @@ private fun StoryRow(story: NewsStory, size: String, index: Int, onOpenArticle: 
 }
 
 @Composable
-private fun EmptyStateMessage(onOpenSetup: () -> Unit) {
-    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+private fun EmptyStateMessage(onOpenSetup: () -> Unit, modifier: Modifier = Modifier) {
+    Column(modifier = modifier.fillMaxWidth().padding(vertical = 12.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(text = "No articles found", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         TextButton(onClick = onOpenSetup) {
             Text("Adjust filters")
@@ -310,7 +323,8 @@ private fun EmptyStateMessage(onOpenSetup: () -> Unit) {
     }
 }
 
-private fun formatTimeAgo(epochMillis: Long): String {
+private fun formatTimeAgo(epochMillis: Long?): String {
+    if (epochMillis == null || epochMillis <= 0) return ""
     val diff = System.currentTimeMillis() - epochMillis
     val minutes = diff / (1000 * 60)
     val hours = minutes / 60

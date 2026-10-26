@@ -137,12 +137,20 @@ class MainActivity : ComponentActivity() {
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
         if (level >= TRIM_MEMORY_BACKGROUND) {
+            try {
+                val cacheFile = java.io.File(cacheDir, "news_cache.json")
+                if (cacheFile.exists()) cacheFile.delete()
+            } catch (_: Throwable) {}
             com.example.ui.components.clearIconBitmapCache()
         }
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        try {
+            val cacheFile = java.io.File(cacheDir, "news_cache.json")
+            if (cacheFile.exists()) cacheFile.delete()
+        } catch (_: Throwable) {}
         com.example.ui.components.clearIconBitmapCache()
     }
 }

@@ -30,6 +30,10 @@ class NewsApiClient(private val context: Context, private val preferences: NewsP
         val endpoint = if (useSearch) RemoteConfig.CURRENTS_SEARCH_PATH else RemoteConfig.CURRENTS_LATEST_NEWS_PATH
         val urlString = buildUrl(endpoint, prefs, page)
 
+        // Debug assertions per spec §4.3
+        assert(!(endpoint == RemoteConfig.CURRENTS_LATEST_NEWS_PATH && (prefs.keywords.isNotBlank() || prefs.query.isNotBlank() || prefs.useDateWindow))) { "Disallowed search-only params on /latest-news" }
+        assert(!(endpoint == RemoteConfig.CURRENTS_SEARCH_PATH && prefs.keywords.isBlank() && prefs.query.isBlank())) { "/search must not emit keywords/query when both blank" }
+
         val conn = (URL(urlString).openConnection() as HttpURLConnection).apply {
             connectTimeout = 15000
             readTimeout = 20000
@@ -41,6 +45,10 @@ class NewsApiClient(private val context: Context, private val preferences: NewsP
 
         try {
             val code = conn.responseCode
+            val finalHost = conn.url?.host ?: ""
+            if (!finalHost.contains("api.currentsapi.services")) {
+                throw NewsApiException(-1, NewsError.Unknown("Redirected to unauthorized host: $finalHost"))
+            }
             val remaining = conn.getHeaderField("X-RateLimit-Remaining")?.toIntOrNull() ?: 100
             val reset = conn.getHeaderField("X-RateLimit-Reset")?.toLongOrNull() ?: (System.currentTimeMillis() / 1000 + 3600)
 
@@ -58,7 +66,7 @@ class NewsApiClient(private val context: Context, private val preferences: NewsP
             }
 
             val responseBody = conn.inputStream.bufferedReader().use { it.readText() }
-            val stories = parseStories(responseBody)
+            val stories = parseStories(responseBody, prefs.pageSize)
             NewsFetchResult(stories, remaining, reset)
         } catch (e: NewsApiException) {
             throw e
@@ -86,11 +94,21 @@ class NewsApiClient(private val context: Context, private val preferences: NewsP
             if (prefs.keywords.isNotBlank()) sb.append("&keywords=").append(android.net.Uri.encode(prefs.keywords))
             if (prefs.query.isNotBlank()) sb.append("&query=").append(android.net.Uri.encode(prefs.query))
             if (prefs.requireImages) sb.append("&has_image=true")
+            // Compute date window from window_hours, clamped to 30-day lookback
+            val now = System.currentTimeMillis()
+            val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).apply { timeZone = TimeZone.getTimeZone("UTC") }
+            val endStr = sdf.format(Date(now))
+            val startMs = now - (prefs.windowHours * 3600L * 1000L)
+            val maxLookbackMs = 30L * 24 * 3600 * 1000
+            val clampedStartMs = maxOf(startMs, now - maxLookbackMs)
+            val startStr = sdf.format(Date(clampedStartMs))
+            sb.append("&start_date=").append(android.net.Uri.encode(startStr))
+            sb.append("&end_date=").append(android.net.Uri.encode(endStr))
         }
         return sb.toString()
     }
 
-    private fun parseStories(jsonStr: String): List<NewsStory> {
+    private fun parseStories(jsonStr: String, maxItems: Int = 20): List<NewsStory> {
         val list = mutableListOf<NewsStory>()
         try {
             val root = JSONObject(jsonStr)
@@ -122,9 +140,9 @@ class NewsApiClient(private val context: Context, private val preferences: NewsP
 
                 val publishedStr = obj.optString("published", "")
                 val publishedEpoch = try {
-                    dateFormat.parse(publishedStr)?.time ?: System.currentTimeMillis()
+                    dateFormat.parse(publishedStr)?.time
                 } catch (_: Throwable) {
-                    System.currentTimeMillis()
+                    null
                 }
 
                 list.add(NewsStory(id, title, description, url, publisher, imageUrl, category, publishedEpoch))
@@ -132,8 +150,7 @@ class NewsApiClient(private val context: Context, private val preferences: NewsP
         } catch (t: Throwable) {
             Log.e(tag, "Error parsing news JSON: ${t.message}", t)
         }
-        return list.distinctBy { it.id }
+        return list.distinctBy { it.id }.take(maxItems)
     }
 }
 
-class NewsApiException(val code: Int, val newsError: NewsError) : Exception(newsError.toString())
