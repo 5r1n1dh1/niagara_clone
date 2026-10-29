@@ -16,3 +16,11 @@
 local.properties
 .env
 debug.keystore
+
+# Release signing material — never commit.
+# `release-key.jks` is the persistent release key generated once per checkout; the CI
+# workflow decodes it from the `RELEASE_KEYSTORE_BASE64` repository secret instead of
+# reading it from git. See docs/RELEASE.md.
+release-key.jks
+my-upload-key.jks
+*.jks

@@ -1,19 +1,31 @@
 name: Release APK
 
+# ---------------------------------------------------------------------------
+# QUOTA-SAFE RELEASE PIPELINE.
+#
+# Runs ONLY on tag pushes (`v*`) or manual dispatch — never on ordinary pushes or
+# PRs — so ordinary development traffic costs zero quota. It builds the release APK,
+# normalises the asset name to `flux.apk`, and uploads it to the EXISTING GitHub
+# release (the release itself is created by the release manager / orchestrator, not
+# by this workflow).
+# ---------------------------------------------------------------------------
+
 on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch: {}
+
+# One release job per ref at a time; a newer tag/run cancels the previous one.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build-release:
     name: Build and Release APK
     runs-on: ubuntu-latest
-    env:
-      RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
-      KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-      KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-      KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+    timeout-minutes: 20
 
     steps:
       - name: Checkout Repository
@@ -31,31 +43,76 @@ jobs:
           gradle-version: '9.3.1'
 
       - name: Ensure gradlew executable
+        run: chmod +x gradlew
+
+      # Signing material + .env are prepared in ONE step:
+      #   * if `secrets.RELEASE_KEYSTORE_BASE64` exists -> decode it to
+      #     `${GITHUB_WORKSPACE}/my-upload-key.jks` and export KEYSTORE_PATH so the
+      #     Gradle release signingConfig picks it up and signs with the PERSISTENT key
+      #   * otherwise generate a throw-away debug keystore so the build still
+      #     completes (with a loud warning from Gradle about non-installable output)
+      - name: Prepare Keystore and Environment
+        env:
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: |
-          chmod +x gradlew
+          set -e
+          # .env is required by the secrets Gradle plugin
+          if [ ! -f .env ]; then
+            touch .env
+            echo "Created empty .env file"
+          fi
+
+          echo "$RELEASE_KEYSTORE_BASE64" | base64 -d > "${GITHUB_WORKSPACE}/my-upload-key.jks" || true
+
+          if [ -s "${GITHUB_WORKSPACE}/my-upload-key.jks" ]; then
+            echo "Decoded release keystore from RELEASE_KEYSTORE_BASE64 secret."
+            echo "KEYSTORE_PATH=${GITHUB_WORKSPACE}/my-upload-key.jks" >> "$GITHUB_ENV"
+            echo "STORE_PASSWORD=$KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
+            echo "KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
+            echo "KEY_PASSWORD=$KEY_PASSWORD" >> "$GITHUB_ENV"
+            echo "KEY_ALIAS=$KEY_ALIAS" >> "$GITHUB_ENV"
+          else
+            echo "No RELEASE_KEYSTORE_BASE64 secret — generating debug keystore fallback."
+            rm -f "${GITHUB_WORKSPACE}/my-upload-key.jks"
+            keytool -genkey -v \
+              -keystore debug.keystore \
+              -storepass android \
+              -alias androiddebugkey \
+              -keypass android \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -dname "CN=Android Debug,O=Android,C=US"
+          fi
+
+          ls -l debug.keystore "${GITHUB_WORKSPACE}"/my-upload-key.jks 2>/dev/null || true
 
       - name: Build Release APK
-        run: ./gradlew assembleRelease --no-daemon --stacktrace
+        run: ./gradlew assembleRelease --no-daemon
 
-      - name: Sign Release APK
+      # Normalise the asset name to `flux.apk` for the releases page.
+      - name: Copy APK to flux.apk
         run: |
-          # Signing performed via environment secrets if keystore configured;
-          # build.gradle.kts uses release signingConfig with secrets.
-          echo "APK signed via release config (env secrets)"
+          APK_FILE=$(find app/build/outputs/apk/release/ -name "*.apk" ! -name "flux.apk" | head -n 1)
+          if [ -z "$APK_FILE" ]; then
+            echo "ERROR: no release APK produced."
+            ls -la app/build/outputs/apk/release/ || true
+            exit 1
+          fi
+          cp "$APK_FILE" flux.apk
+          echo "flux.apk size: $(du -h flux.apk | cut -f1)"
+          ls -l flux.apk
 
       - name: Test
-        run: ./gradlew testDebugUnitTest lint detekt --no-daemon
+        run: ./gradlew testDebugUnitTest --no-daemon
 
-      - name: Upload Release Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: flux-launcher-release-apk
-          path: app/build/outputs/apk/release/*.apk
-          retention-days: 30
-
-      - name: Create GitHub Release
+      # Upload only — the GitHub release must already exist (tag push creates it via
+      # the release notes, or it was created manually/by the orchestrator).
+      - name: Upload flux.apk to GitHub release
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release create "${GITHUB_REF_NAME}" --title "Release ${GITHUB_REF_NAME}" \
-            --notes "Release ${GITHUB_REF_NAME} — APK artifact attached." || true
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${GITHUB_REF_NAME}" flux.apk --clobber --repo "${GITHUB_REPOSITORY}"
+        continue-on-error: false

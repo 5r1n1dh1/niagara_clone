@@ -16,7 +16,18 @@ android {
   namespace = "com.example"
   compileSdk { version = release(36) { minorApiLevel = 1 } }
 
-  // Auto-incrementing versionCode and versionName to enable seamless in-place APK updates
+  // Auto-incrementing versionCode and versionName to enable seamless in-place APK updates.
+  //
+  // `versionCode` MUST strictly increase for every shipped build, otherwise Android's
+  // PackageInstaller refuses an in-place update on the device. When `versionCode` is
+  // commented out in version.properties (the default, "auto" mode) we derive a
+  // timestamp-based code that grows on every build.
+  //
+  // `coerceAtLeast(MIN_VERSION_CODE)` guarantees the auto value is ALWAYS higher than any
+  // build shipped so far — in particular the pinned `versionCode=2` published in v1.0.1 —
+  // so the very first auto build updates in place instead of being rejected.
+  val MIN_VERSION_CODE = 2
+
   val versionProps = Properties()
   val versionPropsFile = file("${rootDir}/version.properties")
   if (versionPropsFile.exists()) {
@@ -27,9 +38,12 @@ android {
 
   val autoVersionCode: Int = versionProps.getProperty("versionCode")?.toIntOrNull()
     ?: (((System.currentTimeMillis() / 1000) - 1700000000L) / 10).toInt()
+      .coerceAtLeast(MIN_VERSION_CODE)
 
   val autoVersionName: String = versionProps.getProperty("versionName")
     ?: "1.0.$autoVersionCode"
+
+  println("RESOLVED versionCode=${autoVersionCode} versionName=${autoVersionName}")
 
   defaultConfig {
     applicationId = "com.aistudio.fluxlauncher.vknwre"
@@ -49,36 +63,59 @@ android {
       keyAlias = "androiddebugkey"
       keyPassword = "android"
     }
+    // Persistent release signing key.
+    //
+    // Keystore resolution order:
+    //   1. `KEYSTORE_PATH` env — CI decodes the base64 secret into a file and exports this
+    //   2. `${rootDir}/release-key.jks` — the persistent, reproducible release key (gitignored)
+    //   3. `${rootDir}/my-upload-key.jks` — legacy location, kept so older setups keep working
+    //
+    // Passwords/alias come from env vars and fall back to the defaults baked into the
+    // project's own `release-key.jks` (see docs/RELEASE.md). Signing EVERY release with
+    // the SAME key is what makes in-place updates work on a real device.
     create("release") {
-      val envKeystore = System.getenv("KEYSTORE_PATH")
-      val keystorePath = envKeystore ?: "${rootDir}/my-upload-key.jks"
-      val keystoreFile = file(keystorePath)
-      val storePass = System.getenv("STORE_PASSWORD") ?: System.getenv("KEYSTORE_PASSWORD") ?: System.getenv("KEYSTORE_PASS")
-      val keyPass = System.getenv("KEY_PASSWORD") ?: System.getenv("KEY_PASS") ?: storePass
-      val alias = System.getenv("KEY_ALIAS") ?: "upload"
+      val storePass: String = System.getenv("STORE_PASSWORD")
+        ?: System.getenv("KEYSTORE_PASSWORD")
+        ?: System.getenv("KEYSTORE_PASS")
+        ?: "fluxstorepass"
+      val keyPass: String = System.getenv("KEY_PASSWORD")
+        ?: System.getenv("KEY_PASS")
+        ?: "fluxkeypass"
+      val alias: String = System.getenv("KEY_ALIAS")?.takeIf { it.isNotBlank() } ?: "flux-release"
 
-      var isValidKeystore = false
-      if (keystoreFile.exists() && keystoreFile.length() > 0 && !storePass.isNullOrBlank()) {
-        try {
-          val ks = KeyStore.getInstance(KeyStore.getDefaultType())
-          FileInputStream(keystoreFile).use { stream ->
-            ks.load(stream, storePass.toCharArray())
-          }
-          if (ks.containsAlias(alias) && ks.getKey(alias, (keyPass ?: storePass).toCharArray()) != null) {
-            isValidKeystore = true
-          }
-        } catch (_: Exception) {
-          isValidKeystore = false
+      val keystoreFile: File? = listOfNotNull(
+        System.getenv("KEYSTORE_PATH")?.takeIf { it.isNotBlank() },
+        "${rootDir}/release-key.jks",
+        "${rootDir}/my-upload-key.jks",
+      )
+        .map { file(it) }
+        .firstOrNull { candidate ->
+          candidate.exists() && candidate.length() > 0 && runCatching {
+            val ks = KeyStore.getInstance(KeyStore.getDefaultType())
+            FileInputStream(candidate).use { stream ->
+              ks.load(stream, storePass.toCharArray())
+            }
+            ks.containsAlias(alias) && ks.getKey(alias, keyPass.toCharArray()) != null
+          }.getOrDefault(false)
         }
-      }
 
-      if (isValidKeystore) {
+      if (keystoreFile != null) {
         storeFile = keystoreFile
         storePassword = storePass
         keyAlias = alias
         keyPassword = keyPass
+        println("RELEASE SIGNING: using persistent keystore '${keystoreFile.absolutePath}' (alias '$alias')")
       } else {
-        // Fallback to debug keystore so release build compiles and packages successfully
+        // Fallback to debug keystore so release build compiles and packages successfully.
+        // This is intentionally loud: a debug-signed APK cannot be updated in place by a
+        // later release-signed build (signature mismatch), so CI/local runs in this state
+        // produce an APK that must be uninstalled before installing the real release.
+        println(
+          "RELEASE SIGNING WARNING: no valid release keystore found " +
+            "(tried KEYSTORE_PATH, release-key.jks, my-upload-key.jks with alias '$alias'); " +
+            "FALLING BACK TO THE DEBUG KEYSTORE. Resulting APK will NOT update in place. " +
+            "See docs/RELEASE.md.",
+        )
         storeFile = file("${rootDir}/debug.keystore")
         storePassword = "android"
         keyAlias = "androiddebugkey"

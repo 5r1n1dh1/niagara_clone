@@ -1,32 +1,53 @@
-name: Build Android APK
+name: Validate
+
+# ---------------------------------------------------------------------------
+# QUOTA-SAFE CI.
+#
+# GitHub Actions quota is EXHAUSTED, so this workflow is deliberately cheap:
+#   * documentation/design-only pushes are ignored entirely (paths-ignore)
+#   * concurrency cancels superseded runs for the same ref
+#   * the job only compiles + tests + lints (no assembleRelease, no packaging)
+#   * release builds happen ONLY in release.yml (tag push / manual dispatch there)
+#
+# The release APK is built by `.github/workflows/release.yml` on tag pushes; it is
+# published on the GitHub Releases page as `flux.apk`.
+# ---------------------------------------------------------------------------
 
 on:
   push:
-    branches: [ "main", "master" ]
+    branches: [ "main" ]
+    # Docs and design notes must never burn CI quota — they cannot break the build.
+    paths-ignore:
+      - '**/*.md'
+      - 'design/**'
+      - 'docs/**'
   pull_request:
-    branches: [ "main", "master" ]
+    branches: [ "main" ]
+    # `opened` covers new PRs; `synchronize` covers new commits; `ready_for_review`
+    # covers draft PRs being marked ready (skipping noisy draft iterations).
+    types: [ opened, synchronize, ready_for_review ]
   workflow_dispatch:
     inputs:
       build_type:
-        description: 'Build Type (debug or release)'
+        description: 'Build Type (debug / release / both)'
         required: true
-        default: 'release'
+        default: 'debug'
         type: choice
         options:
           - debug
           - release
           - both
 
+# One run per ref at a time; a newer push cancels the previous in-flight run.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  build:
-    name: Build & Package APK
+  validate:
+    name: Compile, Test & Lint (quota-safe)
     runs-on: ubuntu-latest
-    env:
-      RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
-      KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-      KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-      KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+    timeout-minutes: 15
 
     steps:
       - name: Checkout Repository
@@ -51,22 +72,16 @@ jobs:
           fi
           chmod +x gradlew
 
-      - name: Prepare Environment Files and Keystore
+      # create an empty .env if missing so the secrets Gradle plugin doesn't fail.
+      # Cheap and side-effect free; no keystores are decoded on this path.
+      - name: Prepare Environment Files and Debug Keystore
         run: |
-          # Create empty .env file if missing so secrets gradle plugin doesn't fail
           if [ ! -f .env ]; then
             touch .env
             echo "Created empty .env file"
           fi
 
-          # 1. Attempt to restore debug.keystore from debug.keystore.base64 if present
-          if [ -f debug.keystore.base64 ] && [ ! -f debug.keystore ]; then
-            echo "Decoding debug.keystore from debug.keystore.base64..."
-            base64 -d debug.keystore.base64 > debug.keystore 2>/dev/null || true
-          fi
-
-          # 2. If debug.keystore is missing or zero-sized, generate a standard Android debug keystore
-          if [ ! -f debug.keystore ] || [ ! -s debug.keystore ]; then
+          if [ ! -f debug.keystore ]; then
             echo "debug.keystore not found. Generating standard Android debug keystore with keytool..."
             keytool -genkey -v \
               -keystore debug.keystore \
@@ -82,46 +97,72 @@ jobs:
           echo "Debug keystore status:"
           ls -l debug.keystore
 
-      - name: Setup Release Keystore (Optional)
+      # 1) Compilation gate: fail fast, before any test/lint work is run.
+      - name: Compile Debug Kotlin
+        run: ./gradlew compileDebugKotlin --no-daemon
+
+      # 2) Tests MUST gate the build (no continue-on-error here).
+      #    lint and detekt are advisory: they may fail without blocking the run,
+      #    so doc/test-only pushes stay green and quota is not spent re-running them forever.
+      - name: Unit Tests
+        run: ./gradlew testDebugUnitTest --no-daemon --continue
+
+      - name: Lint
+        continue-on-error: true
+        run: ./gradlew lint --no-daemon --continue
+
+      - name: Detekt
+        continue-on-error: true
+        run: ./gradlew detekt --no-daemon --continue
+
+      - name: Upload Test and Lint Reports
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-and-lint-reports
+          path: |
+            app/build/reports/tests/
+            app/build/reports/lint-results-debug.*
+            app/build/reports/detekt/
+          if-no-files-found: warn
+          retention-days: 7
+
+      # ---------------------------------------------------------------------
+      # Release build: ONLY on manual dispatch with build_type 'release'/'both'.
+      # Keystore decoding is confined to this step — the cheap validation path
+      # above never touches signing material.
+      # ---------------------------------------------------------------------
+      - name: Prepare Release Keystore (dispatch only)
+        if: github.event_name == 'workflow_dispatch' && (github.event.inputs.build_type == 'release' || github.event.inputs.build_type == 'both')
+        env:
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: |
           echo "$RELEASE_KEYSTORE_BASE64" | base64 -d > "${GITHUB_WORKSPACE}/my-upload-key.jks" || true
           if [ -s "${GITHUB_WORKSPACE}/my-upload-key.jks" ]; then
+            echo "Decoded release keystore from RELEASE_KEYSTORE_BASE64 secret."
             echo "KEYSTORE_PATH=${GITHUB_WORKSPACE}/my-upload-key.jks" >> $GITHUB_ENV
             echo "STORE_PASSWORD=$KEYSTORE_PASSWORD" >> $GITHUB_ENV
             echo "KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD" >> $GITHUB_ENV
             echo "KEY_PASSWORD=$KEY_PASSWORD" >> $GITHUB_ENV
             echo "KEY_ALIAS=$KEY_ALIAS" >> $GITHUB_ENV
           else
-            echo "Keystore is empty or failed to decode, removing empty file to allow fallback"
+            echo "No RELEASE_KEYSTORE_BASE64 secret (or empty) — removing empty file;"
+            echo "the Gradle build will emit a loud warning and fall back to the debug key."
             rm -f "${GITHUB_WORKSPACE}/my-upload-key.jks"
           fi
 
-      - name: Build Release APK
-        run: |
-          set -o pipefail
-          ./gradlew assembleRelease --no-daemon --stacktrace 2>&1 | tee -a gradle-build.log
+      - name: Assemble Release APK (dispatch only)
+        if: github.event_name == 'workflow_dispatch' && (github.event.inputs.build_type == 'release' || github.event.inputs.build_type == 'both')
+        run: ./gradlew assembleRelease --no-daemon
 
-      - name: Zip Release APK
-        run: |
-          APK_FILE=$(find app/build/outputs/apk/release/ -name "*.apk" | head -n 1)
-          echo "APK_FILE=$APK_FILE"
-          zip "${APK_FILE}.zip" "$APK_FILE"
-          echo "ZIPPED_APK=${APK_FILE}.zip" >> $GITHUB_ENV
-
-      - name: Unzip Release APK
-        run: |
-          unzip -o "${ZIPPED_APK}" -d app/build/outputs/apk/release/unzipped/
-          echo "Unzipped APK contents:"
-          ls -la app/build/outputs/apk/release/unzipped/
-
-      - name: Test and Lint
-        run: |
-          ./gradlew testDebugUnitTest lint detekt --no-daemon --stacktrace || echo "Some checks had failures (documented)"
-
-      - name: Upload Release APK Artifact
+      - name: Upload Release APK (dispatch only)
+        if: github.event_name == 'workflow_dispatch' && (github.event.inputs.build_type == 'release' || github.event.inputs.build_type == 'both')
         uses: actions/upload-artifact@v4
         with:
           name: flux-launcher-release-apk
           path: app/build/outputs/apk/release/*.apk
           if-no-files-found: warn
-          retention-days: 30
+          retention-days: 7
