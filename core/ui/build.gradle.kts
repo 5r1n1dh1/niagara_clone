@@ -20,6 +20,8 @@ android {
 dependencies {
   implementation(project(":core:common"))
   implementation(project(":core:domain"))
+  // Compose BOM required for versionless `libs.androidx.compose.*` aliases.
+  implementation(platform(libs.androidx.compose.bom))
   implementation(libs.androidx.compose.ui)
   implementation(libs.androidx.compose.material3)
 }

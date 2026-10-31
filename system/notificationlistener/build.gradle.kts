@@ -18,5 +18,8 @@ android {
 }
 
 dependencies {
+  // Convention plugin applies the Compose compiler; runtime must be on the classpath.
+  implementation(platform(libs.androidx.compose.bom))
+  implementation(libs.androidx.compose.ui)
   implementation(project(":core:domain"))
 }
