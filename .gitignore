@@ -24,3 +24,5 @@ debug.keystore
 release-key.jks
 my-upload-key.jks
 *.jks
+build-logic/build
+flux.apk
