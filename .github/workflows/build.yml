@@ -61,6 +61,13 @@ jobs:
           elif [[ "$GITHUB_REF" == refs/tags/v* ]]; then echo "type=release" >> $GITHUB_OUTPUT
           else echo "type=debug" >> $GITHUB_OUTPUT; fi
 
+      - name: Ensure debug keystore (signing config requirement)
+        run: |
+          if [ ! -f debug.keystore ]; then
+            keytool -genkeypair -v -keystore debug.keystore -storetype JKS -alias androiddebugkey \
+              -keyalg RSA -keysize 2048 -validity 10000 -storepass android -keypass android \
+              -dname "CN=Android Debug,O=Android,C=US"
+          fi
       - name: Build Debug APK
         if: steps.bt.outputs.type != 'release'
         run: ./gradlew :app:assembleDebug --no-daemon
