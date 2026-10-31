@@ -1,6 +1,7 @@
 package com.example
 
 import android.os.Bundle
+import dagger.hilt.android.AndroidEntryPoint
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -12,6 +13,7 @@ import com.example.ui.components.SettingsStudioSheet
 import com.example.ui.theme.NiagaraTheme
 import com.example.util.WidgetIntegrationsManager
 
+@AndroidEntryPoint
 class SettingsActivity : ComponentActivity() {
 
     private lateinit var repository: LauncherRepository
