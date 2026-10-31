@@ -1,5 +1,15 @@
 # Plan v2.0.0 — CI Quota Safety, Release Naming, In-Place Updates, Glassmorphism, Performance & Animations
 
+> **STATUS: COMPLETE (2026-11-01).** Shipped via `v2.0.0` → `v2.0.1` (crash fix).
+> Evidence: Build/Test/Lint/Smoke/Release workflows ALL SUCCESS;
+> Smoke = launch-validated on Android 15 (API 35) emulator in CI (no local runs);
+> `flux.apk` attached to releases by `release.yml` (contents:write).
+> Crash root causes fixed: missing `@AndroidEntryPoint` on activities; duplicate
+> `preferencesDataStore` delegates; minSdk raised to 35 (Android 15+ only).
+> Follow-on: `AGENTS.md` governs all future work (CI-only verification, parallel
+> per-action workflows, quotas, STRIDE/SOLID, modular code).
+
+
 **Target**: `v2.0.0` (MINOR — new release pipeline guarantees + theme/perf/animation upgrades, backward compatible)
 **Date**: 2026-10-29
 **Constraints**: max 2 sub-agents; brief pauses between rapid command batches (rate limits); no design-doc deletion; no remote pushes by agents (orchestrator pushes).
