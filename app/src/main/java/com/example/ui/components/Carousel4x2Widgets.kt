@@ -49,9 +49,7 @@ fun Carousel4x2WidgetCard(
     showSeconds: Boolean = false,
     clockColorTintHex: String = "#FFFFFF",
     clockScale: Float = 1.0f,
-    blurRadius: Float = 15f,
-    translucency: Float = 0.30f,
-    glassEffect: Float = 0.30f,
+    glass: GlassStyle = GlassStyle(),
     appWidgetHost: android.appwidget.AppWidgetHost? = null,
     appWidgetManager: android.appwidget.AppWidgetManager? = null,
     onToggleMediaPlay: () -> Unit,
@@ -73,9 +71,7 @@ fun Carousel4x2WidgetCard(
 ) {
     FrostedGlassPanel(
         cornerRadius = 22.dp,
-        blurRadius = blurRadius.dp,
-        translucency = translucency,
-        glassEffect = glassEffect,
+        glass = glass,
         modifier = modifier
             .fillMaxWidth()
             .height(168.dp) // Standard 4x2 grid equivalent height
@@ -115,7 +111,8 @@ fun Carousel4x2WidgetCard(
                         activeNotifications = activeNotifications,
                         size = "4x2",
                         onDismissNotification = onDismissNotification,
-                        onReplyNotification = onReplyNotification
+                        onReplyNotification = onReplyNotification,
+                        glass = glass
                     )
                 }
                 WidgetType.NEWS_FEED -> {
@@ -123,9 +120,7 @@ fun Carousel4x2WidgetCard(
                         state = newsState,
                         prefs = newsPreferences,
                         size = "4x2",
-                        blurRadius = blurRadius,
-                        translucency = translucency,
-                        glassEffect = glassEffect,
+                        glass = glass,
                         isEmbeddedInCard = true,
                         onOpenArticle = onOpenArticle,
                         onOpenSetup = onOpenNewsSetup,

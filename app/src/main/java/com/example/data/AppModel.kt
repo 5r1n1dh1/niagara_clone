@@ -340,7 +340,15 @@ data class NewsPreferencesState(
     val lastSuccessEpoch: Long = 0L,
     val rateLimitRemaining: Int = 100,
     val rateLimitResetEpoch: Long = 0L,
-    val backoffUntilEpoch: Long = 0L
+    val backoffUntilEpoch: Long = 0L,
+    /**
+     * Opt-in flag for the launcher scheduling background news refreshes.
+     *
+     * Defaults to **false**: a user's news API quota is a finite, paid-for resource, so the
+     * launcher never spends it on the user's behalf without an explicit opt-in. When false, cached
+     * stories stay fully visible and only a user-initiated (forced) refresh may hit the network.
+     */
+    val autoRefreshEnabled: Boolean = false
 )
 
 data class NewsCategory(val code: String, val label: String)

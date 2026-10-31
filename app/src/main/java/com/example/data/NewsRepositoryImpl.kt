@@ -23,6 +23,85 @@ import java.io.File
 
 val Context.settingsStore: DataStore<Preferences> by preferencesDataStore(name = "flux_launcher_settings")
 
+/**
+ * Why an automatic (non-forced) news refresh is being skipped.
+ *
+ * Kept as its own type so the decision is pure, deterministic and unit-testable without touching
+ * DataStore, the network stack or a real device.
+ */
+enum class AutoRefreshBlock {
+    /** Auto-refresh is not opted into. Cached content stays visible; no network call. */
+    NOT_ENABLED,
+
+    /** The device is in battery-optimization mode. Same contract: no network call. */
+    BATTERY_OPTIMIZATION,
+
+    /** The remaining quota is at or below the floor — spending more would 429 the user's key. */
+    QUOTA_FLOOR_REACHED,
+
+    /** The device is offline. */
+    OFFLINE,
+
+    /** A previous failure/backoff is still in force. */
+    BACKOFF
+}
+
+/**
+ * Single source of truth for "should this automatic refresh hit the network?".
+ *
+ * The user's news API quota is finite and paid for, so every automatic call must pass this gate.
+ * `force == true` (an explicit user pull-to-refresh / "Refresh now") bypasses all of it except
+ * offline/backoff, because a human asking for fresh data has knowingly chosen to spend quota.
+ */
+object NewsQuotaPolicy {
+
+    /** Below this many remaining calls, automatic refreshes stop entirely. */
+    const val QUOTA_FLOOR = 10
+
+    /**
+     * @param nowEpochSeconds  current wall clock in seconds.
+     * @param force            user explicitly requested the refresh.
+     * @param autoRefreshEnabled user opt-in for background refreshes (persisted, default false).
+     * @param batteryOptimizationMode launcher-wide battery saver setting.
+     * @param isOffline        no usable network.
+     * @param rateLimitRemaining remaining calls reported by the API / a previous 429; `null` when unknown.
+     * @param backoffUntilEpochSeconds retry-after deadline from the last failure; `null` when none.
+     * @return `null` when the refresh may proceed, else the reason it is blocked.
+     *
+     * Note: `null` means "allowed" — it does not imply data will be fetched, because the caller
+     * still applies the TTL check. Callers decide `Stale` vs `Failed` from their own cache state.
+     */
+    fun blockingReason(
+        nowEpochSeconds: Long,
+        force: Boolean,
+        autoRefreshEnabled: Boolean,
+        batteryOptimizationMode: Boolean,
+        isOffline: Boolean,
+        rateLimitRemaining: Int?,
+        backoffUntilEpochSeconds: Long?
+    ): AutoRefreshBlock? {
+        if (isOffline) return AutoRefreshBlock.OFFLINE
+        if (backoffUntilEpochSeconds != null && backoffUntilEpochSeconds > nowEpochSeconds) {
+            return AutoRefreshBlock.BACKOFF
+        }
+        if (force) return null
+
+        if (!autoRefreshEnabled) return AutoRefreshBlock.NOT_ENABLED
+        if (batteryOptimizationMode) return AutoRefreshBlock.BATTERY_OPTIMIZATION
+        // A null/quota-unknown value must never be treated as "plenty of quota left".
+        val remaining = rateLimitRemaining
+        if (remaining != null && remaining <= QUOTA_FLOOR) return AutoRefreshBlock.QUOTA_FLOOR_REACHED
+        return null
+    }
+
+    /** Human/machine readable retry hint in seconds for a quota-blocked refresh, else `null`. */
+    fun quotaRetryAfterSeconds(rateLimitResetEpochSeconds: Long?, nowEpochSeconds: Long): Long? {
+        if (rateLimitResetEpochSeconds == null || rateLimitResetEpochSeconds <= 0L) return null
+        val delta = rateLimitResetEpochSeconds - nowEpochSeconds
+        return if (delta > 0) delta else null
+    }
+}
+
 class NewsRepositoryImpl(private val context: Context) : NewsRepository {
     private val preferencesWrapper = NewsPreferences(context)
     private val apiClient = NewsApiClient(context, preferencesWrapper)
@@ -49,8 +128,13 @@ class NewsRepositoryImpl(private val context: Context) : NewsRepository {
             } else {
                 _newsState.value = NewsFeedState.Loading(emptyList())
             }
-            repositoryScope.launch {
-                refresh(force = false)
+            // Quota gate: an automatic refresh is only ever scheduled when the user has explicitly
+            // opted in (`autoRefreshEnabled`, default false). Otherwise the cache stays on screen and
+            // nothing is spent — the user can still force a refresh themselves.
+            if (prefs.autoRefreshEnabled) {
+                repositoryScope.launch {
+                    refresh(force = false)
+                }
             }
         }
     }
@@ -65,29 +149,64 @@ class NewsRepositoryImpl(private val context: Context) : NewsRepository {
                 return
             }
 
-            if (!isOnline()) {
-                if (cachedStories.isNotEmpty()) {
-                    _newsState.value = NewsFeedState.Stale(cachedStories, NewsError.Offline)
-                } else {
-                    _newsState.value = NewsFeedState.Failed(NewsError.Offline)
-                }
-                return
-            }
-
             val now = System.currentTimeMillis() / 1000
-            if (prefs.backoffUntilEpoch > now) {
-                if (cachedStories.isNotEmpty()) {
-                    _newsState.value = NewsFeedState.Stale(cachedStories, NewsError.QuotaExceeded(prefs.backoffUntilEpoch - now))
-                }
-                return
-            }
+            val block = NewsQuotaPolicy.blockingReason(
+                nowEpochSeconds = now,
+                force = force,
+                autoRefreshEnabled = prefs.autoRefreshEnabled,
+                batteryOptimizationMode = isBatteryOptimizationEnabled(),
+                isOffline = !isOnline(),
+                rateLimitRemaining = prefs.rateLimitRemaining,
+                backoffUntilEpochSeconds = prefs.backoffUntilEpoch
+            )
 
-            if (!force && isBatteryOptimizationEnabled()) {
-                // Battery optimization mode: skip automatic refresh but keep cached content visible
-                if (cachedStories.isNotEmpty()) {
-                    _newsState.value = NewsFeedState.Ready(cachedStories, prefs.lastSuccessEpoch * 1000, prefs.rateLimitRemaining)
+            when (block) {
+                AutoRefreshBlock.OFFLINE -> {
+                    // Never clears the cache: the user keeps reading what's already on the device.
+                    if (cachedStories.isNotEmpty()) {
+                        _newsState.value = NewsFeedState.Stale(cachedStories, NewsError.Offline)
+                    } else {
+                        _newsState.value = NewsFeedState.Failed(NewsError.Offline)
+                    }
+                    return
                 }
-                return
+
+                AutoRefreshBlock.BACKOFF -> {
+                    val retryAfter = (prefs.backoffUntilEpoch - now).coerceAtLeast(1L)
+                    if (cachedStories.isNotEmpty()) {
+                        _newsState.value = NewsFeedState.Stale(cachedStories, NewsError.QuotaExceeded(retryAfter))
+                    } else {
+                        _newsState.value = NewsFeedState.Failed(NewsError.QuotaExceeded(retryAfter))
+                    }
+                    return
+                }
+
+                AutoRefreshBlock.NOT_ENABLED, AutoRefreshBlock.BATTERY_OPTIMIZATION -> {
+                    // Automatic refresh is not opted into / the device is in battery-saver mode.
+                    // Leave whatever is on screen alone — the cache is the content here.
+                    if (cachedStories.isNotEmpty()) {
+                        _newsState.value = NewsFeedState.Ready(cachedStories, prefs.lastSuccessEpoch * 1000, prefs.rateLimitRemaining)
+                    }
+                    return
+                }
+
+                AutoRefreshBlock.QUOTA_FLOOR_REACHED -> {
+                    // Precious quota: surface the cache with an explicit "quota ran out" reason and a
+                    // retry-after hint instead of spending another call on a feed the user already has.
+                    val retryAfter = NewsQuotaPolicy.quotaRetryAfterSeconds(
+                        rateLimitResetEpochSeconds = prefs.rateLimitResetEpoch,
+                        nowEpochSeconds = now
+                    ) ?: (prefs.rateLimitResetEpoch - now)
+                    val error = NewsError.QuotaExceeded(retryAfter.coerceAtLeast(1L))
+                    if (cachedStories.isNotEmpty()) {
+                        _newsState.value = NewsFeedState.Stale(cachedStories, error)
+                    } else {
+                        _newsState.value = NewsFeedState.Failed(error)
+                    }
+                    return
+                }
+
+                null -> Unit // allowed through to the TTL check below
             }
 
             if (!force) {

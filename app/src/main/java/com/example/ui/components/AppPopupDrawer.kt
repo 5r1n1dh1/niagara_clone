@@ -1037,6 +1037,9 @@ private fun AppSpecificOperationsBar(
         YouTubeMusicFluxWidget(
             media = mediaPlayer,
             size = "4x2",
+            // Rendered inside the drawer's own FrostedGlassPanel: opting into the embedded path
+            // avoids a nested glass panel (double scrim, double blur, double border).
+            isEmbeddedInCard = true,
             onTogglePlay = {
                 val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? android.media.AudioManager
                 try {

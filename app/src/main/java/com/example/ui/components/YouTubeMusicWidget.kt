@@ -47,6 +47,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.MediaPlaybackState
+import com.example.ui.theme.GlassStyle
 
 const val YT_MUSIC_PACKAGE_NAME = "com.google.android.apps.youtube.music"
 const val YT_MUSIC_REVANCED_PACKAGE_NAME = "app.revanced.android.apps.youtube.music"
@@ -242,6 +243,7 @@ fun YouTubeMusicFluxWidget(
     size: String = "4x2", // "4x2", "4x3", "4x4"
     isHeadphonesOverride: Boolean = false,
     isEmbeddedInCard: Boolean = false,
+    glass: GlassStyle = GlassStyle(),
     onTogglePlay: () -> Unit,
     onNext: () -> Unit,
     onPrev: () -> Unit,
@@ -356,23 +358,17 @@ fun YouTubeMusicFluxWidget(
             widgetContent()
         }
     } else {
-        // Standalone Frosted Minimalist Glass Card Container
-        Surface(
-            shape = RoundedCornerShape(24.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.40f),
-            border = BorderStroke(
-                1.dp,
-                Brush.verticalGradient(
-                    colors = listOf(
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.28f),
-                        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.12f)
-                    )
-                )
-            ),
-            tonalElevation = 2.dp,
+        // Standalone Frosted Glass Card Container.
+        //
+        // Goes through the shared FrostedGlassPanel so the widget uses the exact same validated
+        // GlassStyle token (blur / translucency / specular) as every other panel in the launcher,
+        // instead of a bespoke hard-coded surface. When the panel's own `enabled == false`
+        // (non-frosted theme preset) the panel's documented fallback path subs in.
+        FrostedGlassPanel(
+            cornerRadius = 24.dp,
+            glass = glass,
             modifier = modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(24.dp))
                 .testTag("youtube_music_flux_widget_$size")
         ) {
             Box(

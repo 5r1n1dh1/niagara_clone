@@ -60,6 +60,7 @@ fun NewsWidgetSetupSheet(
     var windowHours by remember { mutableIntStateOf(initial.windowHours) }
     var pageSize by remember { mutableIntStateOf(initial.pageSize) }
     var minRefreshMinutes by remember { mutableIntStateOf(initial.minRefreshMinutes) }
+    var autoRefreshEnabled by remember { mutableStateOf(initial.autoRefreshEnabled) }
     var configured by remember { mutableStateOf(initial.configured) }
 
     var validationMsg by remember { mutableStateOf<String?>(null) }
@@ -205,8 +206,10 @@ fun NewsWidgetSetupSheet(
                         query = query,
                         pageSize = pageSize,
                         minRefreshMinutes = minRefreshMinutes,
+                        autoRefreshEnabled = autoRefreshEnabled,
                         onPageSizeChange = { pageSize = it.coerceIn(1, RemoteConfig.CURRENTS_FREE_MAX_PAGE_SIZE) },
-                        onCadenceChange = { minRefreshMinutes = it }
+                        onCadenceChange = { minRefreshMinutes = it },
+                        onAutoRefreshChange = { autoRefreshEnabled = it }
                     )
                 }
 
@@ -229,7 +232,14 @@ fun NewsWidgetSetupSheet(
                             if (initial.configured) {
                                 TextButton(onClick = {
                                     configured = false
-                                    onSave(initial.copy(apiKey = "", configured = false, categories = selectedCategories))
+                                    onSave(
+                                        initial.copy(
+                                            apiKey = "",
+                                            configured = false,
+                                            categories = selectedCategories,
+                                            autoRefreshEnabled = autoRefreshEnabled
+                                        )
+                                    )
                                 }) {
                                     Text("Remove key")
                                 }
@@ -250,7 +260,8 @@ fun NewsWidgetSetupSheet(
                                             windowHours = windowHours,
                                             requireImages = requireImages,
                                             pageSize = pageSize,
-                                            minRefreshMinutes = minRefreshMinutes
+                                            minRefreshMinutes = minRefreshMinutes,
+                                            autoRefreshEnabled = autoRefreshEnabled
                                         )
                                     )
                                 },
@@ -548,8 +559,10 @@ private fun StepCadence(
     query: String,
     pageSize: Int,
     minRefreshMinutes: Int,
+    autoRefreshEnabled: Boolean,
     onPageSizeChange: (Int) -> Unit,
-    onCadenceChange: (Int) -> Unit
+    onCadenceChange: (Int) -> Unit,
+    onAutoRefreshChange: (Boolean) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Refresh cadence", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
@@ -562,6 +575,47 @@ private fun StepCadence(
                 )
             }
         }
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Auto-refresh opt-in. OFF by default: every background refresh spends API quota that the
+        // user paid for, so the launcher never presumes. With this off, cached headlines stay
+        // readable and only a manual "Refresh" hits the network.
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    "Auto-refresh",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = if (autoRefreshEnabled) {
+                        "The launcher will refresh news in the background on the cadence above."
+                    } else {
+                        "Off — saved headlines are shown without spending API quota. Turn on to allow background refreshes."
+                    },
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            Switch(
+                checked = autoRefreshEnabled,
+                onCheckedChange = onAutoRefreshChange,
+                modifier = Modifier.testTag("news_auto_refresh_toggle")
+            )
+        }
+        if (!autoRefreshEnabled) {
+            Text(
+                text = "Every background refresh uses one call from your quota. Auto-refresh stays off until you turn it on.",
+                fontSize = 10.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
         Spacer(modifier = Modifier.height(8.dp))
         Text("Articles per refresh", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {

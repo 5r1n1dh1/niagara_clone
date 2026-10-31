@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.AppItem
 import com.example.data.IconPackType
+import com.example.ui.theme.MotionTokens
 
 /**
  * Fixed Bottom Dock showing user-customized app icons.
@@ -43,6 +44,7 @@ fun FixedDock(
     slotCount: Int = 3,
     showLabels: Boolean = false,
     blurBackground: Boolean = true,
+    isFrostedTheme: Boolean = glass.enabled,
     iconScale: Float = 1.0f,
     cardCornerRadius: Float = 28f,
     glass: com.example.ui.theme.GlassStyle = com.example.ui.theme.GlassStyle(),
@@ -52,7 +54,10 @@ fun FixedDock(
 ) {
     val maxSlots = slotCount.coerceIn(3, 5)
     val displayApps = dockApps.take(maxSlots)
-    val effectiveGlass = if (blurBackground) glass else glass.copy(enabled = false)
+    // The dock honours the selected preset: frosted glass when the user picked FROSTED_GLASS,
+    // otherwise it takes the single documented non-frosted fallback path.
+    val effectiveGlass =
+        if (blurBackground && isFrostedTheme) glass else glass.copy(enabled = false)
 
     Box(
         modifier = modifier
@@ -80,11 +85,8 @@ fun FixedDock(
                     val interactionSource = remember { MutableInteractionSource() }
                     val isPressed by interactionSource.collectIsPressedAsState()
                     val slotScale by animateFloatAsState(
-                        targetValue = if (isPressed) 0.88f else 1.0f,
-                        animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioMediumBouncy,
-                            stiffness = Spring.StiffnessLow
-                        ),
+                        targetValue = if (isPressed) 0.92f else 1.0f,
+                        animationSpec = MotionTokens.dockSpring,
                         label = "dock_slot_scale_$index"
                     )
 

@@ -68,8 +68,21 @@ class LauncherViewModel @Inject constructor(
                 val wpManager = WallpaperManager.getInstance(getApplication())
                 val drawable = try { wpManager.drawable ?: wpManager.peekDrawable() } catch (_: Throwable) { null }
                 if (drawable != null) {
-                    val config = if (drawable.opacity == android.graphics.PixelFormat.OPAQUE) android.graphics.Bitmap.Config.RGB_565 else android.graphics.Bitmap.Config.ARGB_8888
-                    val bitmap = drawable.toBitmap(720, 1280, config)
+                    val context: Context = getApplication()
+                    // Decode at the actual viewport size instead of a hardcoded 720x1280.
+                    // On a tablet or a tall phone the hardcoded size was either too small (visible
+                    // upscaling artefacts behind the glass) or far too large (wasted VRAM holding a
+                    // bitmap bigger than the surface that draws it).
+                    val metrics = context.resources.displayMetrics
+                    val widthPx = metrics.widthPixels
+                    val heightPx = metrics.heightPixels
+                    // RGB_565 halves the footprint for opaque wallpapers with no visible loss
+                    // (there is no alpha to preserve); anything else still needs ARGB_8888.
+                    val config = if (drawable.opacity == android.graphics.PixelFormat.OPAQUE)
+                        android.graphics.Bitmap.Config.RGB_565
+                    else
+                        android.graphics.Bitmap.Config.ARGB_8888
+                    val bitmap = drawable.toBitmap(widthPx, heightPx, config)
                     _systemWallpaperBitmap.value = bitmap.asImageBitmap()
                 }
             } catch (e: Exception) {

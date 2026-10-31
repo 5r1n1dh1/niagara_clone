@@ -2,7 +2,6 @@ package com.example.ui.components
 
 import android.content.Intent
 import android.net.Uri
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -17,7 +16,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -31,6 +29,7 @@ import com.example.data.NewsError
 import com.example.data.NewsFeedState
 import com.example.data.NewsPreferencesState
 import com.example.data.NewsStory
+import com.example.ui.theme.GlassStyle
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -39,9 +38,7 @@ fun NewsWidget(
     state: NewsFeedState,
     prefs: NewsPreferencesState,
     size: String = "4x2",
-    blurRadius: Float = 15f,
-    translucency: Float = 0.30f,
-    glassEffect: Float = 0.30f,
+    glass: GlassStyle = GlassStyle(),
     isEmbeddedInCard: Boolean = false,
     onOpenArticle: (String) -> Unit,
     onOpenSetup: () -> Unit,
@@ -214,14 +211,14 @@ fun NewsWidget(
     if (isEmbeddedInCard) {
         content()
     } else {
-        Surface(
+        // Standalone card: route through the shared glass panel so translucency, blur and the
+        // specular highlight follow the selected preset instead of a hardcoded 0.40 alpha.
+        FrostedGlassPanel(
             modifier = modifier,
-            shape = RoundedCornerShape(24.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.40f),
-            border = BorderStroke(1.dp, Brush.verticalGradient(listOf(MaterialTheme.colorScheme.primary.copy(alpha = 0.28f), MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.12f))))
-        ) {
-            content()
-        }
+            cornerRadius = 24.dp,
+            glass = glass,
+            content = { content() }
+        )
     }
 }
 

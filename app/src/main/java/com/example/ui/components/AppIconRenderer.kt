@@ -1,7 +1,6 @@
 package com.example.ui.components
 
 import android.graphics.drawable.Drawable
-import android.util.LruCache
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -37,18 +36,31 @@ import com.example.data.CustomIconPackSettings
 import com.example.data.CustomPackPreset
 import com.example.data.IconPackType
 import com.example.data.IconShape
+import com.example.util.LauncherPerformanceManager
 import kotlin.math.abs
 
-private val iconBitmapCache = LruCache<String, androidx.compose.ui.graphics.ImageBitmap>(120)
-
+/**
+ * Icon bitmap caching is owned exclusively by [LauncherPerformanceManager].
+ *
+ * There used to be a second private LruCache in this file, which meant the launcher held two
+ * independent eviction policies for the same bitmaps (double memory, no shared trimming). Every
+ * read/write now goes through the single shared byte-bounded cache, so `onTrimMemory`,
+ * `performAggressiveMemoryCleanup` and user cache clears all reach the same entries.
+ */
 fun clearIconBitmapCache() {
-    try {
-        iconBitmapCache.evictAll()
-    } catch (_: Throwable) {}
-    try {
-        val context = android.app.Application.getProcessName()
-        // Defer to repository-level cleanup for news cache
-    } catch (_: Throwable) {}
+    LauncherPerformanceManager.evictIconCache()
+}
+
+/**
+ * Coarse dp bucket for icon cache keys.
+ *
+ * Icon sizes vary by call site (12dp dock, 20dp list row, 46dp popup header ...). Keying on the
+ * exact size would store the same package 3-4 times at nearly identical dimensions, so the size is
+ * quantised into 16dp buckets before it becomes part of the key.
+ */
+private fun iconCacheKey(app: AppItem, sizeDp: Float): String {
+    val bucket = (sizeDp / 16f).toInt()
+    return "${app.instanceKey}_${app.userProfileId}_$bucket"
 }
 
 @Composable
@@ -324,8 +336,8 @@ fun AppIconRenderer(
 
             IconPackType.DEFAULT_APP -> {
                 val context = LocalContext.current
-                val cacheKey = "${app.instanceKey}_${app.userProfileId}_${size.value.toInt()}"
-                val cachedBitmap = iconBitmapCache.get(cacheKey)
+                val cacheKey = iconCacheKey(app, size.value)
+                val cachedBitmap = remember(cacheKey) { LauncherPerformanceManager.getCachedIcon(cacheKey) }
                 val bitmap = remember(app.instanceKey, app.userProfileId, size.value, app.iconDrawable) {
                     if (cachedBitmap != null) {
                         cachedBitmap
@@ -347,7 +359,7 @@ fun AppIconRenderer(
                                 val density = context.resources.displayMetrics.density
                                 val px = (size.value * density).toInt().coerceAtLeast(64)
                                 val converted = d.toBitmap(width = px, height = px).asImageBitmap()
-                                iconBitmapCache.put(cacheKey, converted)
+                                LauncherPerformanceManager.cacheIcon(cacheKey, converted)
                                 converted
                             }
                         } catch (e: Exception) {

@@ -37,6 +37,42 @@ object LauncherPerformanceManager {
     }
 
     /**
+     * Evicts the whole icon cache (used by onTrimMemory at the harshest levels, and on explicit
+     * user-facing cache clears). LRU eviction policy only — never `System.gc()`, which stalls the
+     * main thread without actually reclaiming anything the allocator has not already freed.
+     */
+    fun evictIconCache() {
+        try {
+            appIconMemoryCache.evictAll()
+            Log.d(TAG, "Unified icon memory cache evicted.")
+        } catch (t: Throwable) {
+            Log.e(TAG, "Icon cache eviction failed: ${t.message}", t)
+        }
+    }
+
+    /**
+     * Proactive response to `Application.onTrimMemory` / `ComponentCallbacks2.onTrimMemory`.
+     *
+     * Softer levels trim only the oldest half of the cache; the harshest levels ([TRIM_MEMORY_COMPLETE]
+     * and friends) evict everything. No explicit GC and never on the main thread.
+     */
+    fun onTrimMemory(level: Int) {
+        when {
+            level >= android.content.ComponentCallbacks2.TRIM_MEMORY_COMPLETE ||
+                level >= android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL -> {
+                evictIconCache()
+                Log.w(TAG, "Memory pressure complete (level=$level): icon cache fully evicted.")
+            }
+            level >= android.content.ComponentCallbacks2.TRIM_MEMORY_BACKGROUND ||
+                level >= android.content.ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN -> {
+                appIconMemoryCache.trimToSize(appIconMemoryCache.maxSize() / 2)
+                Log.d(TAG, "Memory pressure moderate (level=$level): icon cache trimmed to half.")
+            }
+            else -> Unit // TRIM_MEMORY_RUNNING_MODERATE / LOW: the LRU policy already handles it.
+        }
+    }
+
+    /**
      * Aggressively trim memory when launcher goes into background or OS signals low memory.
      */
     fun performAggressiveMemoryCleanup(context: Context) {

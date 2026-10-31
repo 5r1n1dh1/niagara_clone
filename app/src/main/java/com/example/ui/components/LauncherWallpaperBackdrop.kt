@@ -17,8 +17,10 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.example.data.LauncherThemePreset
 import com.example.data.WallpaperStyle
+import com.example.ui.theme.GlassStyle
 
 import androidx.compose.runtime.*
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.graphics.drawable.toBitmap
 import androidx.compose.ui.graphics.asImageBitmap
@@ -39,6 +41,7 @@ fun LauncherWallpaperBackdrop(
     autoWallpaperBitmap: android.graphics.Bitmap? = null,
     blurRadius: Dp = 0.dp,
     backgroundBlurStrength: Float = 25f,
+    glass: GlassStyle = GlassStyle(),
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -65,7 +68,12 @@ fun LauncherWallpaperBackdrop(
                     @Suppress("MissingPermission")
                     val drawable = try { wpManager.drawable ?: wpManager.peekDrawable() } catch (_: Throwable) { null }
                     if (drawable != null) {
-                        val bitmap = drawable.toBitmap(720, 1280, android.graphics.Bitmap.Config.ARGB_8888)
+                        // Pre-API-31 fallback path: the device-wide system wallpaper is decoded once
+                        // here, immediately downscaled and pre-blurred on Dispatchers.Default by the
+                        // LaunchedEffect below, and the scaled source is recycled as soon as the blur
+                        // is done. Always ARGB_8888 — this is a *scrim source* under a translucent
+                        // panel, so dropping alpha would punch holes in the glass.
+                        val bitmap = drawable.toBitmap(360, 720, android.graphics.Bitmap.Config.ARGB_8888)
                         activeWallpaperBitmap = bitmap.asImageBitmap()
                     }
                 } catch (_: Exception) {}
@@ -82,31 +90,62 @@ fun LauncherWallpaperBackdrop(
     val baseBlur = if (isFrosted) backgroundBlurStrength.dp else (backgroundBlurStrength * 0.4f).dp
     val effectiveBlur = baseBlur + blurRadius
 
+    // Quantised to even dp steps: a slider drag would otherwise allocate a brand new pre-blurred
+    // bitmap for every fractional tick, and each one is a full stack-blur pass on Dispatchers.Default.
     val blurRadiusPx = (effectiveBlur.value.toInt() / 2 * 2).coerceIn(0, 50)
 
-    var softwareBlurredBitmap by remember(activeWallpaperBitmap, blurRadiusPx) { mutableStateOf<ImageBitmap?>(null) }
+    // API 31+ has a real GPU RenderEffect/blur, so the expensive software stack-blur below is
+    // skipped entirely on modern devices — it used to run on every device, then get discarded
+    // because `softwareBlurredBitmap == null` was false and `Modifier.blur` never applied.
+    val hasHardwareBlur = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S
+
+    var softwareBlurredBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
     var wallpaperLuminance by remember(activeWallpaperBitmap, systemWallpaperBitmap) { mutableStateOf(0.45f) }
 
-    LaunchedEffect(activeWallpaperBitmap, blurRadiusPx) {
+    // The pre-blurred downscaled bitmap we currently own, parked one effect generation longer than
+    // it is drawn. `minSdk = 24` is pre-Oreo, where a Bitmap's native memory is *not* reclaimed by
+    // the GC's Java heap — releasing it requires an explicit recycle().
+    //
+    // Park-then-release (rather than recycling the moment a new one exists) is deliberate: a frame
+    // that already snapshotted the old bitmap could still be drawing it while this effect, which
+    // runs on Dispatchers.Default, swaps the value underneath it. Recycling one generation late
+    // bounds the transient to a single ~1MB 360px entry and can never hit an in-flight frame.
+    val pendingRecycle = remember { mutableStateOf<android.graphics.Bitmap?>(null) }
+
+    LaunchedEffect(activeWallpaperBitmap, systemWallpaperBitmap, blurRadiusPx, hasHardwareBlur) {
+        // Release what the previous generation retired. A new generation means the previous result
+        // has been published through at least one composition/draw cycle.
+        pendingRecycle.value?.let { if (!it.isRecycled) it.recycle() }
+        pendingRecycle.value = null
+
         val sourceBitmap = activeWallpaperBitmap ?: systemWallpaperBitmap
-        if (sourceBitmap != null && blurRadiusPx > 0) {
-            withContext(Dispatchers.Default) {
-                try {
-                    val androidBmp = sourceBitmap.asAndroidBitmap()
-                    // Downscale source bitmap to 360px width for lightning-fast pre-calculated blurring and minimal memory
-                    val scaledWidth = 360
-                    val scaledHeight = (360f * androidBmp.height / androidBmp.width).toInt().coerceAtLeast(480)
-                    val scaledBmp = android.graphics.Bitmap.createScaledBitmap(androidBmp, scaledWidth, scaledHeight, true)
-                    val effectiveRadius = (blurRadiusPx * (360f / androidBmp.width)).toInt().coerceIn(1, 25)
-                    val blurred = fastBlurBitmap(scaledBmp, effectiveRadius)
-                    scaledBmp.recycle()
-                    softwareBlurredBitmap = blurred.asImageBitmap()
-                } catch (_: Exception) {
-                    softwareBlurredBitmap = null
-                }
-            }
-        } else {
+        val needsSoftwareBlur = sourceBitmap != null && blurRadiusPx > 0 && !hasHardwareBlur
+        if (!needsSoftwareBlur) {
+            // Blur off (radius 0 / preset changed) or handled by the GPU: nothing to pre-blur.
+            // The deferred release runs on the next frame so an in-flight draw is never handed a
+            // recycled bitmap.
             softwareBlurredBitmap = null
+            withFrameNanos { }
+            pendingRecycle.value?.let { if (!it.isRecycled) it.recycle() }
+            pendingRecycle.value = null
+            return@LaunchedEffect
+        }
+
+        withContext(Dispatchers.Default) {
+            try {
+                val androidBmp = sourceBitmap.asAndroidBitmap()
+                // Downscale source bitmap to 360px width for lightning-fast pre-calculated blurring and minimal memory
+                val scaledWidth = 360
+                val scaledHeight = (scaledWidth.toFloat() * androidBmp.height / androidBmp.width).toInt().coerceAtLeast(480)
+                val scaledBmp = android.graphics.Bitmap.createScaledBitmap(androidBmp, scaledWidth, scaledHeight, true)
+                val effectiveRadius = (blurRadiusPx * (scaledWidth.toFloat() / androidBmp.width)).toInt().coerceIn(1, 25)
+                val blurred = fastBlurBitmap(scaledBmp, effectiveRadius)
+                scaledBmp.recycle()
+                softwareBlurredBitmap = blurred.asImageBitmap()
+                pendingRecycle.value = blurred
+            } catch (_: Exception) {
+                softwareBlurredBitmap = null
+            }
         }
     }
 
@@ -137,7 +176,10 @@ fun LauncherWallpaperBackdrop(
         }
     }
 
-    val blurModifier = if (effectiveBlur > 0.5.dp && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S && softwareBlurredBitmap == null) {
+    // Hardware blur when the GPU can do it (API 31+); the software pre-blur above covers the rest.
+    // Both paths are keyed on the same quantised radius, so a slider drag produces one new effect
+    // per quantised step rather than one per fractional pixel.
+    val blurModifier = if (effectiveBlur > 0.5.dp && hasHardwareBlur && softwareBlurredBitmap == null) {
         Modifier.blur(effectiveBlur)
     } else {
         Modifier
@@ -250,7 +292,9 @@ fun LauncherWallpaperBackdrop(
 
         // Translucent Theme Scrim Overlay
         if (usesBitmap) {
-            val baseScrimAlpha = if (isFrosted) 0.60f else 0.22f
+            // Every scrim/sheen alpha below is derived from the single validated GlassStyle, so the
+            // backdrop and the panels on top of it light/dim together when the sliders move.
+            val baseScrimAlpha = wallpaperScrimAlpha(isFrosted = isFrosted, glass = glass)
             val dynamicScrimAlpha = (baseScrimAlpha * (0.6f + wallpaperLuminance * 0.8f)).coerceIn(0.15f, 0.85f)
             Box(
                 modifier = Modifier
@@ -266,16 +310,17 @@ fun LauncherWallpaperBackdrop(
                     )
             )
             if (isFrosted) {
-                // Specular frost rim
+                // Specular frost rim — driven by GlassStyle.specular, never a literal.
+                val rimAlpha = (glass.specular * 0.30f).coerceIn(0.02f, 0.30f)
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
                         .background(
                             Brush.linearGradient(
                                 listOf(
-                                    Color.White.copy(alpha = 0.08f),
+                                    Color.White.copy(alpha = rimAlpha),
                                     Color.Transparent,
-                                    Color.White.copy(alpha = 0.04f)
+                                    Color.White.copy(alpha = rimAlpha * 0.5f)
                                 )
                             )
                         )

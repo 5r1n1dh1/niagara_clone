@@ -27,6 +27,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.NotificationItem
+import com.example.ui.theme.GlassStyle
 
 enum class DigestCategory(val label: String, val emoji: String) {
     ALL("All Digest", "🔕"),
@@ -61,6 +62,7 @@ fun NotificationSummaryWidget(
     onReplyNotification: (packageName: String, text: String, isDualApp: Boolean) -> Unit = { _, _, _ -> },
     onClearAllDigest: () -> Unit = {},
     onSimulateNotification: (pkg: String, sender: String, msg: String) -> Unit = { _, _, _ -> },
+    glass: GlassStyle = GlassStyle(),
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -303,9 +305,7 @@ fun NotificationSummaryWidget(
         ) {
             FrostedGlassPanel(
                 cornerRadius = 24.dp,
-                blurRadius = 15.dp,
-                translucency = 0.35f,
-                glassEffect = 0.30f,
+                glass = glass,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp)

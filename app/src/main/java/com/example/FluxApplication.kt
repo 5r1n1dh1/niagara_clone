@@ -31,4 +31,16 @@ class FluxApplication : Application() {
             )
         }
     }
+
+    /**
+     * Forwards OS memory pressure to the single shared icon cache.
+     *
+     * Deliberately the *only* thing done here: no explicit `System.gc()`. LRU eviction already
+     * returns the bitmap memory to the allocator far faster than a blocking GC, and a stop-the-world
+     * collection on a launcher is exactly the jank we are trying to avoid.
+     */
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        com.example.util.LauncherPerformanceManager.onTrimMemory(level)
+    }
 }

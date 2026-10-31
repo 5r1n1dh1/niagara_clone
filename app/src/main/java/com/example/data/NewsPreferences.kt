@@ -31,6 +31,8 @@ class NewsPreferences(context: Context) {
         val rateLimitRemaining = intPreferencesKey("rate_limit_remaining").let { prefs[it] } ?: 100
         val rateLimitResetEpoch = longPreferencesKey("rate_limit_reset_epoch").let { prefs[it] } ?: 0L
         val backoffUntilEpoch = longPreferencesKey("backoff_until_epoch").let { prefs[it] } ?: 0L
+        // Quota is a paid-for resource: background auto-refresh is opt-in and defaults to OFF.
+        val autoRefreshEnabled = booleanPreferencesKey("auto_refresh_enabled").let { prefs[it] } ?: false
 
         NewsPreferencesState(
             apiKey = apiKey,
@@ -48,7 +50,8 @@ class NewsPreferences(context: Context) {
             lastSuccessEpoch = lastSuccessEpoch,
             rateLimitRemaining = rateLimitRemaining,
             rateLimitResetEpoch = rateLimitResetEpoch,
-            backoffUntilEpoch = backoffUntilEpoch
+            backoffUntilEpoch = backoffUntilEpoch,
+            autoRefreshEnabled = autoRefreshEnabled
         )
     }
 
@@ -71,6 +74,7 @@ class NewsPreferences(context: Context) {
                 mutablePrefs[intPreferencesKey("rate_limit_remaining")] = state.rateLimitRemaining
                 mutablePrefs[longPreferencesKey("rate_limit_reset_epoch")] = state.rateLimitResetEpoch
                 mutablePrefs[longPreferencesKey("backoff_until_epoch")] = state.backoffUntilEpoch
+                mutablePrefs[booleanPreferencesKey("auto_refresh_enabled")] = state.autoRefreshEnabled
             }
         }
     }

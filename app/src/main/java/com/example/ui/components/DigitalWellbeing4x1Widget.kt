@@ -32,6 +32,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.ui.theme.GlassStyle
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import kotlinx.coroutines.Dispatchers
@@ -58,9 +59,7 @@ data class DailyAppUsage(
 @Composable
 fun DigitalWellbeing4x1Widget(
     onOpenSettings: () -> Unit = {},
-    blurRadius: Float = 15f,
-    translucency: Float = 0.30f,
-    glassEffect: Float = 0.30f,
+    glass: GlassStyle = GlassStyle(),
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -285,9 +284,7 @@ fun DigitalWellbeing4x1Widget(
         ) {
             FrostedGlassPanel(
                 cornerRadius = 28.dp,
-                blurRadius = blurRadius.dp,
-                translucency = translucency,
-                glassEffect = glassEffect,
+                glass = glass,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 12.dp)

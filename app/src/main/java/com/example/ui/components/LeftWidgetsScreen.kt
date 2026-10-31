@@ -88,6 +88,7 @@ fun LeftWidgetsScreen(
 
     FrostedGlassBackground(
         glass = glass,
+        enabled = glass.enabled,
         modifier = modifier.testTag("left_widgets_screen")
     ) {
         if (selectedWidgetForOptions != null) {
@@ -464,7 +465,8 @@ private fun LeftWidgetCardWrapper(
                             activeNotifications = activeNotifications,
                             size = widget.heightCategory,
                             onDismissNotification = onDismissNotification,
-                            onReplyNotification = onReplyNotification
+                            onReplyNotification = onReplyNotification,
+                            glass = glass
                         )
                     }
                     WidgetType.NEWS_FEED -> {

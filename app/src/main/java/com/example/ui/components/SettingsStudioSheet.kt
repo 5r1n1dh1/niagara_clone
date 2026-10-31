@@ -411,7 +411,8 @@ fun SettingsStudioSheet(
                     SettingsPage.INTEGRATIONS -> {
                         IntegrationsSettingsPage(
                             allApps = allApps,
-                            widgetIntegrations = widgetIntegrations
+                            widgetIntegrations = widgetIntegrations,
+                            glass = glass
                         )
                     }
 
@@ -2866,7 +2867,8 @@ private fun SettingsToggleRow(
 @Composable
 private fun IntegrationsSettingsPage(
     allApps: List<AppItem>,
-    widgetIntegrations: WidgetIntegrationsManager?
+    widgetIntegrations: WidgetIntegrationsManager?,
+    glass: GlassStyle
 ) {
     val context = LocalContext.current
     val pm = context.packageManager
@@ -2893,9 +2895,7 @@ private fun IntegrationsSettingsPage(
 
             FrostedGlassPanel(
                 cornerRadius = 16.dp,
-                blurRadius = 15.dp,
-                translucency = 0.30f,
-                glassEffect = 0.30f,
+                glass = glass,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(14.dp)) {
@@ -2971,9 +2971,7 @@ private fun IntegrationsSettingsPage(
         ) {
             FrostedGlassPanel(
                 cornerRadius = 28.dp,
-                blurRadius = 15.dp,
-                translucency = 0.30f,
-                glassEffect = 0.30f,
+                glass = glass,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 12.dp)

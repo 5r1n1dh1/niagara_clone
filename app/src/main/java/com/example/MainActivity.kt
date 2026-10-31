@@ -457,6 +457,7 @@ fun NiagaraLauncherScreen(
             autoWallpaperBitmap = autoWallpaperBitmap,
             blurRadius = wallpaperBlurRadius + panelBackgroundBlurRadius,
             backgroundBlurStrength = settings.frostedBlurRadius,
+            glass = glass,
             modifier = Modifier.fillMaxSize()
         )
 

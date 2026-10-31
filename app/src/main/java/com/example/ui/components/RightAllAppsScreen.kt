@@ -31,6 +31,8 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.*
+import com.example.ui.theme.GlassStyle
+import com.example.ui.theme.GlassStyleFactory
 import kotlinx.coroutines.launch
 
 sealed class AppDrawerItem {
@@ -75,6 +77,7 @@ fun RightAllAppsScreen(
     modifier: Modifier = Modifier
 ) {
     val listState = rememberLazyListState()
+    val glass = remember(settings) { GlassStyleFactory.fromSettings(settings) }
     val isLeftHanded = settings.leftHandedMode
     val focusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
@@ -170,10 +173,8 @@ fun RightAllAppsScreen(
     }
 
     FrostedGlassBackground(
-        isFrostedTheme = (settings.themePreset == LauncherThemePreset.FROSTED_GLASS),
-        blurStrength = settings.frostedBlurRadius,
-        translucency = settings.frostedTranslucency,
-        glassEffect = settings.frostedGlassEffect,
+        glass = glass,
+        enabled = glass.enabled,
         modifier = modifier
             .fillMaxSize()
             .statusBarsPadding()

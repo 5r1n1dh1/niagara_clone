@@ -3,7 +3,7 @@ package com.example
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.example.data.LauncherRepository
-import com.example.ui.MathEvaluator
+import com.example.util.MathEvaluator
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith

@@ -38,6 +38,8 @@ import androidx.compose.ui.unit.sp
 import com.example.data.*
 import com.example.data.NewsFeedState
 import com.example.data.NewsPreferencesState
+import com.example.ui.theme.GlassStyleFactory
+import com.example.ui.theme.MotionTokens
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
@@ -275,6 +277,9 @@ fun CenterHomeScreen(
     val context = LocalContext.current
     val isYTInstalled = remember(context) { isYouTubeMusicInstalled(context) }
 
+    // One validated glass token for the whole screen, derived from the selected preset.
+    val glass = remember(settings) { GlassStyleFactory.fromSettings(settings) }
+
     // Favorites screen: Clock widget is fixed (#1). All other widgets are optional user choices
     val displayWidgets = remember(carouselWidgets, isYTInstalled) {
         val filteredCarousel = if (isYTInstalled) carouselWidgets else carouselWidgets.filter { it != WidgetType.MEDIA_PLAYER }
@@ -283,6 +288,10 @@ fun CenterHomeScreen(
     }
 
     val pagerState = rememberPagerState(pageCount = { displayWidgets.size })
+    val pagerFlingBehavior = androidx.compose.foundation.pager.PagerDefaults.flingBehavior(
+        state = pagerState,
+        snapAnimationSpec = MotionTokens.screenSpring
+    )
     var showHomeEmptySpaceOptions by remember { mutableStateOf(false) }
 
     val openSystemWallpaperPicker: () -> Unit = {
@@ -340,9 +349,7 @@ fun CenterHomeScreen(
                 Box(modifier = Modifier.animateItem()) {
                     DigitalWellbeing4x1Widget(
                         onOpenSettings = onOpenSettings,
-                        blurRadius = settings.frostedBlurRadius,
-                        translucency = settings.frostedTranslucency,
-                        glassEffect = settings.frostedGlassEffect,
+                        glass = glass,
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -354,6 +361,7 @@ fun CenterHomeScreen(
                 Column(modifier = Modifier.fillMaxWidth()) {
                     HorizontalPager(
                         state = pagerState,
+                        flingBehavior = pagerFlingBehavior,
                         modifier = Modifier
                             .fillMaxWidth()
                             .testTag("center_4x2_carousel")
@@ -387,9 +395,7 @@ fun CenterHomeScreen(
                                 showSeconds = settings.showSeconds,
                                 clockColorTintHex = settings.clockColorTintHex,
                                 clockScale = settings.clockScale,
-                                blurRadius = settings.frostedBlurRadius,
-                                translucency = settings.frostedTranslucency,
-                                glassEffect = settings.frostedGlassEffect,
+                                glass = glass,
                                 appWidgetHost = appWidgetHost,
                                 appWidgetManager = appWidgetManager,
                                 onToggleMediaPlay = onToggleMediaPlay,
