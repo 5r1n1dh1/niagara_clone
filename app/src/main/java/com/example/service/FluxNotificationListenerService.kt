@@ -20,6 +20,7 @@ import android.os.Bundle
 import android.os.SystemClock
 import android.provider.Settings
 import android.service.notification.NotificationListenerService
+import com.example.data.launcherSettingsStore
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
@@ -148,7 +149,7 @@ class FluxNotificationListenerService : NotificationListenerService() {
     private fun isBatteryOptimizationEnabled(): Boolean {
         return try {
             runBlocking {
-                val prefs = context.launcherSettingsStore.data.first()
+                val prefs = applicationContext.launcherSettingsStore.data.first()
                 prefs[booleanPreferencesKey("batteryOptimizationMode")] ?: true
             }
         } catch (_: Throwable) { true }
