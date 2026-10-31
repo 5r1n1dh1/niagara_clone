@@ -71,8 +71,8 @@ jobs:
       - name: Create AVD
         run: |
           export ANDROID_HOME=$ANDROID_SDK_ROOT
-          echo no | avdmanager create avd -n smoke35 -k "system-images;android-35;google_apis;x86_64" -d pixel_6 --force
-          avdmanager list avd | head -n 8
+          echo no | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/avdmanager" create avd -n smoke35 -k "system-images;android-35;google_apis;x86_64" -d pixel_6 --force
+          "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/avdmanager" list avd | head -n 8
 
       - name: Boot emulator (8 min guard, live progress)
         run: |
