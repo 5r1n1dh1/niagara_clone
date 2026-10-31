@@ -1,9 +1,9 @@
 name: Smoke
 
 # LAUNCH VALIDATION in CI (AGENTS.md rule 3: never verify locally).
-# Boots an Android 15 (API 35) emulator, installs the release APK, launches the
-# launcher activity, and FAILS if the app crashes on open (logcat FATAL check).
-# This is the regression gate for "app crashes upon open".
+# Boots an Android 15 (API 35) emulator step-by-step (full log visibility),
+# installs the debug APK, launches the launcher activity, and FAILS if the
+# app crashes on open (logcat FATAL check). Regression gate for launch crashes.
 
 on:
   workflow_run:
@@ -28,7 +28,7 @@ jobs:
   launch:
     name: Launch on API 35 (Android 15)
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
 
@@ -38,78 +38,72 @@ jobs:
           distribution: temurin
           java-version: "21"
 
-      - name: Enable KVM group perms
-        run: |
-          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
-          sudo udevadm control --reload-rules
-          sudo udevadm trigger --name-match=kvm
-
       - name: Gradle cache
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "9.3.1"
 
-      - name: Ensure debug keystore (signing config requirement)
+      - name: Enable KVM
         run: |
-          if [ ! -f debug.keystore ]; then
-            keytool -genkeypair -v -keystore debug.keystore -storetype JKS -alias androiddebugkey \
-              -keyalg RSA -keysize 2048 -validity 10000 -storepass android -keypass android \
-              -dname "CN=Android Debug,O=Android,C=US"
-          fi
-      - name: Build debug APK for smoke test
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          ls -l /dev/kvm
+
+      - name: Build debug APK
         run: |
           chmod +x gradlew
           ./gradlew :app:assembleDebug --no-daemon
 
-      - name: Boot Android 15 emulator
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 35
-          target: aosp_atd
-          arch: x86_64
-          profile: pixel_6
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -no-metrics
-          disable-animations: true
-          script: |
-            adb logcat -c
-            adb install -r -t app/build/outputs/apk/debug/*.apk
-
-            # Launch the launcher activity
-            adb shell am start -W -n com.aistudio.fluxlauncher.vknwre/com.example.MainActivity || true
-            sleep 12
-
-            # Crash detection: any FATAL EXCEPTION for our process after launch
-            CRASHES=$(adb logcat -d | grep -E "FATAL EXCEPTION|AndroidRuntime.*Process: com.aistudio.fluxlauncher" | head -n 40 || true)
-            if [ -n "$CRASHES" ]; then
-              echo "::error::APP CRASHED ON LAUNCH"
-              echo "$CRASHES"
-              exit 1
-            fi
-
-            # Process must still be alive
-            ALIVE=$(adb shell pidof com.aistudio.fluxlauncher.vknwre || true)
-            if [ -z "$ALIVE" ]; then
-              echo "::error::APP PROCESS NOT RUNNING after launch"
-              adb logcat -d | tail -n 80
-              exit 1
-            fi
-            echo "SMOKE OK — process alive (pid $ALIVE), no fatal exceptions"
-
-      - name: Upload logcat on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: smoke-logcat
-          path: |
-            /home/runner/work/**/*.log
-          if-no-files-found: ignore
-          retention-days: 7
-
-      - name: Upload logcat artifact (triage)
-        if: always()
+      - name: Install emulator + Android 15 system image (logged)
         run: |
-          adb logcat -d > smoke-logcat.txt 2>/dev/null || true
-          ls -lh smoke-logcat.txt
+          export ANDROID_HOME=$ANDROID_SDK_ROOT
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          sdkmanager --install "platform-tools" "emulator" "system-images;android-35;google_apis;x86_64" 2>&1 | tail -n 5
+
+      - name: Create AVD
+        run: |
+          export ANDROID_HOME=$ANDROID_SDK_ROOT
+          echo no | avdmanager create avd -n smoke35 -k "system-images;android-35;google_apis;x86_64" -d pixel_6 --force
+          avdmanager list avd | head -n 8
+
+      - name: Boot emulator (8 min guard, live progress)
+        run: |
+          export ANDROID_HOME=$ANDROID_SDK_ROOT
+          adb start-server
+          $ANDROID_HOME/emulator/emulator -avd smoke35 \
+            -no-window -no-audio -no-boot-anim -no-snapshot \
+            -gpu swiftshader_indirect -memory 3072 -cores 4 \
+            -camera-back none -camera-front none > /tmp/emulator.log 2>&1 &
+          echo $! > /tmp/emulator.pid
+          for i in $(seq 1 48); do
+            sleep 10
+            B=$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')
+            echo "t=$((i*10))s boot_completed=${B:-0}"
+            [ "$B" = "1" ] && break
+          done
+          [ "$B" = "1" ] || { echo "EMU BOOT FAILED — last 80 log lines:"; tail -n 80 /tmp/emulator.log; exit 1; }
+
+      - name: Install + launch + crash gate
+        run: |
+          adb install -r -t app/build/outputs/apk/debug/*.apk
+          adb logcat -c
+          adb shell am start -W -n com.aistudio.fluxlauncher.vknwre/com.example.MainActivity || true
+          sleep 15
+          CRASHES=$(adb logcat -d | grep -E "FATAL EXCEPTION|Force finishing activity com.aistudio" | head -n 40 || true)
+          if [ -n "$CRASHES" ]; then
+            echo "::error::APP CRASHED ON LAUNCH"
+            echo "$CRASHES"
+            adb logcat -d > smoke-logcat.txt
+            exit 1
+          fi
+          ALIVE=$(adb shell pidof com.aistudio.fluxlauncher.vknwre | tr -d '\r')
+          [ -n "$ALIVE" ] && echo "SMOKE OK — process alive (pid $ALIVE), no fatal exceptions" || {
+            echo "::error::APP PROCESS NOT RUNNING after launch"; adb logcat -d | tail -n 80 > smoke-logcat.txt; exit 1; }
+
+      - name: Upload smoke logcat (always)
+        if: always()
+        run: adb logcat -d > smoke-logcat.txt 2>/dev/null || true
       - uses: actions/upload-artifact@v4
         if: always()
         with:
