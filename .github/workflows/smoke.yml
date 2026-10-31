@@ -85,6 +85,8 @@ jobs:
           tail -n 3 /tmp/sdk_install.log
           test -d "$SDK/system-images/android-35" || { echo "::error::system image missing after install"; exit 1; }
           echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
+          echo "$SDK/platform-tools" >> "$GITHUB_PATH"
+          echo "$SDK/emulator" >> "$GITHUB_PATH"
           echo "system image OK at $SDK/system-images/android-35"
 
       - name: Create AVD
