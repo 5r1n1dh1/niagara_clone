@@ -1,0 +1,38 @@
+[
+    {
+        "merged": "com.example.feature.wallpaper-release-43:/layout/ime_base_split_test_activity.xml",
+        "source": "com.example.feature.wallpaper-core-1.18.0-5:/layout/ime_base_split_test_activity.xml"
+    },
+    {
+        "merged": "com.example.feature.wallpaper-release-43:/layout/notification_template_part_chronometer.xml",
+        "source": "com.example.feature.wallpaper-core-1.18.0-5:/layout/notification_template_part_chronometer.xml"
+    },
+    {
+        "merged": "com.example.feature.wallpaper-release-43:/layout/notification_template_custom_big.xml",
+        "source": "com.example.feature.wallpaper-core-1.18.0-5:/layout/notification_template_custom_big.xml"
+    },
+    {
+        "merged": "com.example.feature.wallpaper-release-43:/layout/notification_action_tombstone.xml",
+        "source": "com.example.feature.wallpaper-core-1.18.0-5:/layout/notification_action_tombstone.xml"
+    },
+    {
+        "merged": "com.example.feature.wallpaper-release-43:/layout/ime_secondary_split_test_activity.xml",
+        "source": "com.example.feature.wallpaper-core-1.18.0-5:/layout/ime_secondary_split_test_activity.xml"
+    },
+    {
+        "merged": "com.example.feature.wallpaper-release-43:/layout/notification_template_part_time.xml",
+        "source": "com.example.feature.wallpaper-core-1.18.0-5:/layout/notification_template_part_time.xml"
+    },
+    {
+        "merged": "com.example.feature.wallpaper-release-43:/layout/notification_action.xml",
+        "source": "com.example.feature.wallpaper-core-1.18.0-5:/layout/notification_action.xml"
+    },
+    {
+        "merged": "com.example.feature.wallpaper-release-43:/layout/notification_template_icon_group.xml",
+        "source": "com.example.feature.wallpaper-core-1.18.0-5:/layout/notification_template_icon_group.xml"
+    },
+    {
+        "merged": "com.example.feature.wallpaper-release-43:/layout/custom_dialog.xml",
+        "source": "com.example.feature.wallpaper-core-1.18.0-5:/layout/custom_dialog.xml"
+    }
+]

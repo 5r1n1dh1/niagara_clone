@@ -1,0 +1,8 @@
+com.example.core.data-pngs-0 /home/srinidhi/Documents/Google_AI_Studio/Niagara_clone/core/data/build/generated/res/pngs/release
+com.example.core.data-updated_navigation_xml-1 /home/srinidhi/Documents/Google_AI_Studio/Niagara_clone/core/data/build/generated/updated_navigation_xml/release
+com.example.core.data-mergeReleaseResources-2 /home/srinidhi/Documents/Google_AI_Studio/Niagara_clone/core/data/build/intermediates/incremental/release/mergeReleaseResources/merged.dir
+com.example.core.data-mergeReleaseResources-3 /home/srinidhi/Documents/Google_AI_Studio/Niagara_clone/core/data/build/intermediates/incremental/release/mergeReleaseResources/stripped.dir
+com.example.core.data-release-4 /home/srinidhi/Documents/Google_AI_Studio/Niagara_clone/core/data/build/intermediates/merged_res/release/mergeReleaseResources
+com.example.core.data-release-5 /home/srinidhi/Documents/Google_AI_Studio/Niagara_clone/core/data/build/intermediates/packaged_res/release/packageReleaseResources
+com.example.core.data-main-6 /home/srinidhi/Documents/Google_AI_Studio/Niagara_clone/core/data/src/main/res
+com.example.core.data-release-7 /home/srinidhi/Documents/Google_AI_Studio/Niagara_clone/core/data/src/release/res

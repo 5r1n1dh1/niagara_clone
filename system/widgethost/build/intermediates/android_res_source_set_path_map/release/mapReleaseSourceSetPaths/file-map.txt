@@ -1,0 +1,8 @@
+com.example.system.widgethost-pngs-0 /home/srinidhi/Documents/Google_AI_Studio/Niagara_clone/system/widgethost/build/generated/res/pngs/release
+com.example.system.widgethost-updated_navigation_xml-1 /home/srinidhi/Documents/Google_AI_Studio/Niagara_clone/system/widgethost/build/generated/updated_navigation_xml/release
+com.example.system.widgethost-mergeReleaseResources-2 /home/srinidhi/Documents/Google_AI_Studio/Niagara_clone/system/widgethost/build/intermediates/incremental/release/mergeReleaseResources/merged.dir
+com.example.system.widgethost-mergeReleaseResources-3 /home/srinidhi/Documents/Google_AI_Studio/Niagara_clone/system/widgethost/build/intermediates/incremental/release/mergeReleaseResources/stripped.dir
+com.example.system.widgethost-release-4 /home/srinidhi/Documents/Google_AI_Studio/Niagara_clone/system/widgethost/build/intermediates/merged_res/release/mergeReleaseResources
+com.example.system.widgethost-release-5 /home/srinidhi/Documents/Google_AI_Studio/Niagara_clone/system/widgethost/build/intermediates/packaged_res/release/packageReleaseResources
+com.example.system.widgethost-main-6 /home/srinidhi/Documents/Google_AI_Studio/Niagara_clone/system/widgethost/src/main/res
+com.example.system.widgethost-release-7 /home/srinidhi/Documents/Google_AI_Studio/Niagara_clone/system/widgethost/src/release/res

@@ -1,0 +1,8 @@
+com.example.feature.appdrawer-pngs-0 /home/srinidhi/Documents/Google_AI_Studio/Niagara_clone/feature/appdrawer/build/generated/res/pngs/release
+com.example.feature.appdrawer-updated_navigation_xml-1 /home/srinidhi/Documents/Google_AI_Studio/Niagara_clone/feature/appdrawer/build/generated/updated_navigation_xml/release
+com.example.feature.appdrawer-mergeReleaseResources-2 /home/srinidhi/Documents/Google_AI_Studio/Niagara_clone/feature/appdrawer/build/intermediates/incremental/release/mergeReleaseResources/merged.dir
+com.example.feature.appdrawer-mergeReleaseResources-3 /home/srinidhi/Documents/Google_AI_Studio/Niagara_clone/feature/appdrawer/build/intermediates/incremental/release/mergeReleaseResources/stripped.dir
+com.example.feature.appdrawer-release-4 /home/srinidhi/Documents/Google_AI_Studio/Niagara_clone/feature/appdrawer/build/intermediates/merged_res/release/mergeReleaseResources
+com.example.feature.appdrawer-release-5 /home/srinidhi/Documents/Google_AI_Studio/Niagara_clone/feature/appdrawer/build/intermediates/packaged_res/release/packageReleaseResources
+com.example.feature.appdrawer-main-6 /home/srinidhi/Documents/Google_AI_Studio/Niagara_clone/feature/appdrawer/src/main/res
+com.example.feature.appdrawer-release-7 /home/srinidhi/Documents/Google_AI_Studio/Niagara_clone/feature/appdrawer/src/release/res

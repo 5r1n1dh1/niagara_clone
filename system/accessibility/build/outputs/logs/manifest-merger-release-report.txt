@@ -1,0 +1,16 @@
+-- Merging decision tree log ---
+manifest
+ADDED from /home/srinidhi/Documents/Google_AI_Studio/Niagara_clone/system/accessibility/build/intermediates/tmp/ProcessLibraryManifest/release/tempAndroidManifest3714937448614085259.xml:2:13-83
+INJECTED from /home/srinidhi/Documents/Google_AI_Studio/Niagara_clone/system/accessibility/build/intermediates/tmp/ProcessLibraryManifest/release/tempAndroidManifest3714937448614085259.xml:2:13-83
+	package
+		INJECTED from /home/srinidhi/Documents/Google_AI_Studio/Niagara_clone/system/accessibility/build/intermediates/tmp/ProcessLibraryManifest/release/tempAndroidManifest3714937448614085259.xml
+	xmlns:android
+		ADDED from /home/srinidhi/Documents/Google_AI_Studio/Niagara_clone/system/accessibility/build/intermediates/tmp/ProcessLibraryManifest/release/tempAndroidManifest3714937448614085259.xml:2:23-81
+uses-sdk
+INJECTED from /home/srinidhi/Documents/Google_AI_Studio/Niagara_clone/system/accessibility/build/intermediates/tmp/ProcessLibraryManifest/release/tempAndroidManifest3714937448614085259.xml reason: use-sdk injection requested
+INJECTED from /home/srinidhi/Documents/Google_AI_Studio/Niagara_clone/system/accessibility/build/intermediates/tmp/ProcessLibraryManifest/release/tempAndroidManifest3714937448614085259.xml
+INJECTED from /home/srinidhi/Documents/Google_AI_Studio/Niagara_clone/system/accessibility/build/intermediates/tmp/ProcessLibraryManifest/release/tempAndroidManifest3714937448614085259.xml
+	android:targetSdkVersion
+		INJECTED from /home/srinidhi/Documents/Google_AI_Studio/Niagara_clone/system/accessibility/build/intermediates/tmp/ProcessLibraryManifest/release/tempAndroidManifest3714937448614085259.xml
+	android:minSdkVersion
+		INJECTED from /home/srinidhi/Documents/Google_AI_Studio/Niagara_clone/system/accessibility/build/intermediates/tmp/ProcessLibraryManifest/release/tempAndroidManifest3714937448614085259.xml
