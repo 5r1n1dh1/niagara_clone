@@ -47,7 +47,7 @@ android {
 
   defaultConfig {
     applicationId = "com.aistudio.fluxlauncher.vknwre"
-    minSdk = 24
+    minSdk = 35
     targetSdk = 36
     versionCode = autoVersionCode
     versionName = autoVersionName

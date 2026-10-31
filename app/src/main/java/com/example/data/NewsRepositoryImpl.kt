@@ -7,7 +7,6 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
-import androidx.datastore.preferences.preferencesDataStore
 
 import com.example.domain.NewsRepository
 import kotlinx.coroutines.*
@@ -21,7 +20,6 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 
-val Context.settingsStore: DataStore<Preferences> by preferencesDataStore(name = "flux_launcher_settings")
 
 /**
  * Why an automatic (non-forced) news refresh is being skipped.
@@ -349,7 +347,7 @@ class NewsRepositoryImpl(private val context: Context) : NewsRepository {
     private fun isBatteryOptimizationEnabled(): Boolean {
         return try {
             runBlocking {
-                val prefs = context.settingsStore.data.first()
+                val prefs = context.launcherSettingsStore.data.first()
                 prefs[booleanPreferencesKey("batteryOptimizationMode")] ?: true
             }
         } catch (_: Throwable) { true }

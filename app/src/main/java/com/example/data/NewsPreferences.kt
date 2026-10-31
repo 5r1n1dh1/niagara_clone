@@ -3,7 +3,6 @@ package com.example.data
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.*
-import androidx.datastore.preferences.preferencesDataStore
 import com.example.domain.RemoteConfig
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking

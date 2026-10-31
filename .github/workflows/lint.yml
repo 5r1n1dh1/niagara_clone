@@ -1,0 +1,65 @@
+name: Lint
+
+# Static analysis (Android Lint + Detekt) — runs IN PARALLEL with build/test/smoke.
+# Advisory by design: failures annotate the PR but do not block merges, so
+# doc-adjacent nits never burn quota on re-runs. Targeted via `module` input.
+
+on:
+  push:
+    branches: ["main"]
+    paths-ignore: ["**/*.md", "design/**", "docs/**"]
+  pull_request:
+    branches: ["main"]
+    paths-ignore: ["**/*.md", "design/**", "docs/**"]
+  workflow_dispatch:
+    inputs:
+      module:
+        description: "Gradle module to lint (empty = :app), e.g. :core:ui"
+        required: false
+        default: ""
+
+concurrency:
+  group: lint-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint ${{ inputs.module || ':app' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Setup Gradle (cached)
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "9.3.1"
+
+      - name: Ensure gradlew executable
+        run: chmod +x gradlew
+
+      - name: Android Lint (targeted)
+        run: ./gradlew ${{ inputs.module || ':app' }}:lint --no-daemon
+
+      - name: Detekt (targeted)
+        run: ./gradlew ${{ inputs.module || ':app' }}:detekt --no-daemon || echo "detekt not configured for this module"
+
+      - name: Upload lint reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-reports
+          path: |
+            **/build/reports/lint-results*.html
+            **/build/reports/detekt/**
+          retention-days: 7

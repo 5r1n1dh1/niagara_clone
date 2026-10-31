@@ -21,6 +21,10 @@ concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: true
 
+# Required for `gh release upload` (contents:write) — the 403 fix.
+permissions:
+  contents: write
+
 jobs:
   build-release:
     name: Build and Release APK

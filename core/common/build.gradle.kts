@@ -6,7 +6,7 @@ android {
   namespace = "com.example.core.common"
   compileSdk = 36
   defaultConfig {
-    minSdk = 24
+    minSdk = 35
   }
   compileOptions {
     sourceCompatibility = JavaVersion.VERSION_11

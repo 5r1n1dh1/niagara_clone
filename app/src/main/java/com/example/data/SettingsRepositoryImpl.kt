@@ -1,29 +1,50 @@
 package com.example.data
 
 import android.content.Context
-import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.preferencesDataStore
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlinx.serialization.json.Json
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
 
 /**
  * Preferences DataStore implementation of SettingsRepository.
- * Replaces SharedPreferences usage in SettingsRepository for v1.0.1.
+ *
+ * Persists the full [LauncherSettings] object as a single JSON string
+ * (kotlinx.serialization) under one key — one write per change, one read at
+ * startup. Uses the SINGLE canonical [launcherSettingsStore] delegate.
  */
 class SettingsRepositoryImpl(context: Context) : SettingsRepository {
 
-    private val Context.settingsStore: DataStore<Preferences> by preferencesDataStore(name = "flux_launcher_settings")
-    private val store = context.settingsStore
+    private val store = context.launcherSettingsStore
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
+    private val key = stringPreferencesKey("launcher_settings_json")
 
     private val _settings = MutableStateFlow(LauncherSettings())
+    override val settings: StateFlow<LauncherSettings> = _settings.asStateFlow()
 
-    override val settings: StateFlow<LauncherSettings> = _settings
+    init {
+        scope.launch {
+            val persisted = runCatching {
+                json.decodeFromString<LauncherSettings>(store.data.first()[key] ?: "")
+            }.getOrNull()
+            if (persisted != null) _settings.value = persisted
+        }
+    }
 
     override fun updateSettings(newSettings: LauncherSettings) {
         _settings.value = newSettings
-        // DataStore keys mapped from settings fields for v1.0.1 migration
-        // Full serialization handled by LauncherSettings @Serializable
+        scope.launch {
+            runCatching {
+                store.edit { it[key] = json.encodeToString(LauncherSettings.serializer(), newSettings) }
+            }
+        }
     }
 }

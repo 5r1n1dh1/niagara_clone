@@ -23,10 +23,8 @@ import android.service.notification.NotificationListenerService
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
-import androidx.datastore.preferences.preferencesDataStore
 import android.service.notification.StatusBarNotification
 import androidx.core.app.NotificationManagerCompat
-import androidx.datastore.preferences.preferencesDataStore
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import com.example.data.NotificationItem
 import kotlinx.coroutines.CoroutineScope
@@ -44,10 +42,8 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-val Context.settingsStore: DataStore<Preferences> by preferencesDataStore(name = "flux_launcher_settings")
 
 class FluxNotificationListenerService : NotificationListenerService() {
-    private val settingsStore: DataStore<Preferences> by lazy { this.settingsStore }
 
     private val serviceScope = CoroutineScope(Dispatchers.Default)
     private var mediaProgressPollJob: Job? = null
@@ -152,7 +148,7 @@ class FluxNotificationListenerService : NotificationListenerService() {
     private fun isBatteryOptimizationEnabled(): Boolean {
         return try {
             runBlocking {
-                val prefs = settingsStore.data.first()
+                val prefs = context.launcherSettingsStore.data.first()
                 prefs[booleanPreferencesKey("batteryOptimizationMode")] ?: true
             }
         } catch (_: Throwable) { true }
