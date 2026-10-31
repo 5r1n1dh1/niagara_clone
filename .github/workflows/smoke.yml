@@ -89,11 +89,16 @@ jobs:
           echo "$SDK/emulator" >> "$GITHUB_PATH"
           echo "system image OK at $SDK/system-images/android-35"
 
-      - name: Create AVD
+      - name: Create AVD (verify ini exists — emulator needs ANDROID_AVD_HOME)
         run: |
-          export ANDROID_HOME=$ANDROID_SDK_ROOT
+          set -euo pipefail
+          export ANDROID_AVD_HOME="$HOME/.android/avd"
+          mkdir -p "$ANDROID_AVD_HOME"
           echo no | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd -n smoke35 -k "system-images;android-35;google_apis;x86_64" -d pixel_6 --force
-          "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" list avd | head -n 8
+          ls -la "$ANDROID_AVD_HOME"
+          test -f "$ANDROID_AVD_HOME/smoke35.ini" || { echo "::error::smoke35.ini missing"; "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" list avd; exit 1; }
+          echo "ANDROID_AVD_HOME=$ANDROID_AVD_HOME" >> "$GITHUB_ENV"
+          echo "AVD created at $ANDROID_AVD_HOME/smoke35.ini"
 
       - name: Boot emulator (8 min guard, live progress)
         run: |
